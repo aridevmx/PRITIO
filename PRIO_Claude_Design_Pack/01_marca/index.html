@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1, viewport-fit=cover"
+    />
+    <meta
+      name="description"
+      content="PRIO — Tu trabajo, tu casa y lo personal en una sola vista. Prioriza con claridad."
+    />
+    <meta name="theme-color" content="#F4F7F8" />
+
+    <!-- iOS / PWA standalone. El manifest + service worker se inyectan
+         automaticamente por vite-plugin-pwa al build. Estos meta tags
+         se conservan porque iOS Safari los lee para "Agregar a inicio"
+         (algunos no estan en el manifest spec). -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <meta name="apple-mobile-web-app-title" content="PRIO" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="apple-touch-icon" href="/brand/prio-logo-1024.png" />
+
+    <!-- Open Graph / social previews -->
+    <meta property="og:title" content="PRIO" />
+    <meta
+      property="og:description"
+      content="Tu trabajo, tu casa y lo personal en una sola vista. Prioriza con claridad."
+    />
+    <meta property="og:image" content="/brand/prio-logo-1024.png" />
+    <meta property="og:type" content="website" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="/brand/prio-logo-1024.png" />
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <title>PRIO</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

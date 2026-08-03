@@ -1,0 +1,359 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --prio-green: #4fc38a;
+    --prio-coral: #f27d72;
+    --prio-blue: #5ba7d1;
+    --prio-purple: #9b7edc;
+
+    --ink: #0f172a;
+    --ink-soft: #64748b;
+    --ink-muted: #94a3b8;
+
+    --surface: #ffffff;
+    --surface-muted: #f4f7f8;
+
+    --line: #e7ecf1;
+    --line-strong: #d9e2ec;
+
+    /* RGB triplets para las clases de Tailwind que usan alpha-value
+     * (bg-surface/70, border-line/60, etc.). Tienen que ser sin coma,
+     * separados por espacios, para que `rgb(... / N%)` funcione.
+     * Cambian automaticamente bajo `html.dark` (regla abajo).
+     */
+    --surface-rgb: 255 255 255;
+    --surface-muted-rgb: 244 247 248;
+    --surface-subtle-rgb: 249 251 252;
+    --ink-rgb: 15 23 42;
+    --ink-soft-rgb: 100 116 139;
+    --ink-muted-rgb: 148 163 184;
+    --line-rgb: 231 236 241;
+    --line-strong-rgb: 217 226 236;
+
+    /* shadcn/ui tokens (HSL, used by `npx shadcn add ...`).
+     * Aplican en ambos modos — son tokens base, no de tema. En
+     * particular --radius es usada por tailwind config para
+     * rounded-sm/md/lg, asi que TIENE que estar en :root, sino los
+     * elementos se vuelven rectangulares en light mode. */
+    --background: 210 25% 97%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 222 47% 11%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96%;
+    --secondary-foreground: 222 47% 11%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 96%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 203 56% 59%;
+    --radius: 0.75rem;
+  }
+
+  /* Dark mode overrides para los tokens base.
+   *
+   * Cuando el `<html>` tiene la clase `dark` (aplicada por useTheme),
+   * estos valores reemplazan a los anteriores. Cualquier componente
+   * que use `bg-surface`, `text-ink`, `border-line`, etc., cambia
+   * automaticamente — no hace falta agregar `dark:` variants uno por
+   * uno.
+   *
+   * Paleta:
+   *   - surface = bases (cards, modales, popovers). De claro a slate.
+   *   - ink = textos. De casi-negro a casi-blanco.
+   *   - line = bordes. De gris pastel a slate transparente.
+   */
+  html.dark {
+    --surface-rgb: 30 41 59;
+    --surface-muted-rgb: 15 23 42;
+    --surface-subtle-rgb: 30 41 59;
+    --ink-rgb: 226 232 240;
+    --ink-soft-rgb: 148 163 184;
+    --ink-muted-rgb: 100 116 139;
+    --line-rgb: 51 65 85;
+    --line-strong-rgb: 71 85 105;
+  }
+
+  * {
+    box-sizing: border-box;
+  }
+
+  html,
+  body,
+  #root {
+    margin: 0;
+    min-height: 100vh;
+    width: 100%;
+  }
+
+  body {
+    @apply bg-surface-muted font-sans text-ink antialiased;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Dark mode (v2 — comprehensive).
+   *
+   * Estrategia:
+   *   1. Los tokens base (surface, ink, line) son CSS variables y
+   *      cambian automaticamente bajo `html.dark` — eso cubre el 80%
+   *      de la app sin tocar componentes.
+   *   2. `bg-white` es un literal blanco de Tailwind que NO sigue los
+   *      tokens. Lo remapeamos aca a la surface dark equivalente.
+   *      Hacemos lo mismo con sus variantes de opacidad mas comunes.
+   *   3. `bg-ink` se usa como "background de contraste maximo" en
+   *      botones. Si lo dejamos seguir el token (que en dark mode pasa
+   *      a un slate claro), pierde contraste vs text-white. Lo
+   *      forzamos a mantenerse oscuro.
+   */
+  html.dark ::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.25);
+  }
+  html.dark ::-webkit-scrollbar-thumb:hover {
+    background: rgba(148, 163, 184, 0.45);
+  }
+
+  html.dark ::selection {
+    background: rgba(155, 126, 220, 0.4);
+  }
+
+  /* Remap de bg-white (literal blanco de Tailwind) a surface dark.
+   * Cubrimos las opacidades mas usadas. Las opacidades bajas (/5, /10,
+   * /20) las dejamos como overlays sutiles claros — sirven para
+   * highlights y bordes glass-effect, donde no queres que se vuelvan
+   * oscuros. */
+  html.dark .bg-white { background-color: rgb(var(--surface-rgb)); }
+  html.dark .bg-white\/95 { background-color: rgb(var(--surface-rgb) / 0.95); }
+  html.dark .bg-white\/90 { background-color: rgb(var(--surface-rgb) / 0.9); }
+  html.dark .bg-white\/80 { background-color: rgb(var(--surface-rgb) / 0.8); }
+  html.dark .bg-white\/70 { background-color: rgb(var(--surface-rgb) / 0.7); }
+  html.dark .bg-white\/60 { background-color: rgb(var(--surface-rgb) / 0.6); }
+  html.dark .bg-white\/50 { background-color: rgb(var(--surface-rgb) / 0.5); }
+  html.dark .bg-white\/40 { background-color: rgb(var(--surface-rgb) / 0.4); }
+  html.dark .bg-white\/30 { background-color: rgb(var(--surface-rgb) / 0.3); }
+
+  /* Gradient stops: TeamOnboardingBanner y FamilyOnboardingBanner usan
+   * `from-white` y `via-prio-X/5` para crear ese fondo glasmorfico
+   * suave. En dark mode el `from-white` deja un overlay blanco
+   * extraño sobre slate. Remapeamos a surface. */
+  html.dark .from-white { --tw-gradient-from: rgb(var(--surface-rgb)) var(--tw-gradient-from-position); --tw-gradient-to: rgb(var(--surface-rgb) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to); }
+  html.dark .via-white { --tw-gradient-via: rgb(var(--surface-rgb)) var(--tw-gradient-via-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to); }
+  html.dark .to-white { --tw-gradient-to: rgb(var(--surface-rgb)) var(--tw-gradient-to-position); }
+
+  /* Hovers comunes que cambian a blanco en hover */
+  html.dark .hover\:bg-white:hover {
+    background-color: rgb(var(--surface-rgb));
+  }
+  html.dark .hover\:bg-white\/70:hover {
+    background-color: rgb(var(--surface-rgb) / 0.7);
+  }
+
+  /* bg-ink en dark mode: si lo dejaramos seguir el token --ink-rgb
+   * que en dark pasa a slate claro, perderia contraste vs text-white.
+   * Por otro lado, fijarlo a slate-900 lo hacia coincidir con el body
+   * (slate-900) y el boton "Nueva tarea" se volvia invisible.
+   * Solucion: slate-600 (un escalon mas claro). Mantiene text-white
+   * legible y es claramente visible contra body slate-900 + cards
+   * slate-800. Hover a slate-500 para feedback. */
+  html.dark .bg-ink {
+    background-color: rgb(71 85 105);
+  }
+  html.dark .hover\:bg-ink:hover {
+    background-color: rgb(100 116 139);
+  }
+  html.dark .hover\:bg-ink\/90:hover {
+    background-color: rgb(71 85 105 / 0.9);
+  }
+
+  /* Backgrounds de alertas (rojo/ambar) — los dejamos pero con
+   * opacidad menor para que no quemen los ojos en dark. */
+  html.dark .bg-red-50 { background-color: rgb(127 29 29 / 0.25); }
+  html.dark .bg-amber-50 { background-color: rgb(120 53 15 / 0.25); }
+  html.dark .bg-green-50 { background-color: rgb(20 83 45 / 0.25); }
+  html.dark .bg-blue-50 { background-color: rgb(30 58 138 / 0.25); }
+
+  /* Borders de estos mismos — los hacemos un poco mas opacos */
+  html.dark .border-red-200 { border-color: rgb(127 29 29 / 0.5); }
+  html.dark .border-amber-200 { border-color: rgb(120 53 15 / 0.5); }
+  html.dark .border-green-200 { border-color: rgb(20 83 45 / 0.5); }
+  html.dark .border-blue-200 { border-color: rgb(30 58 138 / 0.5); }
+
+  /* Heatmap de carga del calendario (MonthCalendar, MobileWeekCalendar):
+   * usa bg-yellow-100 / bg-orange-100 / bg-red-100 + text-X-900 para
+   * marcar dias con carga creciente (2-3, 4-5, 6+ tareas).
+   *
+   * Iteracion: probamos primero los tonos -800 con 35% opacidad pero
+   * contra slate-900 todos se mezclaban a un cafe indistinto. Cambiamos
+   * a tonos -500 (mas vibrantes) con opacidad 22% — bajan al fondo
+   * slate pero conservan el hue, asi se leen claramente como amarillo,
+   * naranja y rojo. Texto -300 sigue legible. */
+  html.dark .bg-yellow-100 { background-color: rgb(234 179 8 / 0.28); }
+  html.dark .bg-orange-100 { background-color: rgb(249 115 22 / 0.28); }
+  html.dark .bg-red-100 { background-color: rgb(239 68 68 / 0.28); }
+  html.dark .text-yellow-900 { color: rgb(253 224 71); }
+  html.dark .text-orange-900 { color: rgb(253 186 116); }
+  html.dark .text-red-900 { color: rgb(252 165 165); }
+
+
+  /* Inputs: bg-white por default → al refactor de bg-white ya quedan
+   * con surface dark. Su border viene de border-line (CSS var) que
+   * tambien adapta. Lo unico que falta son los placeholders. */
+  html.dark ::placeholder {
+    color: rgb(var(--ink-muted-rgb));
+  }
+
+  /* Gradients de "shell" (backgrounds gradientes radiales con
+   * blanco-blanco-gris): los hacemos planos en dark para evitar
+   * que el centro siga viendose claro. Cubrimos los 4 espacios. */
+  html.dark .bg-shell-pendientes,
+  html.dark .bg-shell-personal,
+  html.dark .bg-shell-casa,
+  html.dark .bg-shell-trabajo {
+    background-image: none;
+    background-color: rgb(var(--surface-muted-rgb));
+  }
+}
+
+@layer components {
+  /* Glassmorphic panel — preserved from v1 */
+  .panel {
+    @apply rounded-2xl border border-line bg-white/70 shadow-glass backdrop-blur-md;
+  }
+}
+
+/* Disable scroll anchoring en el scroll container principal.
+ *
+ * Por que: cuando el TaskFormDialog (smartScroll: true) abre y la
+ * animacion CSS prio-modal-enter del modal-box hace que el contenido
+ * shiftee, el browser default-tiene "scroll anchoring" activo y
+ * RESTAURA automaticamente el scrollTop para mantener el ancla
+ * visual estable. Eso sobreescribe el smooth-scroll que useModalEnter
+ * lanza con requestAnimationFrame, causando el "bounce" donde la
+ * pagina baja y vuelve arriba inmediatamente.
+ *
+ * overflow-anchor: none le dice al browser: "no toques scrollTop
+ * cuando el contenido shiftee, yo manejo el scroll".
+ *
+ * Compatibilidad: Chrome 56+, Firefox 66+, Safari 16.4+, Edge 79+.
+ * En Safari < 16.4 el flag se ignora silenciosamente; el bounce
+ * podria reaparecer en esa cohorte (~5%), pero no es regresion.
+ */
+[data-prio-scroll-root] {
+  overflow-anchor: none;
+}
+
+/* Highlight visual cuando llegas a una tarea via deep link de notificacion.
+   Tres pulsos suaves de un anillo azul + un ligero "pop" inicial.
+   Dura ~2.5s y luego se desvanece. Se puede cortar antes con click
+   sobre la tarjeta. */
+@keyframes prio-task-highlight {
+  0% {
+    box-shadow:
+      0 0 0 0 rgba(91, 167, 209, 0.55),
+      0 0 0 0 rgba(91, 167, 209, 0.0);
+    transform: scale(1.02);
+  }
+  20% {
+    box-shadow:
+      0 0 0 6px rgba(91, 167, 209, 0.35),
+      0 0 24px 6px rgba(91, 167, 209, 0.18);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 4px rgba(91, 167, 209, 0.18),
+      0 0 18px 4px rgba(91, 167, 209, 0.12);
+  }
+  80% {
+    box-shadow:
+      0 0 0 6px rgba(91, 167, 209, 0.28),
+      0 0 22px 6px rgba(91, 167, 209, 0.16);
+  }
+  100% {
+    box-shadow:
+      0 0 0 0 rgba(91, 167, 209, 0);
+    transform: scale(1);
+  }
+}
+
+.task-highlight {
+  animation: prio-task-highlight 2.5s ease-out 1;
+  /* Mantenemos un anillo discreto al final hasta que el component
+     se desmonte el highlight via timeout o click. */
+  box-shadow: 0 0 0 2px rgba(91, 167, 209, 0.35);
+  border-color: rgba(91, 167, 209, 0.5);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .task-highlight {
+    animation: none;
+    box-shadow: 0 0 0 2px rgba(91, 167, 209, 0.45);
+  }
+}
+
+/* Pulse momentaneo para el dia seleccionado en la lista semanal
+   del calendario mobile. Mismo lenguaje visual que task-highlight
+   pero adaptado a un row (sin scale ni box-shadow agresivo —
+   solo flash de background-color). Termina en bg-prio-blue/10
+   que matchea el estilo persistente del row seleccionado. */
+@keyframes prio-day-pulse {
+  0% {
+    background-color: rgba(91, 167, 209, 0.32);
+  }
+  60% {
+    background-color: rgba(91, 167, 209, 0.18);
+  }
+  100% {
+    background-color: rgba(91, 167, 209, 0.1);
+  }
+}
+
+.prio-day-pulse {
+  animation: prio-day-pulse 800ms ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prio-day-pulse {
+    animation: none;
+  }
+}
+
+/* Slide-up + fade-in suave para modales y paneles. Aplica al
+   "modal box" interno (el div blanco con la sombra), no al
+   backdrop. Da sensacion de que aparece desde abajo en lugar
+   de hacer pop. ~300ms.
+
+   Requiere que el padre tenga la clase, o se aplica directamente
+   con `prio-modal-enter` en el div del modal. */
+@keyframes prio-modal-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.prio-modal-enter {
+  animation: prio-modal-enter 280ms cubic-bezier(0.16, 1, 0.3, 1) 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prio-modal-enter {
+    animation: none;
+  }
+}
