@@ -64,9 +64,11 @@ export function mapWorkspace(row: WorkspaceRow): Workspace {
     id: row.id,
     name: row.name,
     type: row.type,
+    plan: row.plan,
     isFrozen: row.is_frozen,
     blockedDaysRequireApproval: row.blocked_days_require_approval,
     autoPromoteDueToDo: row.auto_promote_due_to_do,
+    graceUntil: row.grace_until,
     createdAt: row.created_at,
   };
 }

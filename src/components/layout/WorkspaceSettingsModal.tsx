@@ -32,6 +32,12 @@ const TYPE_GRADIENTS: Record<string, string> = {
   enterprise: "from-orange-400 to-red-500",
 };
 
+const PLAN_LABELS: Record<string, string> = {
+  personal_free: "Gratis",
+  pro: "Pro",
+  enterprise: "Enterprise",
+};
+
 interface WorkspaceSettingsModalProps {
   workspaceId: string;
   onClose: () => void;
@@ -532,6 +538,11 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
                     <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
                       {ws ? TYPE_LABELS[ws.type] ?? ws.type : "..."}
                     </span>
+                    {ws?.plan && (
+                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                        {PLAN_LABELS[ws.plan] ?? ws.plan}
+                      </span>
+                    )}
                     {userIsOwner && (
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Owner</span>
                     )}

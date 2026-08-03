@@ -14,6 +14,7 @@ este proyecto cumple con [Versionado Semántico](https://semver.org/lang/es/).
 
 ### Cambiado
 - Menú de usuario rediseñado: "Mi cuenta" como acción principal, avatar siempre visible y fecha con indicador de despliegue.
+- Modelo open-source + cloud de pago documentado en `PRICING.md`; el frontend ahora mapea el plan del workspace (`personal_free`/`pro`/`enterprise`) y lo muestra en la configuración del workspace.
 
 ## [0.1.0] - 2026-08-02
 

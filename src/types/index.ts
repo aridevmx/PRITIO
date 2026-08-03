@@ -2,6 +2,8 @@ export type Quadrant = "do" | "plan" | "delegate" | "later";
 
 export type WorkspaceType = "personal" | "family" | "team" | "enterprise";
 
+export type WorkspacePlan = "personal_free" | "pro" | "enterprise";
+
 export type WorkspaceRole = "owner" | "admin" | "leader" | "member";
 
 export type TaskKind = "task" | "meeting";
@@ -38,9 +40,11 @@ export interface Workspace {
   id: string;
   name: string;
   type: WorkspaceType;
+  plan: WorkspacePlan;
   isFrozen: boolean;
   blockedDaysRequireApproval: boolean;
   autoPromoteDueToDo: boolean;
+  graceUntil: string | null;
   createdAt: string;
 }
 
@@ -223,9 +227,11 @@ export interface WorkspaceRow {
   id: string;
   name: string;
   type: WorkspaceType;
+  plan: WorkspacePlan;
   is_frozen: boolean;
   blocked_days_require_approval: boolean;
   auto_promote_due_to_do: boolean;
+  grace_until: string | null;
   created_at: string;
 }
 
