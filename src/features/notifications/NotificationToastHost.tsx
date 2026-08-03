@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/components/Toast";
+import { getInAppDelivery } from "@/lib/notifInApp";
 
 let channelKeyCounter = 0;
 
@@ -33,11 +34,13 @@ export function NotificationToastHost() {
           (payload) => {
             const row = payload.new as Record<string, unknown>;
             const delivery = row.delivery as string | undefined;
-            if (delivery === "toast" || delivery === "both") {
-              const body = row.body as string | undefined;
-              const title = row.title as string | undefined;
-              toastRef.current.info(body || title || "");
-            }
+            if (delivery !== "toast" && delivery !== "both") return;
+            const kind = row.kind as string | undefined;
+            const pref = kind ? getInAppDelivery(kind) : "both";
+            if (pref === "off" || pref === "bell") return;
+            const body = row.body as string | undefined;
+            const title = row.title as string | undefined;
+            toastRef.current.info(body || title || "");
           },
         )
         .subscribe();
