@@ -4,6 +4,7 @@ import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
+import { NotificationToastHost } from "@/features/notifications/NotificationToastHost";
 import { PendingInvitationsPopover } from "@/features/invitations/PendingInvitationsPopover";
 import { PushNotificationInit } from "@/features/pushNotifications/PushNotificationInit";
 import { SpaceView } from "@/features/spaces/SpaceView";
@@ -74,6 +75,7 @@ export function AppShell() {
       />
 
       <PushNotificationInit />
+      <NotificationToastHost />
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur-md lg:px-6">
           <button

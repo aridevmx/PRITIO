@@ -3,7 +3,9 @@ import { supabase } from "@/lib/supabase";
 import { mapNotification } from "@/lib/mappers";
 import { formatRelativeTime } from "@/features/tasks/dates";
 import { cn } from "@/lib/utils";
-import type { Notification } from "@/types";
+import type { Notification, NotificationRow } from "@/types";
+
+let channelKeyCounter = 0;
 
 export function NotificationBell() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -31,6 +33,61 @@ export function NotificationBell() {
   useEffect(() => {
     void fetchNotifications();
   }, [fetchNotifications]);
+
+  useEffect(() => {
+    let channel: ReturnType<typeof supabase.channel> | null = null;
+    let cancelled = false;
+
+    (async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+      if (cancelled || !user) return;
+
+      channelKeyCounter++;
+      channel = supabase
+        .channel(`notifications-${user.id}-${channelKeyCounter}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "INSERT",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const notif = mapNotification(payload.new as unknown as NotificationRow);
+            setNotifications((prev) => {
+              if (prev.some((n) => n.id === notif.id)) return prev;
+              return [notif, ...prev];
+            });
+          },
+        )
+        .on(
+          "postgres_changes",
+          {
+            event: "UPDATE",
+            schema: "public",
+            table: "notifications",
+            filter: `user_id=eq.${user.id}`,
+          },
+          (payload) => {
+            const row = payload.new as Record<string, unknown>;
+            setNotifications((prev) =>
+              prev.map((n) => (n.id === row.id ? { ...n, read: Boolean(row.read) } : n)),
+            );
+          },
+        )
+        .subscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      if (channel) {
+        void supabase.removeChannel(channel);
+      }
+    };
+  }, []);
 
   useEffect(() => {
     function handleClickOutside(e: MouseEvent) {

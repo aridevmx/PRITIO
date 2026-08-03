@@ -129,6 +129,7 @@ export function mapNotification(row: NotificationRow): Notification {
     workspaceId: row.workspace_id,
     projectId: row.project_id,
     read: row.read,
+    delivery: row.delivery,
     createdAt: row.created_at,
   };
 }

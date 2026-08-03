@@ -94,6 +94,23 @@ Deno.serve(async (req: Request) => {
       if (recipient.id === payload.actorUserId) continue;
       const prefs = prefsByUser.get(recipient.id);
 
+      // Notificación in-app: la campana siempre la recibe; si el kind es
+      // "toast-worthy", además se muestra un toast efímero en la app.
+      try {
+        const { error } = await supabaseAdmin.from("notifications").insert({
+          user_id: recipient.id,
+          kind: payload.kind,
+          title: pushTitle,
+          body: pushBody,
+          task_id: payload.taskId,
+          workspace_id: payload.workspaceId,
+          delivery: deliveryFor(payload.kind),
+        });
+        if (error) console.error("Failed to insert in-app notification for", recipient.email, error);
+      } catch (err) {
+        console.error("Failed to insert in-app notification for", recipient.email, err);
+      }
+
       if (isNotificationEnabled(payload.kind, "email", prefs)) {
         try {
           await sendEmail({ to: recipient.email, subject, html });
@@ -127,6 +144,12 @@ Deno.serve(async (req: Request) => {
     });
   }
 });
+
+const TOAST_KINDS = new Set<NotificationKind>(["assigned", "meeting_created", "deadline_approaching"]);
+
+function deliveryFor(kind: NotificationKind): "toast" | "bell" | "both" {
+  return TOAST_KINDS.has(kind) ? "both" : "bell";
+}
 
 async function getRecipients(assigneeIds: string[]): Promise<ProfileRecord[]> {
   if (!assigneeIds.length) return [];

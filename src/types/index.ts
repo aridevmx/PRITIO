@@ -9,16 +9,18 @@ export type TaskKind = "task" | "meeting";
 export type TaskApprovalStatus = "pending_approval" | "approved" | "rejected";
 
 export type NotificationKind =
-  | "task_assigned"
-  | "task_overdue"
+  | "assigned"
+  | "updated"
+  | "meeting_created"
+  | "deadline_approaching"
+  | "completed"
   | "workspace_invitation"
-  | "project_invitation"
   | "role_changed"
-  | "meeting_invitation"
-  | "task_pending_approval"
   | "blocked_day_pending_approval"
   | "blocked_day_approved"
   | "blocked_day_rejected";
+
+export type NotificationDelivery = "toast" | "bell" | "both";
 
 export type BlockedDayStatus = "pending" | "approved" | "rejected";
 
@@ -159,6 +161,7 @@ export interface Notification {
   workspaceId: string | null;
   projectId: string | null;
   read: boolean;
+  delivery: NotificationDelivery;
   createdAt: string;
 }
 
@@ -296,6 +299,7 @@ export interface NotificationRow {
   workspace_id: string | null;
   project_id: string | null;
   read: boolean;
+  delivery: NotificationDelivery;
   created_at: string;
 }
 
