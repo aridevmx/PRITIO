@@ -3,6 +3,7 @@ import { supabaseAdmin } from "../_shared/supabase-client.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
 import { sendEmail } from "../_shared/email.ts";
 import { DEFAULT_PREFS } from "../_shared/notification-prefs.ts";
+import { APP_NAME } from "../_shared/app-info.ts";
 import { buildDigestHtml } from "./template.ts";
 import type { DigestTask } from "./template.ts";
 
@@ -176,7 +177,7 @@ Deno.serve(async (req: Request) => {
 
       await sendEmail({
         to: profile.email,
-        subject: `Resumen diario Priorify — ${overdue.length + today.length} tareas pendientes`,
+        subject: `Resumen diario ${APP_NAME} — ${overdue.length + today.length} tareas pendientes`,
         html,
       });
 

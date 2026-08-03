@@ -1,3 +1,5 @@
+import { APP_NAME } from "../_shared/app-info.ts";
+
 export function buildInviteEmailHtml(params: {
   workspaceName: string;
   invitedByName: string;
@@ -35,7 +37,7 @@ export function buildInviteEmailHtml(params: {
           <tr>
             <td style="padding:24px 32px;text-align:center">
               <p style="margin:0 0 24px;font-size:14px;color:#57534e;line-height:1.5">
-                Priorify es un gestor de tareas basado en la Matriz Eisenhower. Organiza tu tiempo, decide qué hacer y colabora con tu equipo.
+                ${APP_NAME} es un gestor de tareas basado en la Matriz Eisenhower. Organiza tu tiempo, decide qué hacer y colabora con tu equipo.
               </p>
               <a href="${inviteLink}" style="display:inline-block;padding:12px 32px;background-color:#1c1917;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:12px">Aceptar invitación</a>
               <p style="margin:16px 0 0;font-size:12px;color:#a1a1aa">O copia este enlace en tu navegador:</p>
@@ -46,7 +48,7 @@ export function buildInviteEmailHtml(params: {
           <!-- Footer -->
           <tr>
             <td style="padding:0 32px 24px;text-align:center;border-top:1px solid #e7e5e4">
-              <p style="margin:16px 0 0;font-size:11px;color:#a1a1aa">Priorify — Open source task management</p>
+              <p style="margin:16px 0 0;font-size:11px;color:#a1a1aa">${APP_NAME} — Open source task management</p>
             </td>
           </tr>
         </table>

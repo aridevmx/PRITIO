@@ -1,3 +1,5 @@
+import { APP_NAME } from "@/lib/branding";
+
 interface PrioLogoProps {
   size?: number;
   withGlow?: boolean;
@@ -27,7 +29,7 @@ export function PrioLogo({ size = 34, withGlow = true }: PrioLogoProps) {
         width: size,
         height: size,
       }}
-      aria-label="Priorify"
+      aria-label={APP_NAME}
     >
       {SPACE_COLORS.map((color, i) => (
         <div

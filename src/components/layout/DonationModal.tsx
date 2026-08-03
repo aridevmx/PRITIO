@@ -1,5 +1,6 @@
 import { createPortal } from "react-dom";
 import { DONATION_LINKS, IS_SELF_HOSTED } from "@/lib/constants";
+import { APP_NAME } from "@/lib/branding";
 
 interface DonationModalProps {
   open: boolean;
@@ -70,7 +71,7 @@ export function DonationModal({ open, onClose }: DonationModalProps) {
           </button>
         </div>
         <p className="mb-5 text-sm text-ink-muted">
-          Priorify es de código abierto y gratuito. Si te es útil, considera donar para ayudarnos a mantener el servidor y que más gente pueda usarlo.
+          {APP_NAME} es de código abierto y gratuito. Si te es útil, considera donar para ayudarnos a mantener el servidor y que más gente pueda usarlo.
         </p>
         <div className="grid grid-cols-2 gap-3">
           {PLATFORMS.filter((p) => p.url).map((platform) => (

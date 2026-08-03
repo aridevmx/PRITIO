@@ -134,10 +134,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
+    } = supabase.auth.onAuthStateChange(async (_event, session) => {
       if (cancelled) return;
-
-      console.log("[AuthProvider] onAuthStateChange:", event, session?.user?.id);
 
       if (session?.user) {
         setUser(session.user);
@@ -146,7 +144,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
           const existingProfile = await loadProfile(session.user.id);
 
           if (!existingProfile) {
-            console.log("[AuthProvider] No profile found, creating...");
             const fullName =
               (session.user.user_metadata?.full_name as string) ?? "";
             await upsertProfile(session.user.id, {

@@ -84,16 +84,14 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       const userProfile = await fetchProfile(userId);
 
       if (wsList.length === 0) {
-        console.log("[WorkspaceProvider] No workspaces, creating via RPC...");
         bootstrapCreatePromise ??= (async () => {
           try {
-            const { data, error } = await supabase.rpc("create_workspace", {
+            const { error } = await supabase.rpc("create_workspace", {
               p_name: "Personal",
               p_type: "personal",
               p_user_id: userId,
             });
             if (error) throw error;
-            console.log("[WorkspaceProvider] RPC result:", data);
           } catch (rpcErr) {
             console.warn("[WorkspaceProvider] RPC failed, trying direct insert:", rpcErr);
             try {
@@ -104,21 +102,15 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
                 type: "personal",
               });
               if (wsErr) throw wsErr;
-              console.log("[WorkspaceProvider] workspace inserted");
 
               const { error: mErr } = await supabase.from("workspace_members").insert({
                 workspace_id: wsId,
                 user_id: userId,
               });
               if (mErr) {
-                console.error("[WorkspaceProvider] member insert error code:", mErr.code);
-                console.error("[WorkspaceProvider] member insert error details:", mErr.details);
-                console.error("[WorkspaceProvider] member insert error hint:", mErr.hint);
-                console.error("[WorkspaceProvider] member insert error message:", mErr.message);
+                console.error("[WorkspaceProvider] member insert error:", mErr);
                 throw mErr;
               }
-
-              console.log("[WorkspaceProvider] Direct insert successful");
             } catch (directErr) {
               console.error("[WorkspaceProvider] Direct insert also failed:", directErr);
             }
@@ -130,7 +122,6 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
           bootstrapCreatePromise = null;
         }
         wsList = await listWorkspaces();
-        console.log("[WorkspaceProvider] After creation, workspaces:", wsList.length);
       }
 
       setWorkspaces(wsList);

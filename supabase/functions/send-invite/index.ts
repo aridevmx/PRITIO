@@ -3,6 +3,7 @@ import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
 import { sendEmail } from "../_shared/email.ts";
 import { buildInviteEmailHtml, buildRoleLabel } from "./template.ts";
+import { APP_NAME } from "../_shared/app-info.ts";
 
 interface InvitePayload {
   invitationId: string;
@@ -108,7 +109,7 @@ Deno.serve(async (req: Request) => {
 
     const sent = await sendEmail({
       to: inv.email,
-      subject: `Te invitaron a unirte a ${ws.name} en PRIO`,
+      subject: `Te invitaron a unirte a ${ws.name} en ${APP_NAME}`,
       html,
     });
 

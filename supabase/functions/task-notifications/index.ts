@@ -3,6 +3,7 @@ import { supabaseAdmin } from "../_shared/supabase-client.ts";
 import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
 import { sendEmail } from "../_shared/email.ts";
 import { isNotificationEnabled, type NotificationKind } from "../_shared/notification-prefs.ts";
+import { APP_NAME } from "../_shared/app-info.ts";
 
 const APP_URL = Deno.env.get("APP_URL") ?? "https://prio.app";
 
@@ -243,12 +244,12 @@ function buildNotification(
           </tr>
           <tr>
             <td style="padding:0 32px 24px;text-align:center">
-              <a href="${taskUrl}" style="display:inline-block;padding:12px 32px;background-color:#1c1917;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:12px">Abrir en Priorify</a>
+              <a href="${taskUrl}" style="display:inline-block;padding:12px 32px;background-color:#1c1917;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:12px">Abrir en ${APP_NAME}</a>
             </td>
           </tr>
           <tr>
             <td style="padding:0 32px 24px;text-align:center;border-top:1px solid #e7e5e4">
-              <p style="margin:16px 0 0;font-size:11px;color:#a1a1aa">Priorify — Open source task management</p>
+              <p style="margin:16px 0 0;font-size:11px;color:#a1a1aa">${APP_NAME} — Open source task management</p>
             </td>
           </tr>
         </table>

@@ -14,6 +14,7 @@ import {
 } from "@/features/calendar/blockedDaysApi";
 import { spacesForWorkspaceType } from "@/features/spaces/spaces";
 import { IS_SELF_HOSTED } from "@/lib/constants";
+import { APP_NAME } from "@/lib/branding";
 import type { SpaceKey } from "@/features/spaces/spaces";
 import type { WorkspaceType } from "@/types";
 import { createPortal } from "react-dom";
@@ -185,7 +186,7 @@ export function Sidebar({
         )}
       >
         <div className="flex flex-col h-full overflow-y-auto p-4 space-y-6">
-          {/* Header: app icon + Priorify + BETA */}
+          {/* Header: app icon + APP_NAME + BETA */}
           <div className="flex items-center gap-3">
             <div className="flex h-8 w-8 items-center justify-center rounded-full bg-gradient-to-br from-purple-400 to-violet-600 text-white">
               <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
@@ -193,7 +194,7 @@ export function Sidebar({
               </svg>
             </div>
             <span className="text-base font-extrabold tracking-tight text-ink">
-              Priorify
+              {APP_NAME}
             </span>
             <span className="ml-auto rounded-full bg-prio-purple/10 px-2 py-0.5 text-xs font-semibold text-prio-purple">
               BETA
@@ -350,7 +351,7 @@ export function Sidebar({
           {/* Footer */}
           <div className="border-t border-line pt-3">
             <p className="text-xs text-ink-muted">
-              &copy; 2026 Priorify. Todos los derechos reservados.
+              &copy; 2026 {APP_NAME}. Todos los derechos reservados.
             </p>
             {!IS_SELF_HOSTED && (
               <button

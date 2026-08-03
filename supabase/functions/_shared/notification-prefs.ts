@@ -1,4 +1,4 @@
-// Priorify V1 — Notification preference helpers
+// V1 — Notification preference helpers
 // Maps a notification kind + channel to the workspace_members.notification_preferences key.
 
 export type NotificationKind = "assigned" | "updated" | "meeting_created" | "deadline_approaching" | "completed";

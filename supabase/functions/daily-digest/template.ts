@@ -1,3 +1,5 @@
+import { APP_NAME } from "../_shared/app-info.ts";
+
 export interface DigestTask {
   title: string;
   dueDate: string | null;
@@ -23,7 +25,7 @@ export function buildDigestHtml(params: {
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Resumen diario Priorify</title>
+  <title>Resumen diario ${APP_NAME}</title>
 </head>
 <body style="margin:0;padding:0;background-color:#f5f5f4;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background-color:#f5f5f4;padding:40px 0">
@@ -52,14 +54,14 @@ export function buildDigestHtml(params: {
           <!-- CTA -->
           <tr>
             <td style="padding:24px 32px 0;text-align:center">
-              <a href="${appUrl}" style="display:inline-block;padding:12px 32px;background-color:#1c1917;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:12px">Abrir Priorify</a>
+              <a href="${appUrl}" style="display:inline-block;padding:12px 32px;background-color:#1c1917;color:#ffffff;font-size:14px;font-weight:600;text-decoration:none;border-radius:12px">Abrir ${APP_NAME}</a>
             </td>
           </tr>
 
           <!-- Footer -->
           <tr>
             <td style="padding:24px 32px;text-align:center;border-top:1px solid #e7e5e4">
-              <p style="margin:0;font-size:11px;color:#a1a1aa">Priorify — Open source task management</p>
+              <p style="margin:0;font-size:11px;color:#a1a1aa">${APP_NAME} — Open source task management</p>
             </td>
           </tr>
         </table>
