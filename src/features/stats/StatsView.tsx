@@ -158,7 +158,7 @@ export function StatsView({ workspaceId }: StatsViewProps) {
   }, [filteredTasks, assigneeNames]);
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="p-4 space-y-6 lg:p-8">
       <TaskFilterBar
         searchQuery={searchQuery}
         onSearchChange={setSearchQuery}
@@ -172,13 +172,13 @@ export function StatsView({ workspaceId }: StatsViewProps) {
         projectOptions={projects}
       />
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard value={activeTotal} label="Tareas activas" />
         <StatCard value={completedThisWeek} label="Completadas esta semana" variant="success" />
         <StatCard value={`${onTimeRate}%`} label="Terminadas a tiempo" variant={onTimeRate >= 80 ? "success" : "danger"} />
       </div>
 
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <HorizontalBarChart data={quadrantData} title="Carga por cuadrante" />
         <HorizontalBarChart data={memberData} title="Por responsable" />
       </div>

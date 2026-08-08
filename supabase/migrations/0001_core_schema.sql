@@ -1,4 +1,4 @@
--- PRIO V1 — Core Schema
+-- PRITIO V1 — Core Schema
 -- Migration 0001: profiles, workspaces, workspace_members, enums
 
 -- ─── Enums ──────────────────────────────────────────────

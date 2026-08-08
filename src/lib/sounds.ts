@@ -1,6 +1,6 @@
 export type SoundName = "taskCompleted" | "notification" | "meetingReminder";
 
-const STORAGE_KEY = "prio:soundsEnabled";
+const STORAGE_KEY = "pritio:soundsEnabled";
 
 export function areSoundsEnabled(): boolean {
   try {

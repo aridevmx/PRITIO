@@ -110,12 +110,13 @@ export async function listMembers(workspaceId: string): Promise<WorkspaceMember[
 export async function removeMember(
   workspaceId: string,
   userId: string,
+  reassignToAssigneeId?: string | null,
 ): Promise<void> {
-  const { error } = await supabase
-    .from("workspace_members")
-    .delete()
-    .eq("workspace_id", workspaceId)
-    .eq("user_id", userId);
+  const { error } = await supabase.rpc("remove_workspace_member", {
+    p_workspace_id: workspaceId,
+    p_user_id: userId,
+    p_reassign_assignee_id: reassignToAssigneeId ?? null,
+  });
 
   if (error) throw error;
 }

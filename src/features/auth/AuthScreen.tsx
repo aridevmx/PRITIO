@@ -1,6 +1,6 @@
 import { type FormEvent, useState } from "react";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { PrioLogo } from "@/components/PrioLogo";
+import { PritioLogo } from "@/components/PritioLogo";
 import { Field } from "@/components/Field";
 import { cn } from "@/lib/utils";
 import { checkEmailHasInvitation } from "@/features/invitations/api";
@@ -37,7 +37,7 @@ export function AuthScreen() {
           const hasInvite = await checkEmailHasInvitation(email);
           if (!hasInvite) {
             throw new Error(
-              "Esta versión está en beta cerrada. Necesitas una invitación para registrarte. Solicita una invitación con el equipo de Prio.",
+              "Esta versión está en beta cerrada. Necesitas una invitación para registrarte. Solicita una invitación con el equipo de PRITIO.",
             );
           }
         }
@@ -79,9 +79,9 @@ export function AuthScreen() {
         <div className="w-full max-w-sm animate-fade-in">
           <div className="panel p-8 text-center">
             <div className="mb-6 flex justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-prio-green/10">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-pritio-green/10">
                 <svg
-                  className="h-8 w-8 text-prio-green"
+                  className="h-8 w-8 text-pritio-green"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -140,7 +140,7 @@ export function AuthScreen() {
       <div className="w-full max-w-sm animate-fade-in">
         <div className="panel p-8">
           <div className="mb-8 flex flex-col items-center gap-3">
-            <PrioLogo size={48} />
+            <PritioLogo size={48} />
             <h1 className="text-xl font-bold text-ink">
               {isSignup
                 ? "Crear cuenta"
@@ -170,7 +170,7 @@ export function AuthScreen() {
                   onChange={(e) => setFullName(e.target.value)}
                   placeholder="Tu nombre"
                   required
-                  className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-prio-blue focus:ring-2 focus:ring-prio-blue/20"
+                  className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-pritio-blue focus:ring-2 focus:ring-pritio-blue/20"
                 />
               </Field>
             )}
@@ -183,7 +183,7 @@ export function AuthScreen() {
                 placeholder="tu@email.com"
                 required
                 autoComplete="email"
-                className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-prio-blue focus:ring-2 focus:ring-prio-blue/20"
+                className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-pritio-blue focus:ring-2 focus:ring-pritio-blue/20"
               />
             </Field>
 
@@ -199,7 +199,7 @@ export function AuthScreen() {
                   autoComplete={
                     isSignup ? "new-password" : "current-password"
                   }
-                  className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-prio-blue focus:ring-2 focus:ring-prio-blue/20"
+                  className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-pritio-blue focus:ring-2 focus:ring-pritio-blue/20"
                 />
               </Field>
             )}
@@ -209,7 +209,7 @@ export function AuthScreen() {
                 <button
                   type="button"
                   onClick={() => goTo("forgot")}
-                  className="text-xs font-medium text-prio-blue hover:underline"
+                  className="text-xs font-medium text-pritio-blue hover:underline"
                 >
                   ¿Olvidaste tu contraseña?
                 </button>

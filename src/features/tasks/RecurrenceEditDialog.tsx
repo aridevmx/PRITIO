@@ -24,7 +24,7 @@ export function RecurrenceEditDialog({
         if (e.target === e.currentTarget) onCancel();
       }}
     >
-      <div className="prio-modal-enter mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-elevated">
+      <div className="pritio-modal-enter mx-4 w-full max-w-sm rounded-2xl bg-white p-6 shadow-elevated">
         <h3 className="text-lg font-bold text-ink">
           Tarea recurrente
         </h3>
@@ -45,7 +45,7 @@ export function RecurrenceEditDialog({
           <button
             type="button"
             onClick={onAllFuture}
-            className="w-full rounded-xl bg-prio-blue px-4 py-2.5 text-sm font-semibold text-white hover:bg-prio-blue/90 transition-colors text-left"
+            className="w-full rounded-xl bg-pritio-blue px-4 py-2.5 text-sm font-semibold text-white hover:bg-pritio-blue/90 transition-colors text-left"
           >
             Todas las futuras
           </button>

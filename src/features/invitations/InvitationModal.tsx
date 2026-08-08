@@ -2,6 +2,9 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { createInvitation, sendInvitationEmail } from "@/features/invitations/api";
 import { useToast } from "@/components/Toast";
+import { useBilling } from "@/features/billing/BillingProvider";
+import { parsePlanLimitError } from "@/features/billing/guarded";
+import { openUpgrade } from "@/features/billing/upgrade";
 import type { WorkspaceRole } from "@/types";
 
 interface InvitationModalProps {
@@ -13,6 +16,7 @@ interface InvitationModalProps {
 
 export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }: InvitationModalProps) {
   const { toast } = useToast();
+  const { canCreate } = useBilling();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<WorkspaceRole>("member");
   const [sending, setSending] = useState(false);
@@ -20,6 +24,7 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
     if (!email.trim()) return;
+    if (!canCreate("members")) return;
     setSending(true);
     try {
       const inv = await createInvitation(workspaceId, email.trim(), role);
@@ -35,6 +40,11 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
       onSent?.();
       onClose();
     } catch (err) {
+      const resource = parsePlanLimitError(err);
+      if (resource) {
+        openUpgrade(resource);
+        return;
+      }
       toast.error(
         err instanceof Error ? err.message : "Error al enviar invitación",
       );
@@ -50,7 +60,7 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="prio-modal-enter mx-4 w-full max-w-md rounded-2xl border border-line bg-surface p-0 shadow-elevated overflow-hidden">
+      <div className="pritio-modal-enter mx-4 w-full max-w-md rounded-2xl border border-line bg-surface p-0 shadow-elevated overflow-hidden">
         <div className="flex items-center justify-between border-b border-line px-6 py-4">
           <h3 className="text-lg font-bold text-ink">Invitar a {workspaceName}</h3>
           <button
@@ -75,7 +85,7 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
               placeholder="correo@ejemplo.com"
               required
               autoFocus
-              className="w-full rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20"
+              className="w-full rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20"
             />
           </div>
 
@@ -91,7 +101,7 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
                   onClick={() => setRole(r)}
                   className={`flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all ${
                     role === r
-                      ? "border-prio-blue bg-prio-blue/10 text-prio-blue shadow-sm"
+                      ? "border-pritio-blue bg-pritio-blue/10 text-pritio-blue shadow-sm"
                       : "border-line text-ink-muted hover:bg-surface-muted"
                   }`}
                 >
@@ -112,7 +122,7 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
             <button
               type="submit"
               disabled={!email.trim() || sending}
-              className="flex-1 rounded-xl bg-prio-blue px-4 py-2 text-sm font-semibold text-white hover:bg-prio-blue/90 transition-colors disabled:opacity-50"
+              className="flex-1 rounded-xl bg-pritio-blue px-4 py-2 text-sm font-semibold text-white hover:bg-pritio-blue/90 transition-colors disabled:opacity-50"
             >
               {sending ? "Enviando..." : "Enviar invitación"}
             </button>

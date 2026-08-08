@@ -42,7 +42,7 @@ export class ErrorBoundary extends React.Component<Props, State> {
           </p>
           <button
             onClick={this.handleRetry}
-            className="mt-6 rounded-lg bg-prio-blue px-6 py-3 text-sm font-semibold text-white hover:bg-prio-blue/90"
+            className="mt-6 rounded-lg bg-pritio-blue px-6 py-3 text-sm font-semibold text-white hover:bg-pritio-blue/90"
           >
             Reintentar
           </button>

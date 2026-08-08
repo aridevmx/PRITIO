@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 
 type Theme = "light" | "dark";
 
-const STORAGE_KEY = "prio-theme";
+const STORAGE_KEY = "pritio-theme";
 
 function getInitialTheme(): Theme {
   const stored = localStorage.getItem(STORAGE_KEY);

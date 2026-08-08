@@ -2,6 +2,9 @@ import { useState, useEffect, useCallback, type FormEvent } from "react";
 import { listProjects, createProject, updateProject, deleteProject, getProjectTaskCount } from "@/features/projects/api";
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { useBilling } from "@/features/billing/BillingProvider";
+import { parsePlanLimitError } from "@/features/billing/guarded";
+import { openUpgrade } from "@/features/billing/upgrade";
 import type { Project } from "@/types";
 
 interface ProjectsManagerProps {
@@ -15,6 +18,7 @@ const PRESET_COLORS = [
 
 export function ProjectsManager({ workspaceId }: ProjectsManagerProps) {
   const { toast } = useToast();
+  const { canCreate } = useBilling();
   const [projects, setProjects] = useState<Project[]>([]);
   const [taskCounts, setTaskCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
@@ -47,6 +51,7 @@ export function ProjectsManager({ workspaceId }: ProjectsManagerProps) {
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     if (!newName.trim()) return;
+    if (!canCreate("projects")) return;
     setCreating(true);
     try {
       await createProject(workspaceId, newName.trim(), newColor);
@@ -54,7 +59,12 @@ export function ProjectsManager({ workspaceId }: ProjectsManagerProps) {
       setNewName("");
       setShowForm(false);
       await fetchProjects();
-    } catch {
+    } catch (err) {
+      const resource = parsePlanLimitError(err);
+      if (resource) {
+        openUpgrade(resource);
+        return;
+      }
       toast.error("Error al crear proyecto");
     } finally {
       setCreating(false);
@@ -94,7 +104,7 @@ export function ProjectsManager({ workspaceId }: ProjectsManagerProps) {
           <p className="text-sm text-ink-muted mb-3">Sin proyectos aún</p>
           <button
             onClick={() => setShowForm(true)}
-            className="rounded-xl bg-prio-blue px-4 py-2 text-sm font-semibold text-white hover:bg-prio-blue/90 transition-colors"
+            className="rounded-xl bg-pritio-blue px-4 py-2 text-sm font-semibold text-white hover:bg-pritio-blue/90 transition-colors"
           >
             Crear primer proyecto
           </button>
@@ -113,13 +123,13 @@ export function ProjectsManager({ workspaceId }: ProjectsManagerProps) {
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
                     autoFocus
-                    className="flex-1 rounded-lg border border-line bg-surface-subtle px-2 py-1 text-sm text-ink outline-none focus:border-prio-blue"
+                    className="flex-1 rounded-lg border border-line bg-surface-subtle px-2 py-1 text-sm text-ink outline-none focus:border-pritio-blue"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleUpdate(p.id);
                       if (e.key === "Escape") setEditingId(null);
                     }}
                   />
-                  <button onClick={() => handleUpdate(p.id)} className="rounded-lg p-1 text-prio-blue hover:bg-prio-blue/10 transition-colors" title="Guardar">
+                  <button onClick={() => handleUpdate(p.id)} className="rounded-lg p-1 text-pritio-blue hover:bg-pritio-blue/10 transition-colors" title="Guardar">
                     <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
                       <path d="M13 4L6 12L3 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
@@ -162,7 +172,7 @@ export function ProjectsManager({ workspaceId }: ProjectsManagerProps) {
           {!showForm && (
             <button
               onClick={() => setShowForm(true)}
-              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line py-2.5 text-sm font-semibold text-ink-muted hover:border-prio-blue hover:text-prio-blue transition-colors"
+              className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line py-2.5 text-sm font-semibold text-ink-muted hover:border-pritio-blue hover:text-pritio-blue transition-colors"
             >
               <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                 <path d="M8 1V15M1 8H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
@@ -179,7 +189,7 @@ export function ProjectsManager({ workspaceId }: ProjectsManagerProps) {
                 onChange={(e) => setNewName(e.target.value)}
                 placeholder="Nombre del proyecto"
                 autoFocus
-                className="w-full rounded-lg border border-line bg-surface-subtle px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-prio-blue"
+                className="w-full rounded-lg border border-line bg-surface-subtle px-3 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-pritio-blue"
               />
               <div className="flex gap-1.5 flex-wrap">
                 {PRESET_COLORS.map((c) => (
@@ -205,7 +215,7 @@ export function ProjectsManager({ workspaceId }: ProjectsManagerProps) {
                 <button
                   type="submit"
                   disabled={!newName.trim() || creating}
-                  className="flex-1 rounded-lg bg-prio-blue px-3 py-1.5 text-sm font-semibold text-white hover:bg-prio-blue/90 transition-colors disabled:opacity-50"
+                  className="flex-1 rounded-lg bg-pritio-blue px-3 py-1.5 text-sm font-semibold text-white hover:bg-pritio-blue/90 transition-colors disabled:opacity-50"
                 >
                   {creating ? "Creando..." : "Crear"}
                 </button>

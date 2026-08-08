@@ -23,8 +23,8 @@ export function ToggleRow({ label, description, checked, onChange }: ToggleRowPr
         aria-label={label}
         onClick={onChange}
         className={cn(
-          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-prio-blue/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
-          checked ? "bg-prio-blue" : "bg-line-strong hover:bg-ink-muted/40",
+          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+          checked ? "bg-pritio-blue" : "bg-line-strong hover:bg-ink-muted/40",
         )}
       >
         <span

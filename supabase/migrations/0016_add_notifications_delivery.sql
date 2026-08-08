@@ -4,11 +4,19 @@
 --    se actualicen en vivo (la publicación supabase_realtime ya existe por defecto).
 
 ALTER TABLE notifications
-  ADD COLUMN delivery TEXT NOT NULL DEFAULT 'bell';
+  ADD COLUMN IF NOT EXISTS delivery TEXT NOT NULL DEFAULT 'bell';
 
-ALTER TABLE notifications
-  ADD CONSTRAINT notifications_delivery_check
-  CHECK (delivery IN ('toast', 'bell', 'both'));
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint
+    WHERE conname = 'notifications_delivery_check'
+  ) THEN
+    ALTER TABLE notifications
+      ADD CONSTRAINT notifications_delivery_check
+      CHECK (delivery IN ('toast', 'bell', 'both'));
+  END IF;
+END $$;
 
 DO $$
 BEGIN

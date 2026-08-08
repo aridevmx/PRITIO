@@ -58,7 +58,7 @@ export function DonationModal({ open, onClose }: DonationModalProps) {
       className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink/30 backdrop-blur-sm"
       onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
     >
-      <div className="prio-modal-enter mx-4 w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-elevated">
+      <div className="pritio-modal-enter mx-4 w-full max-w-sm rounded-2xl border border-line bg-surface p-6 shadow-elevated">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-bold text-ink">Apoyar este proyecto</h3>
           <button
@@ -82,7 +82,7 @@ export function DonationModal({ open, onClose }: DonationModalProps) {
               rel="noopener noreferrer"
               className="flex flex-col items-center gap-2 rounded-xl border border-line p-4 text-ink hover:bg-surface-muted hover:border-line-strong transition-colors"
             >
-              <div className="text-prio-purple">{platform.icon}</div>
+              <div className="text-pritio-purple">{platform.icon}</div>
               <span className="text-xs font-semibold text-center">{platform.name}</span>
             </a>
           ))}

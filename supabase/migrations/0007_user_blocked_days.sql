@@ -1,4 +1,4 @@
--- PRIO V1 — User Blocked Days
+-- PRITIO V1 — User Blocked Days
 -- Migration 0007: user_blocked_days table for marking unavailable days
 
 CREATE TABLE user_blocked_days (

@@ -1,5 +1,8 @@
+import { useState } from "react";
 import { createPortal } from "react-dom";
 import { formatTime, useTimeFormat } from "@/lib/timeFormat";
+import { useToast } from "@/components/Toast";
+import { supabase } from "@/lib/supabase";
 
 interface MeetingDetail {
   id: string;
@@ -14,6 +17,8 @@ interface MeetingDetail {
 interface MeetingDetailModalProps {
   meeting: MeetingDetail;
   onClose: () => void;
+  onEdit?: (meeting: MeetingDetail) => void;
+  onDeleted?: () => void;
 }
 
 function formatDate(iso: string | null): string {
@@ -27,16 +32,34 @@ function formatDate(iso: string | null): string {
   });
 }
 
-export function MeetingDetailModal({ meeting, onClose }: MeetingDetailModalProps) {
+export function MeetingDetailModal({ meeting, onClose, onEdit, onDeleted }: MeetingDetailModalProps) {
   const timeFormat = useTimeFormat();
+  const { toast } = useToast();
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDelete = async () => {
+    if (!confirm(`Eliminar la junta "${meeting.title}"?`)) return;
+    setDeleting(true);
+    try {
+      const { error } = await supabase.from("tasks").delete().eq("id", meeting.id);
+      if (error) throw error;
+      toast.success("Junta eliminada");
+      onDeleted?.();
+    } catch {
+      toast.error("Error al eliminar la junta");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
   return createPortal(
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
       <div className="relative w-full max-w-md rounded-2xl bg-surface shadow-elevated border border-line overflow-hidden">
         {/* Header */}
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-prio-purple/10">
-            <svg className="h-5 w-5 text-prio-purple" viewBox="0 0 12 12" fill="none">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-pritio-purple/10">
+            <svg className="h-5 w-5 text-pritio-purple" viewBox="0 0 12 12" fill="none">
               <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
               <path d="M6 3.5V6.5L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
             </svg>
@@ -110,13 +133,38 @@ export function MeetingDetailModal({ meeting, onClose }: MeetingDetailModalProps
                 href={meeting.meeting_link}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="text-sm font-medium text-prio-blue underline underline-offset-2 hover:text-prio-purple transition-colors"
+                className="text-sm font-medium text-pritio-blue underline underline-offset-2 hover:text-pritio-purple transition-colors"
               >
                 {meeting.meeting_link}
               </a>
             </div>
           )}
         </div>
+
+        {/* Footer */}
+        {(onEdit || onDeleted) && (
+          <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3">
+            {onDeleted && (
+              <button
+                type="button"
+                onClick={() => void handleDelete()}
+                disabled={deleting}
+                className="rounded-xl border border-pritio-coral/30 px-4 py-2 text-sm font-semibold text-pritio-coral transition-colors hover:bg-pritio-coral/5 disabled:opacity-50"
+              >
+                {deleting ? "Eliminando..." : "Eliminar"}
+              </button>
+            )}
+            {onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(meeting)}
+                className="rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink/90"
+              >
+                Editar
+              </button>
+            )}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

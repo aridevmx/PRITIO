@@ -12,8 +12,8 @@ export function StatCard({ value, label, variant = "default" }: StatCardProps) {
       <p
         className={cn(
           "text-2xl font-extrabold tracking-tight",
-          variant === "success" && "text-prio-green",
-          variant === "danger" && "text-prio-coral",
+          variant === "success" && "text-pritio-green",
+          variant === "danger" && "text-pritio-coral",
           variant === "default" && "text-ink",
         )}
       >

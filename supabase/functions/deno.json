@@ -1,6 +1,7 @@
 {
   "imports": {
     "@supabase/supabase-js": "jsr:@supabase/supabase-js@2",
-    "web-push": "npm:web-push@3.6.7"
+    "web-push": "npm:web-push@3.6.7",
+    "stripe": "npm:stripe@^17.0.0"
   }
 }

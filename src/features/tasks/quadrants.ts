@@ -1,9 +1,12 @@
 import type { Quadrant, Task } from "@/types";
 
+export type QuadrantIconKey = "zap" | "calendar" | "users" | "archive";
+
 export interface QuadrantMeta {
   key: Quadrant;
   title: string;
   subtitle: string;
+  iconKey: QuadrantIconKey;
   classes: {
     border: string;
     borderStrong: string;
@@ -13,6 +16,7 @@ export interface QuadrantMeta {
     softBg: string;
     fromAccent: string;
     dropOver: string;
+    glow: string;
   };
 }
 
@@ -21,60 +25,68 @@ export const QUADRANTS: Record<Quadrant, QuadrantMeta> = {
     key: "do",
     title: "Haz ahora",
     subtitle: "Importante y urgente",
+    iconKey: "zap",
     classes: {
-      border: "border-prio-coral/30",
-      borderStrong: "border-prio-coral",
-      badge: "bg-prio-coral/10 text-prio-coral",
-      accentBg: "bg-prio-coral",
-      accentText: "text-prio-coral",
-      softBg: "bg-prio-coral/5",
-      fromAccent: "from-prio-coral/30",
-      dropOver: "ring-2 ring-prio-coral/50 bg-prio-coral/5",
+      border: "border-pritio-coral/30",
+      borderStrong: "border-pritio-coral",
+      badge: "bg-pritio-coral/10 text-pritio-coral",
+      accentBg: "bg-pritio-coral",
+      accentText: "text-pritio-coral",
+      softBg: "bg-pritio-coral/5",
+      fromAccent: "from-pritio-coral/30",
+      dropOver: "ring-2 ring-pritio-coral/50 bg-pritio-coral/5",
+      glow: "shadow-[0_0_0_1px_rgba(242,125,114,0.14),0_10px_32px_-10px_rgba(242,125,114,0.5)]",
     },
   },
   plan: {
     key: "plan",
     title: "Planifica",
     subtitle: "Importante pero no urge",
+    iconKey: "calendar",
     classes: {
-      border: "border-prio-blue/30",
-      borderStrong: "border-prio-blue",
-      badge: "bg-prio-blue/10 text-prio-blue",
-      accentBg: "bg-prio-blue",
-      accentText: "text-prio-blue",
-      softBg: "bg-prio-blue/5",
-      fromAccent: "from-prio-blue/30",
-      dropOver: "ring-2 ring-prio-blue/50 bg-prio-blue/5",
+      border: "border-pritio-blue/30",
+      borderStrong: "border-pritio-blue",
+      badge: "bg-pritio-blue/10 text-pritio-blue",
+      accentBg: "bg-pritio-blue",
+      accentText: "text-pritio-blue",
+      softBg: "bg-pritio-blue/5",
+      fromAccent: "from-pritio-blue/30",
+      dropOver: "ring-2 ring-pritio-blue/50 bg-pritio-blue/5",
+      glow: "shadow-[0_0_0_1px_rgba(91,167,209,0.14),0_10px_32px_-10px_rgba(91,167,209,0.5)]",
     },
   },
   delegate: {
     key: "delegate",
     title: "Delega",
     subtitle: "No importante pero urgente",
+    iconKey: "users",
     classes: {
-      border: "border-prio-green/30",
-      borderStrong: "border-prio-green",
-      badge: "bg-prio-green/10 text-prio-green",
-      accentBg: "bg-prio-green",
-      accentText: "text-prio-green",
-      softBg: "bg-prio-green/5",
-      fromAccent: "from-prio-green/30",
-      dropOver: "ring-2 ring-prio-green/50 bg-prio-green/5",
+      border: "border-pritio-green/30",
+      borderStrong: "border-pritio-green",
+      badge: "bg-pritio-green/10 text-pritio-green",
+      accentBg: "bg-pritio-green",
+      accentText: "text-pritio-green",
+      softBg: "bg-pritio-green/5",
+      fromAccent: "from-pritio-green/30",
+      dropOver: "ring-2 ring-pritio-green/50 bg-pritio-green/5",
+      glow: "shadow-[0_0_0_1px_rgba(79,195,138,0.14),0_10px_32px_-10px_rgba(79,195,138,0.5)]",
     },
   },
   later: {
     key: "later",
     title: "Después",
     subtitle: "No importante y no urgente",
+    iconKey: "archive",
     classes: {
-      border: "border-prio-purple/30",
-      borderStrong: "border-prio-purple",
-      badge: "bg-prio-purple/10 text-prio-purple",
-      accentBg: "bg-prio-purple",
-      accentText: "text-prio-purple",
-      softBg: "bg-prio-purple/5",
-      fromAccent: "from-prio-purple/30",
-      dropOver: "ring-2 ring-prio-purple/50 bg-prio-purple/5",
+      border: "border-pritio-purple/30",
+      borderStrong: "border-pritio-purple",
+      badge: "bg-pritio-purple/10 text-pritio-purple",
+      accentBg: "bg-pritio-purple",
+      accentText: "text-pritio-purple",
+      softBg: "bg-pritio-purple/5",
+      fromAccent: "from-pritio-purple/30",
+      dropOver: "ring-2 ring-pritio-purple/50 bg-pritio-purple/5",
+      glow: "shadow-[0_0_0_1px_rgba(155,126,220,0.14),0_10px_32px_-10px_rgba(155,126,220,0.5)]",
     },
   },
 };

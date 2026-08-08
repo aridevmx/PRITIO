@@ -24,7 +24,7 @@ export function permissionDeniedFor(action: string): string {
 export function LoadingState(): React.JSX.Element {
   return (
     <div className="flex flex-1 items-center justify-center py-20">
-      <div className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-prio-blue" />
+      <div className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-pritio-blue" />
     </div>
   );
 }
@@ -62,7 +62,7 @@ export function ErrorState({
       {onRetry && (
         <button
           onClick={onRetry}
-          className="mt-4 rounded-lg bg-prio-blue px-4 py-2 text-sm font-semibold text-white hover:bg-prio-blue/90"
+          className="mt-4 rounded-lg bg-pritio-blue px-4 py-2 text-sm font-semibold text-white hover:bg-pritio-blue/90"
         >
           Reintentar
         </button>

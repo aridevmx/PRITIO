@@ -2,16 +2,16 @@
 // Renombra la app en todo el repo manteniendo una sola fuente de verdad.
 //
 // Uso:
-//   node scripts/rename-app.mjs "Prio"
-//   node scripts/rename-app.mjs "Prio" "Nuevo tagline"
-//   node scripts/rename-app.mjs "Prio" --dry-run
+//   node scripts/rename-app.mjs "PRITIO"
+//   node scripts/rename-app.mjs "PRITIO" "Nuevo tagline"
+//   node scripts/rename-app.mjs "PRITIO" --dry-run
 //
 // Actualiza:
 //   1. src/lib/branding.ts        (frontend, lo usa la app)
 //   2. supabase/functions/_shared/app-info.ts (edge functions)
 //   3. Cualquier literal restante en src/ supabase/ public/ index.html
 //
-// NO toca: node_modules, dist, .git, PRIO_Claude_Design_Pack (referencia), PRODUCT.md/README.
+// NO toca: node_modules, dist, .git, PRODUCT.md/README.
 
 import { readdir, readFile, writeFile, stat } from "node:fs/promises";
 import { join, extname, sep } from "node:path";
@@ -31,7 +31,7 @@ const newTagline = process.argv[3] && !process.argv[3].startsWith("--")
   : undefined;
 
 const EXCLUDED_DIRS = new Set(["node_modules", "dist", ".git"]);
-const EXCLUDED_PREFIXES = ["PRIO_Claude_Design_Pack", `${sep}PRIO_Claude_Design_Pack`];
+const EXCLUDED_PREFIXES = [];
 const TEXT_EXTENSIONS = new Set([
   ".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs", ".json", ".md", ".html", ".css",
   ".toml", ".sql", ".yml", ".yaml", ".txt", ".svg", ".env.example",

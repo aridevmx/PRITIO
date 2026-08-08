@@ -1,6 +1,14 @@
 import { supabase } from "@/lib/supabase";
 
-type NotificationKind = "assigned" | "updated" | "meeting_created" | "deadline_approaching" | "completed";
+type NotificationKind =
+  | "assigned"
+  | "updated"
+  | "meeting_created"
+  | "deadline_approaching"
+  | "completed"
+  | "task_approved"
+  | "task_rejected"
+  | "approval_requested";
 
 export async function notifyTaskChange(
   kind: NotificationKind,
@@ -8,6 +16,7 @@ export async function notifyTaskChange(
   workspaceId: string,
   assigneeIds?: string[],
   changes?: string[],
+  recipientUserIds?: string[],
 ): Promise<boolean> {
   try {
     const { data: user } = await supabase.auth.getUser();
@@ -21,6 +30,7 @@ export async function notifyTaskChange(
         actorUserId: user.user.id,
         assigneeIds,
         changes,
+        recipientUserIds,
       },
     });
     if (error) throw error;

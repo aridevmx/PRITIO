@@ -48,8 +48,8 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // PRIO brand palette — preserved from v1
-        prio: {
+        // PRITIO brand palette — preserved from v1
+        pritio: {
           green: "#4FC38A",
           coral: "#F27D72",
           blue: "#5BA7D1",

@@ -4,11 +4,15 @@ import { localDateStr } from "@/lib/utils";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { useToast } from "@/components/Toast";
 import { inputClass } from "@/features/account/account-styles";
+import { cn } from "@/lib/utils";
+import type { BlockedDayStatus } from "@/types";
 
 interface MyBlockedDay {
   id: string;
   blockedDate: string;
   reason: string | null;
+  status: BlockedDayStatus;
+  rejectionReason: string | null;
   workspaceName: string | null;
 }
 
@@ -39,7 +43,7 @@ export function BlockedDaysTab() {
     setLoading(true);
     const { data, error } = await supabase
       .from("user_blocked_days")
-      .select("id, blocked_date, reason, workspaces(name)")
+      .select("id, blocked_date, reason, status, rejection_reason, workspaces(name)")
       .eq("user_id", user.id)
       .order("blocked_date", { ascending: true });
     if (error) {
@@ -51,6 +55,8 @@ export function BlockedDaysTab() {
           id: d.id,
           blockedDate: String(d.blocked_date).slice(0, 10),
           reason: d.reason,
+          status: (d.status === "pending" || d.status === "rejected" ? d.status : "approved") as BlockedDayStatus,
+          rejectionReason: d.rejection_reason,
           workspaceName:
             (d.workspaces as { name?: string } | null)?.name ?? null,
         })),
@@ -142,18 +148,38 @@ export function BlockedDaysTab() {
                 className="flex items-center justify-between gap-3 px-4 py-3"
               >
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-ink">{formatDate(d.blockedDate)}</p>
-                  <p className="mt-0.5 truncate text-xs text-ink-muted">
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm font-semibold text-ink">{formatDate(d.blockedDate)}</p>
+                    {d.status === "pending" && (
+                      <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-700">
+                        Pendiente
+                      </span>
+                    )}
+                    {d.status === "approved" && (
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+                        Aprobado
+                      </span>
+                    )}
+                    {d.status === "rejected" && (
+                      <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-red-700">
+                        Rechazado
+                      </span>
+                    )}
+                  </div>
+                  <p className={cn("mt-0.5 truncate text-xs text-ink-muted")}>
                     {d.reason || "Sin motivo"}
                     {d.workspaceName ? ` · ${d.workspaceName}` : ""}
+                    {d.status === "rejected" && d.rejectionReason
+                      ? ` — ${d.rejectionReason}`
+                      : ""}
                   </p>
                 </div>
                 <button
                   onClick={() => handleRemove(d.id)}
                   aria-label={`Quitar día ${d.blockedDate}`}
-                  className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-prio-coral hover:bg-prio-coral/10 transition-colors"
+                  className="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-pritio-coral hover:bg-pritio-coral/10 transition-colors"
                 >
-                  Quitar
+                  {d.status === "pending" ? "Cancelar" : "Quitar"}
                 </button>
               </li>
             ))}
@@ -162,8 +188,8 @@ export function BlockedDaysTab() {
       </div>
 
       <p className="text-xs leading-relaxed text-ink-muted">
-        Los días bloqueados generales aplican a todos tus workspaces. Los días vinculados a un workspace
-        se gestionan en la configuración de ese workspace.
+        Los días bloqueados generales aplican a todos tus workspaces y no requieren aprobación.
+        Los días que bloquees dentro de un workspace los aprueban los líderes del equipo antes de activarse.
       </p>
     </div>
   );

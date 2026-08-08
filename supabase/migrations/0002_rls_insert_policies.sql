@@ -1,4 +1,4 @@
--- PRIO V1 — Add missing INSERT policies
+-- PRITIO V1 — Add missing INSERT policies
 -- Migration 0002: INSERT policies for profiles, workspaces, workspace_members
 
 -- Profiles: allow users to insert their own profile after signup

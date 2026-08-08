@@ -128,7 +128,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       setProfile(userProfile);
 
       if (wsList.length > 0) {
-        const savedId = typeof localStorage !== "undefined" ? localStorage.getItem("prio-workspace-id") : null;
+        const savedId = typeof localStorage !== "undefined" ? localStorage.getItem("pritio-workspace-id") : null;
         const prevId = savedId ?? currentWorkspaceRef.current?.id;
         const next = wsList.find((w) => w.id === prevId) ?? wsList[0];
 
@@ -161,7 +161,7 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       if (!ws) return;
 
       if (typeof localStorage !== "undefined") {
-        localStorage.setItem("prio-workspace-id", id);
+        localStorage.setItem("pritio-workspace-id", id);
       }
 
       setCurrentWorkspace(ws);

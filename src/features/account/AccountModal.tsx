@@ -4,19 +4,20 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { IdentityTab } from "@/features/account/IdentityTab";
 import { SecurityTab } from "@/features/account/SecurityTab";
-import { PreferencesTab } from "@/features/account/PreferencesTab";
 import { BlockedDaysTab } from "@/features/account/BlockedDaysTab";
 import { NotificationsTab } from "@/features/account/NotificationsTab";
 import { AboutTab } from "@/features/account/AboutTab";
+import { useBilling } from "@/features/billing/BillingProvider";
+import { PLAN_LABELS, PLAN_BADGE_CLASSES } from "@/features/billing/plans";
 
 interface AccountModalProps {
   onClose: () => void;
+  initialTab?: TabId;
 }
 
-type TabId =
+export type TabId =
   | "identity"
   | "security"
-  | "preferences"
   | "blockedDays"
   | "notifications"
   | "about";
@@ -24,20 +25,19 @@ type TabId =
 const TABS: { id: TabId; label: string }[] = [
   { id: "identity", label: "Identidad" },
   { id: "security", label: "Seguridad" },
-  { id: "preferences", label: "Preferencias" },
   { id: "blockedDays", label: "Mis días" },
   { id: "notifications", label: "Notificaciones" },
   { id: "about", label: "Acerca de" },
 ];
 
-export function AccountModal({ onClose }: AccountModalProps) {
+export function AccountModal({ onClose, initialTab }: AccountModalProps) {
   const { profile, signOut } = useAuth();
-  const [activeTab, setActiveTab] = useState<TabId>("identity");
+  const { effectivePlan } = useBilling();
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab ?? "identity");
   const tabIds = TABS.map((t) => t.id);
   const tabRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
     identity: null,
     security: null,
-    preferences: null,
     blockedDays: null,
     notifications: null,
     about: null,
@@ -66,20 +66,28 @@ export function AccountModal({ onClose }: AccountModalProps) {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="prio-modal-enter mx-4 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
+      <div className="pritio-modal-enter mx-4 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
         {/* Header: identidad del usuario */}
         <div className="border-b border-line px-6 pt-5 pb-4">
           <div className="flex items-start gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-prio-purple to-prio-blue text-lg font-bold text-white">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-pritio-purple to-pritio-blue text-lg font-bold text-white">
               {(profile?.fullName || profile?.email || "?").charAt(0).toUpperCase()}
             </div>
             <div className="min-w-0 flex-1">
               <h2 className="truncate text-lg font-bold leading-snug text-ink">
                 Mi cuenta
               </h2>
-              <p className="mt-0.5 truncate text-xs text-ink-muted">
-                {profile?.email}
-              </p>
+              <div className="mt-0.5 flex flex-wrap items-center gap-1.5">
+                <span className="truncate text-xs text-ink-muted">{profile?.email}</span>
+                <span
+                  className={cn(
+                    "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                    PLAN_BADGE_CLASSES[effectivePlan],
+                  )}
+                >
+                  {PLAN_LABELS[effectivePlan]}
+                </span>
+              </div>
             </div>
             <button
               onClick={onClose}
@@ -113,7 +121,7 @@ export function AccountModal({ onClose }: AccountModalProps) {
                 ref={(el) => { tabRefs.current[tab.id] = el; }}
                 onClick={() => setActiveTab(tab.id)}
                 className={cn(
-                  "whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-prio-blue/50",
+                  "whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/50",
                   activeTab === tab.id
                     ? "bg-white text-ink shadow-sm"
                     : "text-ink-muted hover:bg-surface hover:text-ink",
@@ -144,15 +152,6 @@ export function AccountModal({ onClose }: AccountModalProps) {
             className="space-y-7"
           >
             {activeTab === "security" && <SecurityTab />}
-          </section>
-          <section
-            role="tabpanel"
-            id="account-panel-preferences"
-            aria-labelledby="account-tab-preferences"
-            hidden={activeTab !== "preferences"}
-            className="space-y-7"
-          >
-            {activeTab === "preferences" && <PreferencesTab />}
           </section>
           <section
             role="tabpanel"
@@ -187,7 +186,7 @@ export function AccountModal({ onClose }: AccountModalProps) {
         <div className="border-t border-line px-6 py-3">
           <button
             onClick={() => void signOut()}
-            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-prio-coral hover:bg-prio-coral/10 transition-colors"
+            className="rounded-lg px-3 py-1.5 text-sm font-semibold text-pritio-coral hover:bg-pritio-coral/10 transition-colors"
           >
             Cerrar sesión
           </button>

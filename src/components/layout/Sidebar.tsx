@@ -6,9 +6,13 @@ import { MiniCalendar } from "@/components/layout/MiniCalendar";
 import { WorkspaceSwitcher } from "@/components/layout/WorkspaceSwitcher";
 import { DonationModal } from "@/components/layout/DonationModal";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
+import { useBilling } from "@/features/billing/BillingProvider";
+import { parsePlanLimitError } from "@/features/billing/guarded";
+import { openUpgrade } from "@/features/billing/upgrade";
 import { useTaskDates } from "@/features/calendar/useTaskDates";
 import {
   blockedDaysEnabled,
+  listBlockedDays,
   listWorkspaceBlockedDays,
   toggleBlockedDay,
 } from "@/features/calendar/blockedDaysApi";
@@ -19,6 +23,10 @@ import type { SpaceKey } from "@/features/spaces/spaces";
 import type { WorkspaceType } from "@/types";
 import { createPortal } from "react-dom";
 import { MeetingDetailModal } from "@/components/MeetingDetailModal";
+import { TaskFormDialog } from "@/features/tasks/TaskFormDialog";
+import { getTask } from "@/features/tasks/api";
+import type { Task, BlockedDayStatus } from "@/types";
+import { useToast } from "@/components/Toast";
 
 interface SidebarProps {
   activeSpace: SpaceKey;
@@ -36,19 +44,21 @@ interface TodayMeeting {
   meeting_link: string | null;
   location: string | null;
   description: string | null;
+  due_date: string | null;
 }
 
-function todayMeetingsQuery(workspaceId: string) {
-  const today = todayStr();
+function upcomingMeetingsQuery(workspaceId: string, from: string, to: string) {
   return supabase
     .from("tasks")
-    .select("id, title, start_at, end_at, meeting_link, location, description")
+    .select("id, title, start_at, end_at, meeting_link, location, description, due_date")
     .eq("workspace_id", workspaceId)
     .eq("kind", "meeting")
-    .eq("due_date", today)
+    .gte("due_date", from)
+    .lte("due_date", to)
     .eq("is_active", true)
+    .order("due_date", { ascending: true })
     .order("start_at", { ascending: true })
-    .limit(5);
+    .limit(10);
 }
 
 export function Sidebar({
@@ -58,8 +68,10 @@ export function Sidebar({
   onClose,
   onNavigateToCalendar,
 }: SidebarProps) {
-  const { currentWorkspace, createWorkspace, profile, members } =
+  const { currentWorkspace, createWorkspace, profile, members, isLeader } =
     useWorkspace();
+  const { canCreate } = useBilling();
+  const { toast } = useToast();
   const timeFormat = useTimeFormat();
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -73,6 +85,9 @@ export function Sidebar({
     { id: string; title: string; kind: string; start_at: string | null; completed: boolean; quadrant: string }[]
   >([]);
   const [popoverBlocked, setPopoverBlocked] = useState(false);
+  const [popoverBlockedBy, setPopoverBlockedBy] = useState<
+    { name: string; userId: string; reason: string | null; status: BlockedDayStatus }[]
+  >([]);
   const [popoverLoading, setPopoverLoading] = useState(false);
 
   const activeWorkspaceId = showAllDates ? null : (currentWorkspace?.id ?? null);
@@ -81,27 +96,53 @@ export function Sidebar({
 
   const blockedEnabled = blockedDaysEnabled(activeSpace, members.length);
   const [workspaceBlockedDates, setWorkspaceBlockedDates] = useState<string[]>([]);
+  const [workspacePendingDates, setWorkspacePendingDates] = useState<string[]>([]);
 
   useEffect(() => {
     let cancelled = false;
-    if (!blockedEnabled || showAllDates || !currentWorkspace?.id) {
-      setWorkspaceBlockedDates([]);
-      return;
-    }
     const now = new Date();
     const from = localDateStr(new Date(now.getFullYear(), now.getMonth() - 2, 1));
     const to = localDateStr(new Date(now.getFullYear(), now.getMonth() + 3, 0));
+
+    if (showAllDates) {
+      if (!profile?.id) {
+        setWorkspaceBlockedDates([]);
+        setWorkspacePendingDates([]);
+        return;
+      }
+      listBlockedDays(profile.id, null, from, to)
+        .then((dates) => {
+          if (!cancelled) setWorkspaceBlockedDates(dates);
+        })
+        .catch(() => {
+          if (!cancelled) setWorkspaceBlockedDates([]);
+        });
+      return () => {
+        cancelled = true;
+      };
+    }
+
+    if (!blockedEnabled || !currentWorkspace?.id) {
+      setWorkspaceBlockedDates([]);
+      setWorkspacePendingDates([]);
+      return;
+    }
     listWorkspaceBlockedDays(currentWorkspace.id, from, to)
       .then((rows) => {
-        if (!cancelled) setWorkspaceBlockedDates(rows.map((r) => r.date));
+        if (cancelled) return;
+        setWorkspaceBlockedDates(rows.filter((r) => r.status === "approved").map((r) => r.date));
+        setWorkspacePendingDates(rows.filter((r) => r.status === "pending").map((r) => r.date));
       })
       .catch(() => {
-        if (!cancelled) setWorkspaceBlockedDates([]);
+        if (!cancelled) {
+          setWorkspaceBlockedDates([]);
+          setWorkspacePendingDates([]);
+        }
       });
     return () => {
       cancelled = true;
     };
-  }, [blockedEnabled, showAllDates, currentWorkspace?.id]);
+  }, [blockedEnabled, showAllDates, currentWorkspace?.id, profile?.id]);
 
   const wsColorMap: Record<string, string> = {
     personal: "#9B7EDC",
@@ -109,66 +150,135 @@ export function Sidebar({
     team: "#5BA7D1",
     enterprise: "#F27D72",
   };
-  const [todayMeetings, setTodayMeetings] = useState<TodayMeeting[]>([]);
+  const [upcomingMeetings, setUpcomingMeetings] = useState<TodayMeeting[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<TodayMeeting | null>(null);
+  const [editingMeeting, setEditingMeeting] = useState<Task | null>(null);
+  const [showAllMeetings, setShowAllMeetings] = useState(false);
 
-  useEffect(() => {
+  const loadUpcomingMeetings = useCallback(() => {
     if (!currentWorkspace?.id) return;
-    todayMeetingsQuery(currentWorkspace.id).then(({ data }) => {
-      setTodayMeetings(data ?? []);
+    const from = todayStr();
+    const to = localDateStr(new Date(new Date().getTime() + 6 * 24 * 3600 * 1000));
+    upcomingMeetingsQuery(currentWorkspace.id, from, to).then(({ data }) => {
+      setUpcomingMeetings(data ?? []);
+      setShowAllMeetings(false);
     });
   }, [currentWorkspace?.id]);
+
+  useEffect(() => {
+    loadUpcomingMeetings();
+  }, [loadUpcomingMeetings]);
+
+  const handleEditMeeting = useCallback(async (meeting: { id: string }) => {
+    try {
+      const fullTask = await getTask(meeting.id);
+      setEditingMeeting(fullTask);
+      setSelectedMeeting(null);
+    } catch {
+      setSelectedMeeting(null);
+    }
+  }, []);
 
   const spaces = currentWorkspace
     ? spacesForWorkspaceType(currentWorkspace.type)
     : [];
 
-  const handleDayClick = useCallback(async (dateStr: string) => {
-    setDayPopover(dateStr);
-    setPopoverLoading(true);
-    try {
-      const { data } = await supabase
-        .from("tasks")
-        .select("id, title, kind, start_at, completed, quadrant")
-        .eq("is_active", true)
-        .eq("due_date", dateStr)
-        .order("created_at", { ascending: false })
-        .limit(10);
-      setPopoverTasks(data ?? []);
+  const handleDayClick = useCallback(
+    async (dateStr: string) => {
+      setDayPopover(dateStr);
+      setPopoverLoading(true);
+      setPopoverBlocked(false);
+      setPopoverBlockedBy([]);
+      try {
+        const { data } = await supabase
+          .from("tasks")
+          .select("id, title, kind, start_at, completed, quadrant")
+          .eq("is_active", true)
+          .eq("due_date", dateStr)
+          .order("created_at", { ascending: false })
+          .limit(10);
+        setPopoverTasks(data ?? []);
 
-      /* Check blocked */
-      if (profile?.id && currentWorkspace?.id && blockedEnabled) {
-        const { data: bd } = await supabase
-          .from("user_blocked_days")
-          .select("id")
-          .eq("user_id", profile.id)
-          .eq("workspace_id", currentWorkspace.id)
-          .eq("blocked_date", dateStr)
-          .maybeSingle();
-        setPopoverBlocked(!!bd);
+        /* Check blocked + who/motivo */
+        if (profile?.id && currentWorkspace?.id && blockedEnabled) {
+          const rows = await listWorkspaceBlockedDays(
+            currentWorkspace.id,
+            dateStr,
+            dateStr,
+          );
+          setPopoverBlockedBy(rows);
+          setPopoverBlocked(rows.some((r) => r.userId === profile.id && r.status === "approved"));
+        }
+      } catch {
+        // ignore
+      } finally {
+        setPopoverLoading(false);
       }
-    } catch {
-      // ignore
-    } finally {
-      setPopoverLoading(false);
-    }
-  }, [profile?.id, currentWorkspace?.id, blockedEnabled]);
+    },
+    [profile?.id, currentWorkspace?.id, blockedEnabled],
+  );
 
-  const handleToggleBlocked = useCallback(async () => {
-    if (!profile?.id || !currentWorkspace?.id || !dayPopover || !blockedEnabled) return;
-    try {
-      const isNowBlocked = await toggleBlockedDay(profile.id, currentWorkspace.id, dayPopover);
-      setPopoverBlocked(isNowBlocked);
-      setWorkspaceBlockedDates((prev) => {
-        const set = new Set(prev);
-        if (isNowBlocked) set.add(dayPopover);
-        else set.delete(dayPopover);
-        return Array.from(set);
-      });
-    } catch {
-      // ignore
-    }
-  }, [profile?.id, currentWorkspace?.id, dayPopover, blockedEnabled]);
+  const handleToggleBlocked = useCallback(
+    async (reason?: string) => {
+      if (!profile?.id || !currentWorkspace?.id || !dayPopover || !blockedEnabled)
+        return;
+      const alreadyBlocked = popoverBlockedBy.some((r) => r.userId === profile.id);
+      if (!alreadyBlocked && !canCreate("blocked_days")) return;
+      try {
+        const result = await toggleBlockedDay(
+          profile.id,
+          currentWorkspace.id,
+          dayPopover,
+          reason,
+          isLeader,
+        );
+        const { blocked, pending } = result;
+        setPopoverBlocked(blocked && !pending);
+        setPopoverBlockedBy((prev) => {
+          const others = prev.filter((r) => r.userId !== profile.id);
+          if (blocked) {
+            return [
+              {
+                name: "Tú",
+                userId: profile.id,
+                reason: reason?.trim() || null,
+                status: pending ? "pending" : "approved",
+              },
+              ...others,
+            ];
+          }
+          return others;
+        });
+        setWorkspaceBlockedDates((prev) => {
+          const set = new Set(prev);
+          if (blocked && !pending) set.add(dayPopover);
+          else set.delete(dayPopover);
+          return Array.from(set);
+        });
+        setWorkspacePendingDates((prev) => {
+          const set = new Set(prev);
+          if (blocked && pending) set.add(dayPopover);
+          else set.delete(dayPopover);
+          return Array.from(set);
+        });
+        if (blocked && pending) {
+          toast.info("Solicitud enviada — espera la aprobación del equipo");
+        } else if (blocked) {
+          toast.success("Día bloqueado");
+        } else {
+          toast.success("Solicitud cancelada");
+        }
+      } catch (err) {
+        const resource = parsePlanLimitError(err);
+        if (resource) {
+          openUpgrade(resource);
+          return;
+        }
+        toast.error("No se pudo actualizar el día");
+      }
+    },
+    [profile?.id, currentWorkspace?.id, dayPopover, blockedEnabled, isLeader, toast, canCreate, popoverBlockedBy],
+  );
 
   return (
     <>
@@ -181,7 +291,7 @@ export function Sidebar({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 flex w-64 flex-col bg-surface border-r border-line transition-transform duration-200 lg:static lg:translate-x-0",
+          "fixed inset-y-0 left-0 z-50 flex w-[85vw] max-w-72 flex-col bg-surface border-r border-line transition-transform duration-200 lg:static lg:translate-x-0",
           isOpen ? "translate-x-0" : "-translate-x-full",
         )}
       >
@@ -196,7 +306,7 @@ export function Sidebar({
             <span className="text-base font-extrabold tracking-tight text-ink">
               {APP_NAME}
             </span>
-            <span className="ml-auto rounded-full bg-prio-purple/10 px-2 py-0.5 text-xs font-semibold text-prio-purple">
+            <span className="ml-auto rounded-full bg-pritio-purple/10 px-2 py-0.5 text-xs font-semibold text-pritio-purple">
               BETA
             </span>
           </div>
@@ -262,12 +372,12 @@ export function Sidebar({
             </nav>
           </div>
 
-          {/* Juntas de hoy */}
+          {/* Juntas próximas */}
           <div>
             <p className="text-xs text-ink-muted uppercase tracking-wide mb-2">
-              Juntas de hoy
+              Juntas próximas
             </p>
-            {todayMeetings.length === 0 ? (
+            {upcomingMeetings.length === 0 ? (
               <div className="rounded-2xl bg-surface shadow-sm border border-line p-4">
                 <div className="flex items-center gap-3">
                   <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-surface-muted text-ink-muted shrink-0">
@@ -275,31 +385,42 @@ export function Sidebar({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <p className="text-sm text-ink-muted">Sin juntas hoy</p>
+                  <p className="text-sm text-ink-muted">Sin juntas en 7 días</p>
                 </div>
               </div>
             ) : (
-              <div className="space-y-2">
-                {todayMeetings.map((m) => (
+              <div className="max-h-64 space-y-2 overflow-y-auto pr-1">
+                {(showAllMeetings
+                  ? upcomingMeetings
+                  : upcomingMeetings.slice(0, 3)
+                ).map((m) => (
                   <button
                     key={m.id}
                     onClick={() => setSelectedMeeting(m)}
                     className="w-full rounded-2xl bg-surface shadow-sm border border-line p-4 text-left hover:shadow-soft hover:border-ink-muted/30 transition-all"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-prio-purple/10 text-prio-purple shrink-0 mt-0.5">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-pritio-purple/10 text-pritio-purple shrink-0 mt-0.5">
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>
                       </div>
                       <div className="min-w-0">
                         <p className="font-semibold text-sm text-ink truncate">{m.title}</p>
-                        {m.start_at && (
-                          <p className="text-xs text-ink-muted mt-0.5">
-                            {formatTime(new Date(m.start_at), timeFormat)}
-                            {m.end_at ? ` - ${formatTime(new Date(m.end_at), timeFormat)}` : ""}
-                          </p>
-                        )}
+                        <p className="text-xs text-ink-muted mt-0.5">
+                          {m.due_date
+                            ? m.due_date === todayStr()
+                              ? "Hoy"
+                              : new Date(m.due_date + "T12:00:00").toLocaleDateString(
+                                  "es-MX",
+                                  { weekday: "short", day: "numeric", month: "short" },
+                                )
+                            : ""}
+                          {m.start_at
+                            ? ` · ${formatTime(new Date(m.start_at), timeFormat)}`
+                            : ""}
+                          {m.end_at ? ` - ${formatTime(new Date(m.end_at), timeFormat)}` : ""}
+                        </p>
                         {m.description && (
                           <p className="text-xs text-ink-soft mt-1 line-clamp-1">{m.description}</p>
                         )}
@@ -307,6 +428,16 @@ export function Sidebar({
                     </div>
                   </button>
                 ))}
+                {upcomingMeetings.length > 3 && (
+                  <button
+                    onClick={() => setShowAllMeetings((v) => !v)}
+                    className="w-full rounded-lg py-1.5 text-center text-xs font-semibold text-pritio-purple hover:bg-surface-muted transition-colors"
+                  >
+                    {showAllMeetings
+                      ? "Ver menos"
+                      : `Ver más (${upcomingMeetings.length - 3})`}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -340,6 +471,7 @@ export function Sidebar({
               <MiniCalendar
                 taskDates={taskDates}
                 blockedDates={workspaceBlockedDates}
+                pendingDates={workspacePendingDates}
                 onDayClick={handleDayClick}
               />
             </div>
@@ -356,7 +488,7 @@ export function Sidebar({
             {!IS_SELF_HOSTED && (
               <button
                 onClick={() => setShowDonate(true)}
-                className="mt-2 text-xs text-prio-purple hover:text-prio-purple/80 transition-colors"
+                className="mt-2 text-xs text-pritio-purple hover:text-pritio-purple/80 transition-colors"
               >
                 Donar ❤️
               </button>
@@ -368,11 +500,15 @@ export function Sidebar({
       {/* Day popover */}
       {dayPopover && (
         <DayPopover
+          key={dayPopover}
           dateStr={dayPopover}
           tasks={popoverTasks}
           isBlocked={popoverBlocked}
+          blockedBy={popoverBlockedBy}
           loading={popoverLoading}
           blockedEnabled={blockedEnabled}
+          needsApproval={!isLeader}
+          myUserId={profile?.id ?? ""}
           onToggleBlocked={handleToggleBlocked}
           onNavigateToCalendar={() => {
             onNavigateToCalendar?.(dayPopover);
@@ -383,7 +519,26 @@ export function Sidebar({
       )}
 
       <DonationModal open={showDonate} onClose={() => setShowDonate(false)} />
-      {selectedMeeting && <MeetingDetailModal meeting={selectedMeeting} onClose={() => setSelectedMeeting(null)} />}
+      {selectedMeeting && (
+        <MeetingDetailModal
+          meeting={selectedMeeting}
+          onClose={() => setSelectedMeeting(null)}
+          onEdit={(m) => void handleEditMeeting(m)}
+          onDeleted={() => {
+            setSelectedMeeting(null);
+            loadUpcomingMeetings();
+          }}
+        />
+      )}
+      <TaskFormDialog
+        open={!!editingMeeting}
+        task={editingMeeting}
+        onClose={() => setEditingMeeting(null)}
+        onSaved={() => {
+          setEditingMeeting(null);
+          loadUpcomingMeetings();
+        }}
+      />
 
       {/* Create workspace dialog — full screen */}
       {showCreateDialog && (
@@ -397,7 +552,7 @@ export function Sidebar({
               value={newWsName}
               onChange={(e) => setNewWsName(e.target.value)}
               placeholder="Ej: Trabajo, Familia..."
-              className="w-full rounded-xl border border-line px-3.5 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20 mb-4"
+              className="w-full rounded-xl border border-line px-3.5 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20 mb-4"
             />
 
             <label className="block text-sm font-medium text-ink mb-1.5">Tipo</label>
@@ -407,7 +562,7 @@ export function Sidebar({
                 className={cn(
                   "flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all",
                   newWsType === "team"
-                    ? "border-prio-blue bg-prio-blue/10 text-prio-blue shadow-sm"
+                    ? "border-pritio-blue bg-pritio-blue/10 text-pritio-blue shadow-sm"
                     : "border-line text-ink-muted hover:bg-surface-muted",
                 )}
               >
@@ -418,7 +573,7 @@ export function Sidebar({
                 className={cn(
                   "flex-1 rounded-xl border px-3 py-2 text-sm font-medium transition-all",
                   newWsType === "family"
-                    ? "border-prio-blue bg-prio-blue/10 text-prio-blue shadow-sm"
+                    ? "border-pritio-blue bg-pritio-blue/10 text-pritio-blue shadow-sm"
                     : "border-line text-ink-muted hover:bg-surface-muted",
                 )}
               >
@@ -439,6 +594,7 @@ export function Sidebar({
               <button
                 disabled={!newWsName.trim() || creating}
                 onClick={async () => {
+                  if (!canCreate("workspaces")) return;
                   setCreating(true);
                   try {
                     const ws = await createWorkspace(newWsName.trim(), newWsType);
@@ -456,13 +612,18 @@ export function Sidebar({
                     }
                     setShowCreateDialog(false);
                     setNewWsName("");
-                  } catch {
-                    // error logged by createWorkspace
+                  } catch (err) {
+                    const resource = parsePlanLimitError(err);
+                    if (resource) {
+                      openUpgrade(resource);
+                      return;
+                    }
+                    toast.error("No se pudo crear el workspace");
                   } finally {
                     setCreating(false);
                   }
                 }}
-                className="rounded-xl bg-prio-blue px-4 py-2 text-sm font-medium text-white transition-all hover:bg-prio-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="rounded-xl bg-pritio-blue px-4 py-2 text-sm font-medium text-white transition-all hover:bg-pritio-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {creating ? "Creando..." : "Crear"}
               </button>
@@ -480,9 +641,12 @@ interface DayPopoverProps {
   dateStr: string;
   tasks: { id: string; title: string; kind: string; start_at: string | null; completed: boolean; quadrant: string }[];
   isBlocked: boolean;
+  blockedBy: { name: string; userId: string; reason: string | null; status: BlockedDayStatus }[];
   loading: boolean;
   blockedEnabled: boolean;
-  onToggleBlocked: () => void;
+  needsApproval: boolean;
+  myUserId: string;
+  onToggleBlocked: (reason?: string) => void;
   onNavigateToCalendar: () => void;
   onClose: () => void;
 }
@@ -491,13 +655,18 @@ function DayPopover({
   dateStr,
   tasks,
   isBlocked,
+  blockedBy,
   loading,
   blockedEnabled,
+  needsApproval,
+  myUserId,
   onToggleBlocked,
   onNavigateToCalendar,
   onClose,
 }: DayPopoverProps) {
   const timeFormat = useTimeFormat();
+  const [showReason, setShowReason] = useState(false);
+  const [reason, setReason] = useState("");
   const formatted = new Date(dateStr + "T12:00:00").toLocaleDateString("es-MX", {
     weekday: "long",
     day: "numeric",
@@ -511,7 +680,7 @@ function DayPopover({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="prio-modal-enter mx-4 w-full max-w-xs rounded-2xl bg-surface p-5 shadow-elevated border border-line">
+      <div className="pritio-modal-enter mx-4 w-full max-w-xs rounded-2xl bg-surface p-5 shadow-elevated border border-line">
         <div className="flex items-center justify-between mb-3">
           <h4 className="text-sm font-bold text-ink capitalize">{formatted}</h4>
           <button
@@ -528,7 +697,7 @@ function DayPopover({
           <p className="text-xs text-ink-soft py-3 text-center">Cargando...</p>
         ) : (
           <div className="space-y-2">
-            {tasks.length === 0 && !isBlocked && (
+            {tasks.length === 0 && blockedBy.length === 0 && (
               <p className="text-xs text-ink-muted py-3 text-center">Sin actividades este día</p>
             )}
 
@@ -542,7 +711,7 @@ function DayPopover({
               >
                 <div className="flex items-center gap-1.5">
                   {t.kind === "meeting" && (
-                    <svg className="h-3 w-3 shrink-0 text-prio-purple" viewBox="0 0 12 12" fill="none">
+                    <svg className="h-3 w-3 shrink-0 text-pritio-purple" viewBox="0 0 12 12" fill="none">
                       <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
                       <path d="M6 3.5V6.5L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                     </svg>
@@ -559,32 +728,148 @@ function DayPopover({
               </div>
             ))}
 
-            {/* Blocked toggle */}
-            {blockedEnabled && (
-              <button
-                type="button"
-                onClick={onToggleBlocked}
-                className={cn(
-                  "flex w-full items-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors",
-                  isBlocked
-                    ? "border-rose-200 bg-rose-50 text-rose-700"
-                    : "border-line text-ink-muted hover:bg-surface-muted",
+            {/* Blocked by list */}
+            {blockedBy.length > 0 && (
+              <div className="space-y-2">
+                {blockedBy.some((b) => b.status === "approved") && (
+                  <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-rose-700 mb-1">
+                      Día bloqueado por:
+                    </p>
+                    {blockedBy
+                      .filter((b) => b.status === "approved")
+                      .map((b, i) => (
+                        <p key={`${b.userId}-${i}`} className="text-[11px] text-rose-700/90">
+                          <span className="font-semibold">
+                            {b.userId === myUserId ? "Tú" : b.name}
+                          </span>
+                          {b.reason ? ` — ${b.reason}` : ""}
+                        </p>
+                      ))}
+                  </div>
                 )}
-              >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                  <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M3.5 3.5L8.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
-                {isBlocked ? "Quitar bloqueo" : "Bloquear día"}
-              </button>
+                {blockedBy.some((b) => b.status === "pending") && (
+                  <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-amber-700 mb-1">
+                      Pendiente de aprobación:
+                    </p>
+                    {blockedBy
+                      .filter((b) => b.status === "pending")
+                      .map((b, i) => (
+                        <p key={`${b.userId}-${i}`} className="text-[11px] text-amber-700/90">
+                          <span className="font-semibold">
+                            {b.userId === myUserId ? "Tú" : b.name}
+                          </span>
+                          {b.reason ? ` — ${b.reason}` : ""}
+                        </p>
+                      ))}
+                  </div>
+                )}
+                {blockedBy.some((b) => b.status === "rejected" && b.userId === myUserId) && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2">
+                    <p className="text-[11px] font-semibold text-red-700 mb-1">
+                      Tu solicitud fue rechazada:
+                    </p>
+                    {blockedBy
+                      .filter((b) => b.status === "rejected" && b.userId === myUserId)
+                      .map((b, i) => (
+                        <p key={`${b.userId}-${i}`} className="text-[11px] text-red-700/90">
+                          {b.reason || "Sin motivo"}
+                        </p>
+                      ))}
+                  </div>
+                )}
+              </div>
             )}
+
+            {/* Blocked toggle */}
+            {blockedEnabled &&
+              (isBlocked ? (
+                <button
+                  type="button"
+                  onClick={() => onToggleBlocked()}
+                  className="flex w-full items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-100 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M3.5 3.5L8.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  Quitar bloqueo
+                </button>
+              ) : blockedBy.some((b) => b.userId === myUserId && b.status === "pending") ? (
+                <button
+                  type="button"
+                  onClick={() => onToggleBlocked()}
+                  className="flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
+                    <path d="M4 12L12 4M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  Cancelar solicitud
+                </button>
+              ) : blockedBy.some((b) => b.userId === myUserId && b.status === "rejected") ? (
+                <button
+                  type="button"
+                  onClick={() => setShowReason(true)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
+                    <path d="M3.5 4L8.5 8M8.5 4L3.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  Reintentar solicitud
+                </button>
+              ) : showReason ? (
+                <div className="space-y-1.5">
+                  <input
+                    autoFocus
+                    value={reason}
+                    onChange={(e) => setReason(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") onToggleBlocked(reason);
+                    }}
+                    placeholder="Motivo (opcional)"
+                    className="w-full rounded-lg border border-line bg-surface-subtle px-3 py-2 text-xs text-ink placeholder:text-ink-muted focus:border-rose-400 focus:outline-none focus:ring-2 focus:ring-rose-400/20"
+                  />
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => onToggleBlocked(reason)}
+                      className="flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-rose-500 px-3 py-2 text-xs font-medium text-white hover:bg-rose-600 transition-colors"
+                    >
+                      {needsApproval ? "Solicitar día" : "Bloquear día"}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowReason(false);
+                        setReason("");
+                      }}
+                      className="rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-muted hover:bg-surface-muted transition-colors"
+                    >
+                      Cancelar
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setShowReason(true)}
+                  className="flex w-full items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-muted hover:bg-surface-muted transition-colors"
+                >
+                  <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
+                    <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
+                    <path d="M3.5 3.5L8.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                  </svg>
+                  {needsApproval ? "Solicitar día" : "Bloquear día"}
+                </button>
+              ))}
           </div>
         )}
 
         <button
           type="button"
           onClick={onNavigateToCalendar}
-          className="mt-3 w-full rounded-lg bg-prio-blue py-2 text-xs font-semibold text-white hover:bg-prio-blue/90 transition-colors"
+          className="mt-3 w-full rounded-lg bg-pritio-blue py-2 text-xs font-semibold text-white hover:bg-pritio-blue/90 transition-colors"
         >
           Ver en calendario
         </button>

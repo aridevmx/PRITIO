@@ -1,4 +1,4 @@
--- PRIO V1 — Fix invitations SELECT policy
+-- PRITIO V1 — Fix invitations SELECT policy
 -- Migration 0009: allow invited users to see their own pending invitations
 
 -- Drop the old policy that only allows workspace admins to SELECT

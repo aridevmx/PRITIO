@@ -5,7 +5,7 @@ import { sendEmail } from "../_shared/email.ts";
 import { isNotificationEnabled, type NotificationKind } from "../_shared/notification-prefs.ts";
 import { APP_NAME } from "../_shared/app-info.ts";
 
-const APP_URL = Deno.env.get("APP_URL") ?? "https://prio.app";
+const APP_URL = Deno.env.get("APP_URL") ?? "https://pritio.app";
 
 interface TaskNotificationPayload {
   kind: NotificationKind;
@@ -14,6 +14,7 @@ interface TaskNotificationPayload {
   actorUserId: string;
   assigneeIds?: string[];
   changes?: string[];
+  recipientUserIds?: string[];
 }
 
 interface TaskRecord {
@@ -69,7 +70,7 @@ Deno.serve(async (req: Request) => {
       supabaseAdmin.from("tasks").select("id, title, kind, due_date, start_at, end_at, meeting_link, location, description").eq("id", payload.taskId).single().then((r) => r.data as unknown as TaskRecord | null),
       supabaseAdmin.from("workspaces").select("id, name").eq("id", payload.workspaceId).single().then((r) => r.data as unknown as WorkspaceRecord | null),
       supabaseAdmin.from("profiles").select("id, full_name, email").eq("id", payload.actorUserId).single().then((r) => r.data as unknown as ProfileRecord | null),
-      getRecipients(payload.assigneeIds ?? []),
+      getRecipients(payload.assigneeIds ?? [], payload.recipientUserIds ?? []),
     ]);
 
     if (!task || !workspace) {
@@ -151,24 +152,27 @@ function deliveryFor(kind: NotificationKind): "toast" | "bell" | "both" {
   return TOAST_KINDS.has(kind) ? "both" : "bell";
 }
 
-async function getRecipients(assigneeIds: string[]): Promise<ProfileRecord[]> {
-  if (!assigneeIds.length) return [];
+async function getRecipients(assigneeIds: string[], recipientUserIds: string[] = []): Promise<ProfileRecord[]> {
+  const userIds = new Set<string>(recipientUserIds.filter(Boolean));
 
-  const { data: assignees } = await supabaseAdmin
-    .from("assignees")
-    .select("linked_user_id")
-    .in("id", assigneeIds);
+  if (assigneeIds.length > 0) {
+    const { data: assignees } = await supabaseAdmin
+      .from("assignees")
+      .select("linked_user_id")
+      .in("id", assigneeIds);
 
-  const userIds = (assignees ?? [])
-    .map((a: Record<string, unknown>) => a.linked_user_id as string)
-    .filter(Boolean);
+    for (const a of (assignees ?? []) as Record<string, unknown>[]) {
+      const uid = a.linked_user_id as string | null;
+      if (uid) userIds.add(uid);
+    }
+  }
 
-  if (!userIds.length) return [];
+  if (userIds.size === 0) return [];
 
   const { data: profiles } = await supabaseAdmin
     .from("profiles")
     .select("id, full_name, email")
-    .in("id", userIds);
+    .in("id", Array.from(userIds));
 
   return (profiles ?? []) as ProfileRecord[];
 }
@@ -206,6 +210,9 @@ function buildNotification(
     meeting_created: `Nueva junta en ${workspaceName}`,
     deadline_approaching: `${typeLabel} por vencer en ${workspaceName}`,
     completed: `${typeLabel} completada en ${workspaceName}`,
+    task_approved: `Tu tarea fue aprobada en ${workspaceName}`,
+    task_rejected: `Tu tarea fue rechazada en ${workspaceName}`,
+    approval_requested: `Tarea por aprobar en ${workspaceName}`,
   };
 
   const titles: Record<NotificationKind, string> = {
@@ -214,6 +221,9 @@ function buildNotification(
     meeting_created: "Nueva junta",
     deadline_approaching: "Por vencer",
     completed: `${typeLabel} completada`,
+    task_approved: "Tarea aprobada",
+    task_rejected: "Tarea rechazada",
+    approval_requested: "Tarea por aprobar",
   };
 
   const detailsHtml = `

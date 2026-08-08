@@ -2,11 +2,26 @@ export type Quadrant = "do" | "plan" | "delegate" | "later";
 
 export type WorkspaceType = "personal" | "family" | "team" | "enterprise";
 
-export type WorkspacePlan = "personal_free" | "pro" | "enterprise";
+export type WorkspacePlan = "free" | "pro";
+
+/** Purchasable Pro tier (enterprise workspaces map to "team"). */
+export type BillingTier = "personal" | "family" | "team";
+
+export type BillingCurrency = "usd" | "mxn";
+
+export type BillingPeriod = "monthly" | "yearly";
+
+export type SubscriptionStatus =
+  | "active"
+  | "trialing"
+  | "past_due"
+  | "canceled";
 
 export type WorkspaceRole = "owner" | "admin" | "leader" | "member";
 
 export type TaskKind = "task" | "meeting";
+
+export type RecurrenceFreq = "daily" | "weekly" | "monthly";
 
 export type TaskApprovalStatus = "pending_approval" | "approved" | "rejected";
 
@@ -20,7 +35,10 @@ export type NotificationKind =
   | "role_changed"
   | "blocked_day_pending_approval"
   | "blocked_day_approved"
-  | "blocked_day_rejected";
+  | "blocked_day_rejected"
+  | "task_approved"
+  | "task_rejected"
+  | "approval_requested";
 
 export type NotificationDelivery = "toast" | "bell" | "both";
 
@@ -46,6 +64,48 @@ export interface Workspace {
   autoPromoteDueToDo: boolean;
   graceUntil: string | null;
   createdAt: string;
+}
+
+export interface Subscription {
+  id: string;
+  userId: string;
+  workspaceId: string;
+  plan: "pro";
+  status: SubscriptionStatus;
+  currentPeriodEnd: string | null;
+  quantity: number;
+  trialEndsAt: string | null;
+  stripeSubscriptionId: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type PlanResource =
+  | "members"
+  | "active_tasks"
+  | "projects"
+  | "assignees"
+  | "blocked_days"
+  | "workspaces";
+
+export interface PlanLimits {
+  plan: WorkspacePlan;
+  workspaceType: WorkspaceType;
+  memberLimit: number;
+  activeTaskLimit: number;
+  projectLimit: number;
+  assigneeLimit: number;
+  blockedDayLimit: number;
+  workspaceLimit: number;
+}
+
+export interface WorkspaceUsage {
+  members: number;
+  activeTasks: number;
+  projects: number;
+  assignees: number;
+  blockedDays: number;
+  workspaces: number;
 }
 
 export interface NotificationPreferences {
@@ -134,6 +194,12 @@ export interface Task {
   blockOverrideId: string | null;
   graceStartedAt: string | null;
   submitFinalizedAt: string | null;
+  recurrenceFreq: RecurrenceFreq | null;
+  recurrenceInterval: number;
+  recurrenceEndDate: string | null;
+  recurrenceCount: number | null;
+  recurrenceParentId: string | null;
+  approvalRequestedAt: string | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -235,6 +301,31 @@ export interface WorkspaceRow {
   created_at: string;
 }
 
+export interface SubscriptionRow {
+  id: string;
+  user_id: string;
+  workspace_id: string;
+  plan: "pro";
+  status: SubscriptionStatus;
+  current_period_end: string | null;
+  quantity: number;
+  trial_ends_at: string | null;
+  stripe_subscription_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlanLimitsRow {
+  plan: WorkspacePlan;
+  workspace_type: WorkspaceType;
+  member_limit: number;
+  active_task_limit: number;
+  project_limit: number;
+  assignee_limit: number;
+  blocked_day_limit: number;
+  workspace_limit: number;
+}
+
 export interface WorkspaceMemberRow {
   id: string;
   workspace_id: string;
@@ -290,6 +381,12 @@ export interface TaskRow {
   block_override_id: string | null;
   grace_started_at: string | null;
   submit_finalized_at: string | null;
+  recurrence_freq: RecurrenceFreq | null;
+  recurrence_interval: number;
+  recurrence_end_date: string | null;
+  recurrence_count: number | null;
+  recurrence_parent_id: string | null;
+  approval_requested_at: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -335,6 +432,11 @@ export interface CreateTaskPayload {
   meetingLink?: string | null;
   requiresApproval?: boolean;
   assigneeIds?: string[];
+  recurrenceFreq?: RecurrenceFreq | null;
+  recurrenceInterval?: number;
+  recurrenceEndDate?: string | null;
+  recurrenceCount?: number | null;
+  approvalRequestedAt?: string | null;
   createdBy: string;
 }
 
@@ -351,5 +453,13 @@ export interface UpdateTaskPayload {
   projectId?: string | null;
   completed?: boolean;
   requiresApproval?: boolean;
+  approved?: boolean;
+  rejected?: boolean;
+  rejectionReason?: string | null;
+  approvalRequestedAt?: string | null;
   assigneeIds?: string[];
+  recurrenceFreq?: RecurrenceFreq | null;
+  recurrenceInterval?: number;
+  recurrenceEndDate?: string | null;
+  recurrenceCount?: number | null;
 }

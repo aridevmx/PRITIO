@@ -8,7 +8,7 @@ export const IN_APP_EVENTS: { kind: string; label: string }[] = [
   { kind: "workspace_invitation", label: "Invitación a workspace" },
 ];
 
-const STORAGE_KEY = "prio:inAppPrefs";
+const STORAGE_KEY = "pritio:inAppPrefs";
 
 const DEFAULTS: Record<string, InAppDelivery> = {
   task_assigned: "both",

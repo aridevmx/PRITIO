@@ -77,7 +77,7 @@ export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: Workspac
                     <span className="block text-xs text-ink-muted capitalize">{ws.type}</span>
                   </div>
                   {isActive && (
-                    <svg className="h-4 w-4 shrink-0 text-prio-blue" viewBox="0 0 16 16" fill="none">
+                    <svg className="h-4 w-4 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
                       <path d="M13 4L6 12L3 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
                     </svg>
                   )}

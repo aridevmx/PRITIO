@@ -3,19 +3,22 @@ import { createPortal } from "react-dom";
 import { cn, todayStr, localDateStr } from "@/lib/utils";
 import { Field } from "@/components/Field";
 import { SegmentedControl } from "@/components/SegmentedControl";
+import { TimePicker } from "@/components/TimePicker";
 import { QUADRANTS, QUADRANT_ORDER } from "@/features/tasks/quadrants";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { useToast } from "@/components/Toast";
 import { supabase } from "@/lib/supabase";
 import { createTask as apiCreateTask, updateTask as apiUpdateTask } from "@/features/tasks/api";
+import { useBilling } from "@/features/billing/BillingProvider";
+import { parsePlanLimitError } from "@/features/billing/guarded";
+import { openUpgrade } from "@/features/billing/upgrade";
 import { formatTime, useTimeFormat } from "@/lib/timeFormat";
-import type { Task, Quadrant, TaskKind, CreateTaskPayload } from "@/types";
+import { notifyTaskChange } from "@/features/tasks/notifications";
+import { RecurrenceEditDialog } from "@/features/tasks/RecurrenceEditDialog";
+import type { Task, Quadrant, TaskKind, RecurrenceFreq, CreateTaskPayload } from "@/types";
 
 const MEETING_DURATIONS = [15, 30, 45, 60] as const;
 type MeetingDuration = (typeof MEETING_DURATIONS)[number];
-
-const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => String(i).padStart(2, "0"));
-const MINUTE_OPTIONS = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "0"));
 
 interface TaskFormDialogProps {
   open: boolean;
@@ -23,6 +26,8 @@ interface TaskFormDialogProps {
   onSaved: (task: Task) => void;
   task?: Task | null;
   defaultQuadrant?: Quadrant;
+  defaultDueDate?: string;
+  defaultStartTime?: string;
 }
 
 function addDays(days: number): string {
@@ -40,10 +45,14 @@ function meetingStartISO(day: string, time: string): string | null {
 
 function meetingEndISO(day: string, time: string, duration: MeetingDuration): string | null {
   if (!day || !time) return null;
-  const d = new Date(`${day}T${time}`);
-  d.setMinutes(d.getMinutes() + duration);
-  if (isNaN(d.getTime())) return null;
-  return d.toISOString();
+  const start = new Date(`${day}T${time}`);
+  if (isNaN(start.getTime())) return null;
+  const end = new Date(start);
+  end.setMinutes(end.getMinutes() + duration);
+  if (isNaN(end.getTime())) return null;
+  const dayEnd = new Date(`${day}T23:59`);
+  if (end.getTime() > dayEnd.getTime()) return dayEnd.toISOString();
+  return end.toISOString();
 }
 
 function snapTo5(time: string): string {
@@ -56,14 +65,23 @@ function snapTo5(time: string): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
+function timeToMinutes(time: string): number {
+  const [h, m] = time.split(":").map(Number);
+  if (isNaN(h) || isNaN(m)) return 0;
+  return h * 60 + m;
+}
+
 export function TaskFormDialog({
   open,
   onClose,
   onSaved,
   task,
   defaultQuadrant = "do",
+  defaultDueDate,
+  defaultStartTime,
 }: TaskFormDialogProps) {
-  const { currentWorkspace, profile } = useWorkspace();
+  const { currentWorkspace, profile, members } = useWorkspace();
+  const { canCreate } = useBilling();
   const { toast } = useToast();
 
   const [title, setTitle] = useState("");
@@ -72,14 +90,24 @@ export function TaskFormDialog({
   const [quadrant, setQuadrant] = useState<Quadrant>(defaultQuadrant);
   const [kind, setKind] = useState<TaskKind>("task");
   const [dueDate, setDueDate] = useState("");
+  const [blockDay, setBlockDay] = useState("");
   const [meetingDay, setMeetingDay] = useState("");
   const [meetingStartTime, setMeetingStartTime] = useState("");
   const [meetingDuration, setMeetingDuration] = useState<MeetingDuration>(30);
+  const [taskStartTime, setTaskStartTime] = useState("");
+  const [taskEndTime, setTaskEndTime] = useState("");
+  const [showTaskTime, setShowTaskTime] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [location, setLocation] = useState("");
   const [meetingLink, setMeetingLink] = useState("");
   const [requiresApproval, setRequiresApproval] = useState(false);
   const [projectId, setProjectId] = useState("");
   const [selectedAssigneeIds, setSelectedAssigneeIds] = useState<string[]>([]);
+  const [recurrenceFreq, setRecurrenceFreq] = useState<RecurrenceFreq | "">("");
+  const [recurrenceInterval, setRecurrenceInterval] = useState(1);
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
+  const [recurrenceChoice, setRecurrenceChoice] = useState<"this" | "all" | null>(null);
+  const [recurrencePromptOpen, setRecurrencePromptOpen] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const timeFormat = useTimeFormat();
@@ -118,48 +146,89 @@ export function TaskFormDialog({
         setQuadrant(task.quadrant);
         setKind(task.kind);
         setDueDate(task.dueDate ?? "");
+        setBlockDay("");
+        setTaskStartTime("");
+        setTaskEndTime("");
+        setShowTaskTime(false);
         if (task.startAt) {
           const start = new Date(task.startAt);
-          setMeetingDay(localDateStr(start));
-          setMeetingStartTime(
-            snapTo5(start.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false })),
+          const time = snapTo5(
+            start.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }),
           );
-          const minutes = task.endAt ? Math.round((new Date(task.endAt).getTime() - start.getTime()) / 60000) : 30;
+          const endTime = task.endAt
+            ? snapTo5(
+                new Date(task.endAt).toLocaleTimeString("es-MX", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                }),
+              )
+            : "";
+          const minutes = task.endAt
+            ? Math.round((new Date(task.endAt).getTime() - start.getTime()) / 60000)
+            : 30;
           const clamped = MEETING_DURATIONS.reduce(
             (best, d) => (Math.abs(d - minutes) < Math.abs(best - minutes) ? d : best),
             MEETING_DURATIONS[0],
           );
-          setMeetingDuration(clamped);
+          if (task.kind === "meeting") {
+            setMeetingDay(localDateStr(start));
+            setMeetingStartTime(time);
+            setMeetingDuration(clamped);
+            setMeetingLink(task.meetingLink ?? "");
+          } else {
+            setMeetingDay("");
+            setMeetingStartTime("");
+            setMeetingDuration(30);
+            setBlockDay(localDateStr(start));
+            setTaskStartTime(time);
+            setTaskEndTime(endTime);
+            setShowTaskTime(true);
+            setMeetingLink("");
+          }
         } else {
           setMeetingDay(task.dueDate ?? "");
           setMeetingStartTime("");
           setMeetingDuration(30);
+          setMeetingLink(task.meetingLink ?? "");
         }
         setLocation(task.location ?? "");
-        setMeetingLink(task.meetingLink ?? "");
         setRequiresApproval(task.requiresApproval);
         setProjectId(task.projectId ?? "");
         setSelectedAssigneeIds(task.assigneeIds);
+        setRecurrenceFreq(task.recurrenceFreq ?? "");
+        setRecurrenceInterval(task.recurrenceInterval || 1);
+        setRecurrenceEndDate(task.recurrenceEndDate ?? "");
+        setRecurrenceChoice(null);
       } else {
         setTitle("");
         setDescription("");
         setShowDescription(false);
         setQuadrant(defaultQuadrant);
         setKind("task");
-        setDueDate("");
+        setDueDate(defaultStartTime ? "" : (defaultDueDate ?? ""));
+        setBlockDay(defaultStartTime ? (defaultDueDate ?? "") : "");
         setMeetingDay("");
         setMeetingStartTime("");
         setMeetingDuration(30);
+        setTaskStartTime(defaultStartTime ?? "");
+        setTaskEndTime("");
+        setShowTaskTime(!!defaultStartTime);
         setLocation("");
         setMeetingLink("");
         setRequiresApproval(false);
         setProjectId("");
         setSelectedAssigneeIds([]);
+        setRecurrenceFreq("");
+        setRecurrenceInterval(1);
+        setRecurrenceEndDate("");
+        setRecurrenceChoice(null);
       }
       setError("");
+      setShowMore(false);
       setTimeout(() => titleRef.current?.focus(), 50);
     }
-  }, [open, task, defaultQuadrant]);
+  }, [open, task, defaultQuadrant, defaultDueDate, defaultStartTime]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -185,13 +254,30 @@ export function TaskFormDialog({
     );
   };
 
-  const handleSubmit = useCallback(async () => {
+  const performSave = useCallback(async (choice: "this" | "all" | null) => {
     if (!title.trim()) {
       setError("El titulo es requerido");
       return;
     }
     if (kind === "meeting" && meetingStartTime && !meetingDay) {
       setError("Indica el día de la junta");
+      return;
+    }
+    if (kind === "task" && taskStartTime && !blockDay) {
+      setError("Indica el día del bloque de tiempo");
+      return;
+    }
+    if (kind === "task" && taskStartTime && !taskEndTime) {
+      setError("Indica la hora de fin del bloque");
+      return;
+    }
+    if (
+      kind === "task" &&
+      taskStartTime &&
+      taskEndTime &&
+      timeToMinutes(taskEndTime) <= timeToMinutes(taskStartTime)
+    ) {
+      setError("La hora de fin debe ser posterior a la de inicio");
       return;
     }
     if (!currentWorkspace || !profile) {
@@ -201,10 +287,39 @@ export function TaskFormDialog({
 
     setSaving(true);
     setError("");
+    setRecurrencePromptOpen(false);
 
     const effectiveDueDate = kind === "meeting" ? (meetingDay || null) : (dueDate || null);
-    const effectiveStartAt = kind === "meeting" ? meetingStartISO(meetingDay, meetingStartTime) : null;
-    const effectiveEndAt = kind === "meeting" ? meetingEndISO(meetingDay, meetingStartTime, meetingDuration) : null;
+    const effectiveStartAt =
+      kind === "meeting"
+        ? meetingStartISO(meetingDay, meetingStartTime)
+        : meetingStartISO(blockDay, taskStartTime);
+    const effectiveEndAt =
+      kind === "meeting"
+        ? meetingEndISO(meetingDay, meetingStartTime, meetingDuration)
+        : meetingStartISO(blockDay, taskEndTime);
+
+    const effectiveFreq: RecurrenceFreq | null =
+      choice === "this" ? null : recurrenceFreq === "" ? null : recurrenceFreq;
+
+    const resubmitting = isEdit && requiresApproval && Boolean(task?.rejected);
+    const newlyRequiring = isEdit && requiresApproval && !task?.requiresApproval;
+    const approvalRequestedAt = !requiresApproval
+      ? null
+      : isEdit && !resubmitting && !newlyRequiring
+        ? (task?.approvalRequestedAt ?? null)
+        : new Date().toISOString();
+
+    const managerUserIds = members
+      .filter(
+        (m) =>
+          m.userId !== profile.id &&
+          (m.role === "owner" || m.role === "admin" || m.role === "leader"),
+      )
+      .map((m) => m.userId);
+
+    const shouldNotifyApproval =
+      requiresApproval && (!isEdit || newlyRequiring || resubmitting);
 
     try {
       let saved: Task;
@@ -220,8 +335,16 @@ export function TaskFormDialog({
           location: location.trim() || null,
           meetingLink: meetingLink.trim() || null,
           requiresApproval,
+          approved: resubmitting ? false : undefined,
+          rejected: resubmitting ? false : undefined,
+          rejectionReason: resubmitting ? null : undefined,
+          approvalRequestedAt,
           projectId: projectId || null,
           assigneeIds: selectedAssigneeIds,
+          recurrenceFreq: effectiveFreq,
+          recurrenceInterval: recurrenceFreq === "" ? 1 : recurrenceInterval,
+          recurrenceEndDate: recurrenceFreq === "" ? null : recurrenceEndDate || null,
+          recurrenceCount: null,
         });
       } else {
         const payload: CreateTaskPayload = {
@@ -236,12 +359,37 @@ export function TaskFormDialog({
           location: location.trim() || null,
           meetingLink: meetingLink.trim() || null,
           requiresApproval,
+          approvalRequestedAt,
           projectId: projectId || null,
           assigneeIds: selectedAssigneeIds,
+          recurrenceFreq: effectiveFreq,
+          recurrenceInterval: recurrenceFreq === "" ? 1 : recurrenceInterval,
+          recurrenceEndDate: recurrenceFreq === "" ? null : recurrenceEndDate || null,
           createdBy: profile.id,
         };
+        if (!canCreate("active_tasks")) return;
         saved = await apiCreateTask(payload);
       }
+
+      if (isEdit) {
+        const assigneesChanged =
+          selectedAssigneeIds.length !== (task?.assigneeIds.length ?? 0) ||
+          selectedAssigneeIds.some((id) => !task?.assigneeIds.includes(id));
+        if (assigneesChanged) {
+          void notifyTaskChange("assigned", saved.id, currentWorkspace.id, selectedAssigneeIds);
+        } else {
+          void notifyTaskChange("updated", saved.id, currentWorkspace.id, selectedAssigneeIds);
+        }
+      } else if (kind === "meeting") {
+        void notifyTaskChange("meeting_created", saved.id, currentWorkspace.id, selectedAssigneeIds);
+      } else if (selectedAssigneeIds.length > 0) {
+        void notifyTaskChange("assigned", saved.id, currentWorkspace.id, selectedAssigneeIds);
+      }
+
+      if (shouldNotifyApproval && managerUserIds.length > 0) {
+        void notifyTaskChange("approval_requested", saved.id, currentWorkspace.id, [], undefined, managerUserIds);
+      }
+
       onSaved(saved);
       toast.success(
         isEdit
@@ -250,6 +398,11 @@ export function TaskFormDialog({
       );
       onClose();
     } catch (err) {
+      const resource = parsePlanLimitError(err);
+      if (resource) {
+        openUpgrade(resource);
+        return;
+      }
       const msg = err instanceof Error ? err.message : "Error al guardar";
       setError(msg);
       toast.error(msg);
@@ -257,21 +410,30 @@ export function TaskFormDialog({
       setSaving(false);
     }
   }, [
-    title, description, quadrant, kind, dueDate, meetingDay, meetingStartTime, meetingDuration,
-    location, meetingLink, requiresApproval, projectId, selectedAssigneeIds,
-    currentWorkspace, profile, isEdit, task, onSaved, onClose, toast,
+    title, description, quadrant, kind, dueDate, blockDay, meetingDay, meetingStartTime, meetingDuration,
+    taskStartTime, taskEndTime, location, meetingLink, requiresApproval, projectId, selectedAssigneeIds,
+    recurrenceFreq, recurrenceInterval, recurrenceEndDate, currentWorkspace, profile, members, isEdit, task,
+    canCreate, onSaved, onClose, toast,
   ]);
+
+  const handleSubmit = useCallback(async () => {
+    if (isEdit && task?.recurrenceFreq && recurrenceChoice === null) {
+      setRecurrencePromptOpen(true);
+      return;
+    }
+    await performSave(recurrenceChoice);
+  }, [isEdit, task, recurrenceChoice, performSave]);
 
   if (!open) return null;
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[9998] flex items-center justify-center bg-ink/30 backdrop-blur-sm"
+      className="fixed inset-0 z-[9998] flex items-end justify-center bg-ink/30 backdrop-blur-sm md:items-center"
       onMouseDown={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="prio-modal-enter mx-4 max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-surface p-6 shadow-elevated">
+      <div className="pritio-modal-enter max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl border border-b-0 border-line bg-surface p-5 shadow-elevated md:mx-4 md:max-h-[90vh] md:max-w-lg md:rounded-b-2xl md:border-b md:p-6">
         <h3 className="text-lg font-bold text-ink">
           {isEdit ? "Editar tarea" : "Nueva tarea"}
         </h3>
@@ -292,7 +454,7 @@ export function TaskFormDialog({
               {
                 value: "task",
                 label: "Tarea",
-                activeClassName: "text-prio-blue",
+                activeClassName: "text-pritio-blue",
                 icon: (
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                     <path d="M2.5 4.5l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
@@ -305,7 +467,7 @@ export function TaskFormDialog({
               {
                 value: "meeting",
                 label: "Junta",
-                activeClassName: "text-prio-purple",
+                activeClassName: "text-pritio-purple",
                 icon: (
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
                     <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
@@ -326,7 +488,7 @@ export function TaskFormDialog({
                 if (error) setError("");
               }}
               placeholder="Ej: Revisar propuesta de proyecto"
-              className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-prio-blue focus:outline-none focus:ring-2 focus:ring-prio-blue/20"
+              className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
             />
           </Field>
 
@@ -337,7 +499,7 @@ export function TaskFormDialog({
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Detalles adicionales..."
                 rows={3}
-                className="w-full resize-none rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-prio-blue focus:outline-none focus:ring-2 focus:ring-prio-blue/20"
+                className="w-full resize-none rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
               />
             </Field>
           ) : (
@@ -382,52 +544,36 @@ export function TaskFormDialog({
           </Field>
 
           {kind === "task" && (
-              <Field label="Fecha limite" badge="Opcional">
-                <div className="flex flex-col gap-1.5">
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-prio-blue focus:outline-none focus:ring-2 focus:ring-prio-blue/20"
-                  />
-                  <div className="flex gap-1">
-                    {[
-                      { label: "Hoy", value: todayStr() },
-                      { label: "Mañana", value: addDays(1) },
-                      { label: "1 sem", value: addDays(7) },
-                    ].map((s) => (
-                      <button
-                        key={s.label}
-                        type="button"
-                        onClick={() => setDueDate(s.value)}
-                        className={cn(
-                          "rounded-md border px-2 py-0.5 text-[11px] font-medium transition-all",
-                          dueDate === s.value
-                            ? "border-prio-blue bg-prio-blue/5 text-prio-blue"
-                            : "border-line text-ink-soft hover:bg-surface-muted",
-                        )}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
+            <Field label="Fecha limite" badge="Opcional">
+              <div className="flex flex-col gap-1.5">
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                />
+                <div className="flex gap-1">
+                  {[
+                    { label: "Hoy", value: todayStr() },
+                    { label: "Mañana", value: addDays(1) },
+                    { label: "1 sem", value: addDays(7) },
+                  ].map((s) => (
+                    <button
+                      key={s.label}
+                      type="button"
+                      onClick={() => setDueDate(s.value)}
+                      className={cn(
+                        "rounded-md border px-2 py-0.5 text-[11px] font-medium transition-all",
+                        dueDate === s.value
+                          ? "border-pritio-blue bg-pritio-blue/5 text-pritio-blue"
+                          : "border-line text-ink-soft hover:bg-surface-muted",
+                      )}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
                 </div>
-              </Field>
-            )}
-
-          {/* Project + Approval row */}
-          {projects.length > 0 && (
-            <Field label="Proyecto" badge="Opcional">
-              <select
-                value={projectId}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-prio-blue focus:outline-none focus:ring-2 focus:ring-prio-blue/20"
-              >
-                <option value="">Sin proyecto</option>
-                {projects.map((p) => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
+              </div>
             </Field>
           )}
 
@@ -440,43 +586,11 @@ export function TaskFormDialog({
                     type="date"
                     value={meetingDay}
                     onChange={(e) => setMeetingDay(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-prio-purple focus:outline-none focus:ring-2 focus:ring-prio-purple/20"
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
                   />
                 </Field>
                 <Field label="Hora de inicio">
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={meetingStartTime ? meetingStartTime.slice(0, 2) : ""}
-                      onChange={(e) => {
-                        const h = e.target.value;
-                        const m = meetingStartTime ? meetingStartTime.slice(3, 5) : "";
-                        if (!h) setMeetingStartTime("");
-                        else setMeetingStartTime(m ? `${h}:${m}` : `${h}:00`);
-                      }}
-                      className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-prio-purple focus:outline-none focus:ring-2 focus:ring-prio-purple/20"
-                    >
-                      <option value="">--</option>
-                      {HOUR_OPTIONS.map((h) => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                    <span className="text-sm font-semibold text-ink-soft">:</span>
-                    <select
-                      value={meetingStartTime ? meetingStartTime.slice(3, 5) : ""}
-                      onChange={(e) => {
-                        const m = e.target.value;
-                        const h = meetingStartTime ? meetingStartTime.slice(0, 2) : "";
-                        if (!m) setMeetingStartTime("");
-                        else setMeetingStartTime(h ? `${h}:${m}` : `00:${m}`);
-                      }}
-                      className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-prio-purple focus:outline-none focus:ring-2 focus:ring-prio-purple/20"
-                    >
-                      <option value="">--</option>
-                      {MINUTE_OPTIONS.map((m) => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <TimePicker value={meetingStartTime} onChange={setMeetingStartTime} accent="purple" />
                 </Field>
               </div>
               <Field label="Duración">
@@ -489,7 +603,7 @@ export function TaskFormDialog({
                       className={cn(
                         "rounded-full border px-3 py-1.5 text-sm font-semibold transition-all",
                         meetingDuration === dur
-                          ? "border-prio-purple bg-prio-purple text-white"
+                          ? "border-pritio-purple bg-pritio-purple text-white"
                           : "border-line bg-surface text-ink-soft hover:bg-surface-muted",
                       )}
                     >
@@ -518,7 +632,7 @@ export function TaskFormDialog({
                     value={location}
                     onChange={(e) => setLocation(e.target.value)}
                     placeholder="Ej: Sala B, Edificio Principal"
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-prio-purple focus:outline-none focus:ring-2 focus:ring-prio-purple/20"
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
                   />
                 </Field>
                 <Field label="Enlace de la junta" badge="Opcional">
@@ -527,53 +641,79 @@ export function TaskFormDialog({
                     value={meetingLink}
                     onChange={(e) => setMeetingLink(e.target.value)}
                     placeholder="https://meet.google.com/..."
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-prio-purple focus:outline-none focus:ring-2 focus:ring-prio-purple/20"
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
                   />
                 </Field>
               </div>
             </>
           )}
 
-          {/* Multi-assignee */}
-          {assignees.length > 0 && (
-            <Field label="Asignar a" badge="Opcional">
-              <div className="flex flex-wrap gap-1.5">
-                {selectedAssigneeIds.map((id) => {
-                  const a = assignees.find((x) => x.id === id);
-                  return (
-                    <span
-                      key={id}
-                      className="inline-flex items-center gap-1 rounded-full bg-prio-blue/10 px-2.5 py-1 text-xs font-medium text-prio-blue"
-                    >
-                      {a?.name ?? id}
-                      <button
-                        type="button"
-                        onClick={() => toggleAssignee(id)}
-                        className="ml-0.5 text-prio-blue/60 hover:text-prio-blue"
-                      >
-                        <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                          <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
-                      </button>
-                    </span>
-                  );
-                })}
-              </div>
-              <select
-                value=""
-                onChange={(e) => {
-                  if (e.target.value) toggleAssignee(e.target.value);
-                }}
-                className="mt-1.5 w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-prio-blue focus:outline-none focus:ring-2 focus:ring-prio-blue/20"
-              >
-                <option value="">Agregar asignado...</option>
-                {assignees
-                  .filter((a) => !selectedAssigneeIds.includes(a.id))
-                  .map((a) => (
-                    <option key={a.id} value={a.id}>{a.name}</option>
-                  ))}
-              </select>
-            </Field>
+          {/* Project + Assignee row (2 columns) */}
+          {(projects.length > 0 || assignees.length > 0) && (
+            <div
+              className={cn(
+                "grid gap-4",
+                projects.length > 0 && assignees.length > 0
+                  ? "grid-cols-1 sm:grid-cols-2"
+                  : "grid-cols-1",
+              )}
+            >
+              {projects.length > 0 && (
+                <Field label="Proyecto" badge="Opcional">
+                  <select
+                    value={projectId}
+                    onChange={(e) => setProjectId(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                  >
+                    <option value="">Sin proyecto</option>
+                    {projects.map((p) => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
+                  </select>
+                </Field>
+              )}
+
+              {assignees.length > 0 && (
+                <Field label="Asignar a" badge="Opcional">
+                  <div className="flex flex-wrap gap-1.5">
+                    {selectedAssigneeIds.map((id) => {
+                      const a = assignees.find((x) => x.id === id);
+                      return (
+                        <span
+                          key={id}
+                          className="inline-flex items-center gap-1 rounded-full bg-pritio-blue/10 px-2.5 py-1 text-xs font-medium text-pritio-blue"
+                        >
+                          {a?.name ?? id}
+                          <button
+                            type="button"
+                            onClick={() => toggleAssignee(id)}
+                            className="ml-0.5 text-pritio-blue/60 hover:text-pritio-blue"
+                          >
+                            <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                            </svg>
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </div>
+                  <select
+                    value=""
+                    onChange={(e) => {
+                      if (e.target.value) toggleAssignee(e.target.value);
+                    }}
+                    className="mt-1.5 w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                  >
+                    <option value="">Agregar asignado...</option>
+                    {assignees
+                      .filter((a) => !selectedAssigneeIds.includes(a.id))
+                      .map((a) => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                  </select>
+                </Field>
+              )}
+            </div>
           )}
 
           {/* Approval checkbox (only when workspace has members) */}
@@ -583,10 +723,126 @@ export function TaskFormDialog({
                 type="checkbox"
                 checked={requiresApproval}
                 onChange={(e) => setRequiresApproval(e.target.checked)}
-                className="h-4 w-4 rounded border-line text-prio-blue focus:ring-prio-blue/20"
+                className="h-4 w-4 rounded border-line text-pritio-blue focus:ring-pritio-blue/20"
               />
               Requiere aprobacion
             </label>
+          )}
+
+          {/* Optional sections */}
+          <button
+            type="button"
+            onClick={() => setShowMore((v) => !v)}
+            className="flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink transition-colors"
+          >
+            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+              {showMore ? (
+                <path d="M4 8h8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              ) : (
+                <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+              )}
+            </svg>
+            {showMore ? "- Menos Opciones" : "+ Mas Opciones"}
+          </button>
+
+          {showMore && (
+            <div className="space-y-4">
+              {kind === "task" &&
+                (showTaskTime ? (
+                  <>
+                    <Field label="Fecha">
+                      <input
+                        type="date"
+                        value={blockDay}
+                        onChange={(e) => setBlockDay(e.target.value)}
+                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                      />
+                    </Field>
+                    <Field label="Horario">
+                      <div className="flex items-center gap-2">
+                        <TimePicker value={taskStartTime} onChange={setTaskStartTime} accent="blue" compact />
+                        <span className="text-sm font-semibold text-ink-soft">a</span>
+                        <TimePicker value={taskEndTime} onChange={setTaskEndTime} accent="blue" compact />
+                      </div>
+                    </Field>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowTaskTime(false);
+                        setTaskStartTime("");
+                        setTaskEndTime("");
+                        setBlockDay("");
+                      }}
+                      className="flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink transition-colors"
+                    >
+                      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+                        <path d="M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                      Quitar bloque
+                    </button>
+                  </>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setShowTaskTime(true)}
+                    className="flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink transition-colors"
+                  >
+                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+                      <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                    Agregar bloque de tiempo
+                  </button>
+                ))}
+
+              {/* Recurrence */}
+              <div className="rounded-xl border border-line bg-surface-subtle/60 p-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-muted">Repetir</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {[
+                    { value: "", label: "No" },
+                    { value: "daily", label: "Diario" },
+                    { value: "weekly", label: "Semanal" },
+                    { value: "monthly", label: "Mensual" },
+                  ].map((opt) => (
+                    <button
+                      key={opt.value}
+                      type="button"
+                      onClick={() => setRecurrenceFreq(opt.value as RecurrenceFreq | "")}
+                      className={cn(
+                        "rounded-full border px-3 py-1.5 text-xs font-semibold transition-all",
+                        recurrenceFreq === opt.value
+                          ? "border-pritio-blue bg-pritio-blue text-white"
+                          : "border-line bg-surface text-ink-soft hover:bg-surface-muted",
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
+                {recurrenceFreq && (
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <Field label="Cada">
+                      <input
+                        type="number"
+                        min={1}
+                        max={99}
+                        value={recurrenceInterval}
+                        onChange={(e) => setRecurrenceInterval(Math.max(1, Number(e.target.value) || 1))}
+                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                      />
+                    </Field>
+                    <Field label="Hasta" badge="Opcional">
+                      <input
+                        type="date"
+                        value={recurrenceEndDate}
+                        onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                      />
+                    </Field>
+                  </div>
+                )}
+              </div>
+            </div>
           )}
         </div>
 
@@ -600,12 +856,19 @@ export function TaskFormDialog({
           <button
             onClick={handleSubmit}
             disabled={saving}
-            className="rounded-xl bg-prio-blue px-5 py-2.5 text-sm font-semibold text-white hover:bg-prio-blue/90 transition-colors disabled:opacity-50"
+            className="rounded-xl bg-pritio-blue px-5 py-2.5 text-sm font-semibold text-white hover:bg-pritio-blue/90 transition-colors disabled:opacity-50"
           >
             {saving ? "Guardando..." : isEdit ? "Guardar cambios" : "Crear tarea"}
           </button>
         </div>
       </div>
+      <RecurrenceEditDialog
+        open={recurrencePromptOpen}
+        title={title}
+        onThisOne={() => void performSave("this")}
+        onAllFuture={() => void performSave("all")}
+        onCancel={() => setRecurrencePromptOpen(false)}
+      />
     </div>,
     document.body,
   );

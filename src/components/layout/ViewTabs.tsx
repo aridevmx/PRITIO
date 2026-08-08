@@ -1,9 +1,16 @@
 import { cn } from "@/lib/utils";
 
-export type ViewKey = "cuadrantes" | "calendario" | "indicadores";
+export type ViewKey =
+  | "cuadrantes"
+  | "plan"
+  | "calendario"
+  | "kanban"
+  | "indicadores";
 
 const ALL_TABS: { key: ViewKey; label: string }[] = [
   { key: "cuadrantes", label: "Cuadrantes" },
+  { key: "plan", label: "Plan" },
+  { key: "kanban", label: "Tablero" },
   { key: "calendario", label: "Calendario" },
   { key: "indicadores", label: "Indicadores" },
 ];
@@ -28,7 +35,7 @@ export function ViewTabs({ active, onChange, availableTabs }: ViewTabsProps) {
           className={cn(
             "rounded-full px-4 py-1.5 text-sm font-medium transition-all",
             active === tab.key
-              ? "bg-gradient-to-r from-pink-500 to-fuchsia-500 text-white shadow-sm"
+              ? "bg-ink text-white shadow-sm"
               : "text-ink-soft hover:text-ink",
           )}
         >

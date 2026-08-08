@@ -43,8 +43,8 @@ export function TaskFilterBar({
   hideResponsable = false,
 }: TaskFilterBarProps) {
   return (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="relative flex-1 min-w-[200px]">
+    <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
+      <div className="relative flex-1 min-w-[200px] shrink-0 lg:shrink">
         <svg
           className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
           fill="none"
@@ -59,7 +59,7 @@ export function TaskFilterBar({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           placeholder="Buscar tareas..."
-          className="w-full rounded-lg border border-line bg-surface py-2 pl-10 pr-3 text-sm text-ink outline-none placeholder:text-ink-muted transition-colors focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20"
+          className="w-full rounded-lg border border-line bg-surface py-2 pl-10 pr-3 text-sm text-ink outline-none placeholder:text-ink-muted transition-colors focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20"
         />
       </div>
 
@@ -67,7 +67,7 @@ export function TaskFilterBar({
         <select
           value={projectId}
           onChange={(e) => onProjectChange(e.target.value)}
-          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20"
         >
           <option value="">Proyecto</option>
           {projectOptions.map((p) => (
@@ -83,7 +83,7 @@ export function TaskFilterBar({
           className={cn(
             "rounded-lg border px-3 py-2 text-sm font-medium transition-colors",
             myTasksOnly
-              ? "border-prio-blue bg-prio-blue/10 text-prio-blue"
+              ? "border-pritio-blue bg-pritio-blue/10 text-pritio-blue"
               : "border-line text-ink-muted hover:bg-surface-muted",
           )}
         >
@@ -95,7 +95,7 @@ export function TaskFilterBar({
         <select
           value={responsableId}
           onChange={(e) => onResponsableChange(e.target.value)}
-          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20"
+          className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20"
         >
           <option value="">Responsable</option>
           {responsableOptions.map((a) => (
@@ -104,19 +104,19 @@ export function TaskFilterBar({
         </select>
       )}
 
-      <select className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20">
+      <select className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20">
         <option value="">Estado</option>
         <option value="pending">Pendientes</option>
         <option value="completed">Completadas</option>
       </select>
 
-      <select className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20">
+      <select className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20">
         <option value="">Tipo</option>
         <option value="task">Tarea</option>
         <option value="meeting">Junta</option>
       </select>
 
-      <select className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20">
+      <select className="rounded-lg border border-line bg-surface px-3 py-2 text-sm text-ink-muted outline-none transition-colors focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20">
         <option value="">Gestionar</option>
         <option value="select-all">Seleccionar todo</option>
         <option value="clear-all">Limpiar selección</option>

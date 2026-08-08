@@ -7,7 +7,7 @@ import { APP_NAME } from "../_shared/app-info.ts";
 import { buildDigestHtml } from "./template.ts";
 import type { DigestTask } from "./template.ts";
 
-const APP_URL = Deno.env.get("APP_URL") ?? "https://prio.app";
+const APP_URL = Deno.env.get("APP_URL") ?? "https://pritio.app";
 
 interface SyncTask {
   id: string;

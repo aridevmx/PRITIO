@@ -47,7 +47,7 @@ export function IdentityTab() {
             />
           ) : null}
           <div
-            className={`h-20 w-20 rounded-full bg-prio-purple items-center justify-center text-2xl font-bold text-white ${
+            className={`h-20 w-20 rounded-full bg-pritio-purple items-center justify-center text-2xl font-bold text-white ${
               avatarUrl ? "hidden" : "flex"
             }`}
           >

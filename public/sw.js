@@ -6,10 +6,10 @@ self.addEventListener("push", (event) => {
   try {
     data = event.data?.json() ?? {};
   } catch {
-    data = { title: "Priorify", body: event.data?.text() ?? "" };
+    data = { title: "Pritio", body: event.data?.text() ?? "" };
   }
 
-  const title = data.title ?? "Priorify";
+  const title = data.title ?? "Pritio";
   const body = data.body ?? "";
   const url = data.url ?? APP_URL;
 

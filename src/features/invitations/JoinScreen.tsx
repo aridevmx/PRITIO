@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { acceptInvitation } from "@/features/invitations/api";
-import { PrioLogo } from "@/components/PrioLogo";
+import { PritioLogo } from "@/components/PritioLogo";
 
 type JoinState = "loading" | "not_authenticated" | "not_found" | "accepted" | "error";
 
@@ -23,7 +23,7 @@ export function JoinScreen() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (!session?.user) {
-        localStorage.setItem("prio-pending-invitation", invitationId);
+        localStorage.setItem("pritio-pending-invitation", invitationId);
         setState("not_authenticated");
         return;
       }
@@ -90,7 +90,7 @@ export function JoinScreen() {
         <div className="w-full max-w-sm text-center">
           <div className="panel p-8">
             <div className="mb-6 flex justify-center">
-              <PrioLogo size={48} />
+              <PritioLogo size={48} />
             </div>
             <h2 className="text-xl font-bold text-ink">Invitación recibida</h2>
             <p className="mt-2 text-sm text-ink-soft">
@@ -113,7 +113,7 @@ export function JoinScreen() {
       <div className="w-full max-w-sm text-center">
         <div className="panel p-8">
           <div className="mb-6 flex justify-center">
-            <PrioLogo size={48} />
+            <PritioLogo size={48} />
           </div>
 
           {state === "loading" && (
@@ -141,8 +141,8 @@ export function JoinScreen() {
           {state === "accepted" && (
             <>
               <div className="mb-4 flex justify-center">
-                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-prio-green/10">
-                  <svg className="h-7 w-7 text-prio-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                <div className="flex h-14 w-14 items-center justify-center rounded-full bg-pritio-green/10">
+                  <svg className="h-7 w-7 text-pritio-green" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M20 6L9 17L4 12" />
                   </svg>
                 </div>

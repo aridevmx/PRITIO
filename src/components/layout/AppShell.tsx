@@ -1,23 +1,27 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate, useParams, Navigate } from "react-router-dom";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
+import { useViewPrefs } from "@/lib/viewPrefs";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { UserMenu } from "@/components/layout/UserMenu";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { NotificationToastHost } from "@/features/notifications/NotificationToastHost";
 import { PendingInvitationsPopover } from "@/features/invitations/PendingInvitationsPopover";
 import { PushNotificationInit } from "@/features/pushNotifications/PushNotificationInit";
+import { UpgradeHost } from "@/features/billing/UpgradeHost";
 import { SpaceView } from "@/features/spaces/SpaceView";
 import { useAuth } from "@/features/auth/AuthProvider";
-import { spacesForWorkspaceType, spacePath, SLUG_TO_SPACE } from "@/features/spaces/spaces";
+import { spacesForWorkspaceType, spacePath, SLUG_TO_SPACE, SPACES } from "@/features/spaces/spaces";
 import type { SpaceKey } from "@/features/spaces/spaces";
 import type { ViewKey } from "@/components/layout/ViewTabs";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { cn } from "@/lib/utils";
 
 function availableViewsFor(workspaceType: string, space: SpaceKey): ViewKey[] {
   const isPersonal = workspaceType === "personal" || space === "personal" || space === "pendientes";
   return isPersonal
-    ? ["cuadrantes", "calendario"]
-    : ["cuadrantes", "calendario", "indicadores"];
+    ? ["cuadrantes", "plan", "kanban", "calendario"]
+    : ["cuadrantes", "plan", "kanban", "calendario", "indicadores"];
 }
 
 export function AppShell() {
@@ -25,16 +29,42 @@ export function AppShell() {
   const params = useParams<{ space?: string; view?: string }>();
   const { currentWorkspace, profile } = useWorkspace();
   const { signOut } = useAuth();
+  const { hiddenViews } = useViewPrefs();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<string | null>(null);
 
   const workspaceType = currentWorkspace?.type ?? "personal";
-  const validSpaces: SpaceKey[] = currentWorkspace
-    ? spacesForWorkspaceType(currentWorkspace.type).map((s) => s.key)
-    : ["pendientes"];
+  const validSpaces: SpaceKey[] = useMemo(
+    () =>
+      currentWorkspace
+        ? spacesForWorkspaceType(currentWorkspace.type).map((s) => s.key)
+        : ["pendientes"],
+    [currentWorkspace],
+  );
   const defaultSpace: SpaceKey = validSpaces[0] ?? "pendientes";
 
   const activeSpace = params.space ? SLUG_TO_SPACE[params.space] : undefined;
+
+  const availableTabs = useMemo(
+    () =>
+      activeSpace
+        ? availableViewsFor(workspaceType, activeSpace).filter((v) => !hiddenViews.includes(v))
+        : [],
+    [workspaceType, activeSpace, hiddenViews],
+  );
+
+  const viewParam = params.view as ViewKey | undefined;
+
+  useEffect(() => {
+    if (
+      viewParam &&
+      activeSpace &&
+      validSpaces.includes(activeSpace) &&
+      !(availableTabs as string[]).includes(viewParam)
+    ) {
+      navigate(spacePath(activeSpace, "cuadrantes"), { replace: true });
+    }
+  }, [viewParam, activeSpace, validSpaces, availableTabs, navigate]);
 
   const handleNavigateToCalendar = useCallback(
     (dateStr: string) => {
@@ -49,13 +79,11 @@ export function AppShell() {
     return <Navigate to={spacePath(defaultSpace)} replace />;
   }
 
-  const availableTabs = availableViewsFor(workspaceType, activeSpace);
-  const viewParam = params.view as ViewKey | undefined;
   const activeView: ViewKey =
     viewParam && (availableTabs as string[]).includes(viewParam) ? viewParam : "cuadrantes";
 
   const handleSpaceChange = (key: SpaceKey) => {
-    const newTabs = availableViewsFor(workspaceType, key);
+    const newTabs = availableViewsFor(workspaceType, key).filter((v) => !hiddenViews.includes(v));
     const view = (newTabs as string[]).includes(activeView) ? activeView : "cuadrantes";
     navigate(spacePath(key, view));
   };
@@ -76,29 +104,35 @@ export function AppShell() {
 
       <PushNotificationInit />
       <NotificationToastHost />
+      <UpgradeHost />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line bg-surface/80 px-4 backdrop-blur-md lg:px-6">
+        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line/70 bg-surface/75 px-4 backdrop-blur-xl lg:px-6">
           <button
             onClick={() => setSidebarOpen(true)}
-            className="rounded-lg p-1.5 text-ink-soft hover:bg-surface-muted lg:hidden"
+            aria-label="Abrir menú"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40 lg:hidden"
           >
             <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
             </svg>
           </button>
 
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <h1 className="text-sm font-bold text-ink truncate">
+          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+            <span
+              aria-hidden
+              className={cn("h-2.5 w-2.5 shrink-0 rounded-full", SPACES[activeSpace].accent.bg)}
+            />
+            <h1 className="truncate text-sm font-bold tracking-tight text-ink">
               {currentWorkspace?.name ?? ""}
             </h1>
             {currentWorkspace && (
-              <span className="shrink-0 rounded-full bg-surface-muted px-2 py-0.5 text-[11px] font-semibold capitalize text-ink-muted">
+              <span className="shrink-0 rounded-full border border-line bg-surface-muted px-2 py-0.5 text-[11px] font-semibold capitalize text-ink-soft">
                 {currentWorkspace.type}
               </span>
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-1.5">
             <PendingInvitationsPopover />
             <NotificationBell />
             {profile && (
@@ -107,7 +141,7 @@ export function AppShell() {
                   <img
                     src={profile.avatarUrl}
                     alt=""
-                    className="h-7 w-7 rounded-full object-cover border border-line cursor-pointer hover:opacity-80 transition-opacity"
+                    className="h-7 w-7 cursor-pointer rounded-full object-cover ring-1 ring-line/70 transition group-hover:ring-2 group-hover:ring-pritio-purple/40"
                     onError={(e) => {
                       const target = e.target as HTMLImageElement;
                       target.style.display = "none";
@@ -116,7 +150,7 @@ export function AppShell() {
                     }}
                   />
                 ) : null}
-                <div className={`flex h-7 w-7 items-center justify-center rounded-full bg-prio-purple text-[11px] font-bold text-white shadow-sm cursor-pointer hover:opacity-80 transition-opacity ${
+                <div className={`flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-pritio-purple to-pritio-blue text-[11px] font-bold text-white shadow-sm transition group-hover:ring-2 group-hover:ring-pritio-purple/40 ${
                   profile.avatarUrl ? "hidden" : ""
                 }`}>
                   {profile.fullName?.charAt(0)?.toUpperCase() ?? profile.email.charAt(0).toUpperCase()}
@@ -126,7 +160,7 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-auto" data-prio-scroll-root>
+        <main className="flex-1 overflow-x-hidden overflow-y-auto pb-20 lg:pb-0" data-pritio-scroll-root>
           <SpaceView
             space={activeSpace}
             view={activeView}
@@ -134,6 +168,12 @@ export function AppShell() {
             calendarDate={calendarDate}
           />
         </main>
+
+        <MobileBottomNav
+          activeView={activeView}
+          availableTabs={availableTabs}
+          onViewChange={handleViewChange}
+        />
       </div>
     </div>
   );

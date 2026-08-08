@@ -8,9 +8,9 @@ export default defineConfig([
   {
     ignores: [
       "dist",
-      "PRIO_Claude_Design_Pack",
       "public",
       "scripts",
+      "supabase/.temp",
     ],
   },
   {

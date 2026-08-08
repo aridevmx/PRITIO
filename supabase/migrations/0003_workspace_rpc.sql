@@ -1,4 +1,4 @@
--- PRIO V1 — RPC functions for workspace creation (bypass RLS)
+-- PRITIO V1 — RPC functions for workspace creation (bypass RLS)
 
 -- Creates a personal workspace and adds the user as owner in a single transaction.
 -- Uses SECURITY DEFINER to bypass RLS (the user is authenticated but cannot

@@ -144,7 +144,7 @@ export function NotificationsTab() {
                   setInApp((prev) => ({ ...prev, [ev.kind]: v }));
                   setInAppDelivery(ev.kind, v);
                 }}
-                className="rounded-lg border border-line bg-surface-subtle px-2.5 py-1.5 text-xs font-semibold text-ink outline-none focus:border-prio-blue"
+                className="rounded-lg border border-line bg-surface-subtle px-2.5 py-1.5 text-xs font-semibold text-ink outline-none focus:border-pritio-blue"
               >
                 {(Object.keys(DELIVERY_LABELS) as InAppDelivery[]).map((d) => (
                   <option key={d} value={d}>

@@ -28,7 +28,7 @@ interface ProfileRecord {
   full_name: string;
 }
 
-const APP_URL = Deno.env.get("APP_URL") ?? "https://prio.app";
+const APP_URL = Deno.env.get("APP_URL") ?? "https://pritio.app";
 
 Deno.serve(async (req: Request) => {
   const cors = handleCors(req);

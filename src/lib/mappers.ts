@@ -3,6 +3,9 @@ import type {
   ProfileRow,
   Workspace,
   WorkspaceRow,
+  Subscription,
+  SubscriptionRow,
+  WorkspacePlan,
   Task,
   TaskRow,
   Assignee,
@@ -15,6 +18,20 @@ import type {
   InvitationRow,
   UserBlockedDay,
 } from "@/types";
+
+// ─── Plan normalization ───────────────────────────────────
+// workspaces.plan is legacy (was per-workspace). Billing now lives on
+// account-level subscriptions; workspaces default to 'free'. Normalize any
+// leftover legacy value so the UI never sees 'personal_free'/'enterprise'.
+
+export function normalizePlan(plan: string | null | undefined): WorkspacePlan {
+  switch (plan) {
+    case "pro":
+      return "pro";
+    default:
+      return "free";
+  }
+}
 
 // ─── Task columns for select queries ──────────────────────
 
@@ -42,6 +59,12 @@ export const TASK_COLUMNS = [
   "block_override_id",
   "grace_started_at",
   "submit_finalized_at",
+  "recurrence_freq",
+  "recurrence_interval",
+  "recurrence_end_date",
+  "recurrence_count",
+  "recurrence_parent_id",
+  "approval_requested_at",
   "created_by",
   "created_at",
   "updated_at",
@@ -64,12 +87,28 @@ export function mapWorkspace(row: WorkspaceRow): Workspace {
     id: row.id,
     name: row.name,
     type: row.type,
-    plan: row.plan,
+    plan: normalizePlan(row.plan),
     isFrozen: row.is_frozen,
     blockedDaysRequireApproval: row.blocked_days_require_approval,
     autoPromoteDueToDo: row.auto_promote_due_to_do,
     graceUntil: row.grace_until,
     createdAt: row.created_at,
+  };
+}
+
+export function mapSubscription(row: SubscriptionRow): Subscription {
+  return {
+    id: row.id,
+    userId: row.user_id,
+    workspaceId: row.workspace_id,
+    plan: "pro",
+    status: row.status,
+    currentPeriodEnd: row.current_period_end,
+    quantity: row.quantity,
+    trialEndsAt: row.trial_ends_at,
+    stripeSubscriptionId: row.stripe_subscription_id,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -99,6 +138,12 @@ export function mapTask(row: TaskRow, assigneeIds: string[]): Task {
     blockOverrideId: row.block_override_id,
     graceStartedAt: row.grace_started_at,
     submitFinalizedAt: row.submit_finalized_at,
+    recurrenceFreq: row.recurrence_freq,
+    recurrenceInterval: row.recurrence_interval ?? 1,
+    recurrenceEndDate: row.recurrence_end_date,
+    recurrenceCount: row.recurrence_count,
+    recurrenceParentId: row.recurrence_parent_id,
+    approvalRequestedAt: row.approval_requested_at,
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,

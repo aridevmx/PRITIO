@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from "@/features/auth/AuthProvider";
 import { AuthScreen } from "@/features/auth/AuthScreen";
 import { ResetPasswordScreen } from "@/features/auth/ResetPasswordScreen";
 import { WorkspaceProvider, useWorkspace } from "@/features/workspaces/WorkspaceProvider";
+import { BillingProvider } from "@/features/billing/BillingProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { LoadingState } from "@/components/State";
 import { JoinScreen } from "@/features/invitations/JoinScreen";
@@ -16,9 +17,9 @@ function PendingInvitationRedirect() {
 
   useEffect(() => {
     if (!user) return;
-    const pending = localStorage.getItem("prio-pending-invitation");
+    const pending = localStorage.getItem("pritio-pending-invitation");
     if (pending) {
-      localStorage.removeItem("prio-pending-invitation");
+      localStorage.removeItem("pritio-pending-invitation");
       navigate(`/invitacion/${pending}`, { replace: true });
     }
   }, [user, navigate]);
@@ -49,7 +50,9 @@ function Root() {
 
   return (
     <WorkspaceProvider>
-      <AuthenticatedApp />
+      <BillingProvider>
+        <AuthenticatedApp />
+      </BillingProvider>
     </WorkspaceProvider>
   );
 }

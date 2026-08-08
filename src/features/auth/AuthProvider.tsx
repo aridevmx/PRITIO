@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { fetchProfile, upsertProfile } from "@/features/auth/api";
+import { getAppUrl } from "@/lib/appUrl";
 import type { Profile } from "@/types";
 
 interface AuthContextValue {
@@ -78,7 +79,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: getAppUrl(),
       },
     });
     if (error) throw error;
@@ -86,7 +87,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: `${getAppUrl()}/reset-password`,
     });
     if (error) throw error;
   }, []);

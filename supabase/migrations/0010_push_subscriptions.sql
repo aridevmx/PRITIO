@@ -1,4 +1,4 @@
--- PRIO V1 — Push subscriptions
+-- PRITIO V1 — Push subscriptions
 -- Migration 0010: table for storing Web Push subscription data
 
 CREATE TABLE push_subscriptions (

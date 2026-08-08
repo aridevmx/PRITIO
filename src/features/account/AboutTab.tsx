@@ -1,12 +1,12 @@
 import { APP_NAME, APP_VERSION, APP_TAGLINE, APP_URL } from "@/lib/branding";
 
-const REPO_URL = "https://github.com/priorify/prio";
+const REPO_URL = "https://github.com/Pritio/PRITIO";
 
 export function AboutTab() {
   return (
     <div className="space-y-7">
       <div className="flex flex-col items-center gap-3 rounded-2xl border border-line bg-surface-muted px-5 py-8 text-center">
-        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-prio-green to-prio-blue text-2xl font-black text-white shadow-sm">
+        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-pritio-green to-pritio-blue text-2xl font-black text-white shadow-sm">
           {APP_NAME.charAt(0)}
         </div>
         <div>
@@ -35,7 +35,7 @@ export function AboutTab() {
           className="flex items-center justify-between px-3.5 py-3 transition-colors hover:bg-surface-subtle"
         >
           <span className="text-sm font-medium text-ink">Sitio oficial</span>
-          <span className="text-xs text-ink-muted">prio.app ↗</span>
+          <span className="text-xs text-ink-muted">pritio.app ↗</span>
         </a>
         <div className="px-3.5 py-3">
           <p className="text-sm font-medium text-ink">Licencia</p>

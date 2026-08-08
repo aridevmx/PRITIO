@@ -1,6 +1,6 @@
 # Changelog
 
-Todas las versiones notables de Prio se documentan aquí.
+Todas las versiones notables de PRITIO se documentan aquí.
 Formato basado en [Keep a Changelog](https://keepachangelog.com/es/1.1.0/);
 este proyecto cumple con [Versionado Semántico](https://semver.org/lang/es/).
 
@@ -33,4 +33,4 @@ este proyecto cumple con [Versionado Semántico](https://semver.org/lang/es/).
 - Marca centralizada en `src/lib/branding.ts` (nombre, tagline, versión, URL).
 - Nombres de producto unificados a través de la app y edge functions.
 
-[0.1.0]: https://github.com/<owner>/prio/releases/tag/v0.1.0
+[0.1.0]: https://github.com/<owner>/PRITIO/releases/tag/v0.1.0

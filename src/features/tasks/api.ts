@@ -2,8 +2,19 @@ import { supabase } from "@/lib/supabase";
 import { TASK_COLUMNS, mapTask } from "@/lib/mappers";
 import type { Task, CreateTaskPayload, UpdateTaskPayload } from "@/types";
 
-export async function listTasks(workspaceId: string): Promise<Task[]> {
-  const { data: taskRows, error } = await supabase
+export async function getTask(taskId: string): Promise<Task> {
+  const { data: taskRow, error } = await supabase
+    .from("tasks")
+    .select(TASK_COLUMNS)
+    .eq("id", taskId)
+    .single();
+
+  if (error) throw error;
+
+  return mapTask(taskRow as never, await fetchAssigneesFor(taskId));
+}
+
+export async function listTasks(workspaceId: string): Promise<Task[]> {  const { data: taskRows, error } = await supabase
     .from("tasks")
     .select(TASK_COLUMNS)
     .eq("workspace_id", workspaceId)
@@ -13,12 +24,22 @@ export async function listTasks(workspaceId: string): Promise<Task[]> {
 
   const taskIds = (taskRows as unknown as Record<string, unknown>[] | null ?? []).map((r) => r.id as string);
 
+  const assigneeMap = await fetchAssigneesMap(taskIds);
+
+  return (taskRows as unknown as Record<string, unknown>[] | null ?? []).map((row) =>
+    mapTask(row as never, assigneeMap.get(row.id as string) ?? []),
+  );
+}
+
+async function fetchAssigneesMap(taskIds: string[]): Promise<Map<string, string[]>> {
+  const assigneeMap = new Map<string, string[]>();
+  if (taskIds.length === 0) return assigneeMap;
+
   const { data: assigneeRows } = await supabase
     .from("task_assignees")
     .select("task_id, assignee_id")
     .in("task_id", taskIds);
 
-  const assigneeMap = new Map<string, string[]>();
   (assigneeRows ?? []).forEach((row: Record<string, unknown>) => {
     const taskId = row.task_id as string;
     const assigneeId = row.assignee_id as string;
@@ -27,9 +48,7 @@ export async function listTasks(workspaceId: string): Promise<Task[]> {
     assigneeMap.set(taskId, ids);
   });
 
-  return (taskRows as unknown as Record<string, unknown>[] | null ?? []).map((row) =>
-    mapTask(row as never, assigneeMap.get(row.id as string) ?? []),
-  );
+  return assigneeMap;
 }
 
 export async function createTask(payload: CreateTaskPayload): Promise<Task> {
@@ -48,6 +67,11 @@ export async function createTask(payload: CreateTaskPayload): Promise<Task> {
       location: payload.location ?? null,
       meeting_link: payload.meetingLink ?? null,
       requires_approval: payload.requiresApproval ?? false,
+      recurrence_freq: payload.recurrenceFreq ?? null,
+      recurrence_interval: payload.recurrenceInterval ?? 1,
+      recurrence_end_date: payload.recurrenceEndDate ?? null,
+      recurrence_count: payload.recurrenceCount ?? null,
+      approval_requested_at: payload.approvalRequestedAt ?? null,
       created_by: payload.createdBy,
     })
     .select(TASK_COLUMNS)
@@ -90,7 +114,15 @@ export async function updateTask(
   if (payload.meetingLink !== undefined) updateData.meeting_link = payload.meetingLink;
   if (payload.completed !== undefined) updateData.completed = payload.completed;
   if (payload.requiresApproval !== undefined) updateData.requires_approval = payload.requiresApproval;
+  if (payload.approved !== undefined) updateData.approved = payload.approved;
+  if (payload.rejected !== undefined) updateData.rejected = payload.rejected;
+  if (payload.rejectionReason !== undefined) updateData.rejection_reason = payload.rejectionReason;
+  if (payload.approvalRequestedAt !== undefined) updateData.approval_requested_at = payload.approvalRequestedAt;
   if (payload.projectId !== undefined) updateData.project_id = payload.projectId;
+  if (payload.recurrenceFreq !== undefined) updateData.recurrence_freq = payload.recurrenceFreq;
+  if (payload.recurrenceInterval !== undefined) updateData.recurrence_interval = payload.recurrenceInterval;
+  if (payload.recurrenceEndDate !== undefined) updateData.recurrence_end_date = payload.recurrenceEndDate;
+  if (payload.recurrenceCount !== undefined) updateData.recurrence_count = payload.recurrenceCount;
 
   const { data: taskRow, error } = await supabase
     .from("tasks")
@@ -146,6 +178,14 @@ export async function archiveTask(taskId: string): Promise<void> {
   if (error) throw error;
 }
 
+async function fetchAssigneesFor(taskId: string): Promise<string[]> {
+  const { data: assigneeRows } = await supabase
+    .from("task_assignees")
+    .select("assignee_id")
+    .eq("task_id", taskId);
+  return (assigneeRows ?? []).map((r: Record<string, unknown>) => r.assignee_id as string);
+}
+
 export async function approveTask(taskId: string): Promise<Task> {
   const { data: taskRow, error } = await supabase
     .from("tasks")
@@ -155,7 +195,7 @@ export async function approveTask(taskId: string): Promise<Task> {
     .single();
 
   if (error) throw error;
-  return mapTask(taskRow as never, []);
+  return mapTask(taskRow as never, await fetchAssigneesFor(taskId));
 }
 
 export async function rejectTask(
@@ -170,7 +210,27 @@ export async function rejectTask(
     .single();
 
   if (error) throw error;
-  return mapTask(taskRow as never, []);
+  return mapTask(taskRow as never, await fetchAssigneesFor(taskId));
+}
+
+export async function listPendingApprovals(workspaceId: string): Promise<Task[]> {
+  const { data: taskRows, error } = await supabase
+    .from("tasks")
+    .select(TASK_COLUMNS)
+    .eq("workspace_id", workspaceId)
+    .eq("requires_approval", true)
+    .eq("approved", false)
+    .eq("rejected", false)
+    .eq("completed", false)
+    .order("approval_requested_at", { ascending: true, nullsFirst: true });
+
+  if (error) throw error;
+
+  const rows = (taskRows as unknown as Record<string, unknown>[] | null ?? []);
+  const taskIds = rows.map((r) => r.id as string);
+  const assigneeMap = await fetchAssigneesMap(taskIds);
+
+  return rows.map((row) => mapTask(row as never, assigneeMap.get(row.id as string) ?? []));
 }
 
 export async function listMyPendingTasks(): Promise<Task[]> {

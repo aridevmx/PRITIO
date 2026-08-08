@@ -5,7 +5,7 @@ const SMTP_HOST = Deno.env.get("SMTP_HOST") ?? "";
 const SMTP_PORT = Deno.env.get("SMTP_PORT") ?? "587";
 const SMTP_USER = Deno.env.get("SMTP_USER") ?? "";
 const SMTP_PASS = Deno.env.get("SMTP_PASS") ?? "";
-const SMTP_FROM = Deno.env.get("SMTP_FROM") ?? "prio@clipotapp.com";
+const SMTP_FROM = Deno.env.get("SMTP_FROM") ?? "pritio@clipotapp.com";
 const FROM_NAME = Deno.env.get("SMTP_FROM_NAME") ?? APP_NAME;
 
 export interface SendEmailParams {

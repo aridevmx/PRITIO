@@ -53,7 +53,7 @@ export function ConfirmDialog({
         if (e.target === e.currentTarget) onClose();
       }}
     >
-      <div className="prio-modal-enter mx-4 w-full max-w-md rounded-2xl bg-surface p-6 shadow-elevated">
+      <div className="pritio-modal-enter mx-4 w-full max-w-md rounded-2xl bg-surface p-6 shadow-elevated">
         <h3 className="text-lg font-bold text-ink">{title}</h3>
         <p className="mt-2 text-sm text-ink-soft">{description}</p>
         <div className="mt-6 flex justify-end gap-3">
@@ -70,7 +70,7 @@ export function ConfirmDialog({
               "rounded-lg px-4 py-2 text-sm font-semibold text-white",
               variant === "danger"
                 ? "bg-red-500 hover:bg-red-600"
-                : "bg-prio-coral hover:bg-prio-coral/90",
+                : "bg-pritio-coral hover:bg-pritio-coral/90",
             )}
           >
             {confirmLabel}

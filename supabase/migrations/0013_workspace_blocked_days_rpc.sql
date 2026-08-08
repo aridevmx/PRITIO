@@ -1,4 +1,4 @@
--- PRIO V1 — Workspace blocked days RPC
+-- PRITIO V1 — Workspace blocked days RPC
 -- Migration 0013: lets workspace members see who blocked which day in the calendar.
 -- SECURITY DEFINER bypasses RLS on user_blocked_days/profiles, but only returns rows
 -- for workspaces the caller belongs to.

@@ -3,6 +3,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { useTheme } from "@/lib/useTheme";
 import { useTimeFormat, setTimeFormat } from "@/lib/timeFormat";
 import { areSoundsEnabled, setSoundsEnabled } from "@/lib/sounds";
+import { useViewPrefs } from "@/lib/viewPrefs";
 import { ToggleRow } from "@/features/account/AccountToggle";
 import { useToast } from "@/components/Toast";
 import { exportMyData, downloadJson } from "@/features/account/exportData";
@@ -10,6 +11,7 @@ import { exportMyData, downloadJson } from "@/features/account/exportData";
 export function PreferencesTab() {
   const { theme, setTheme } = useTheme();
   const timeFormat = useTimeFormat();
+  const { hiddenViews, toggleView } = useViewPrefs();
   const { toast } = useToast();
 
   const [sounds, setSounds] = useState(areSoundsEnabled());
@@ -19,7 +21,7 @@ export function PreferencesTab() {
     setExporting(true);
     try {
       const data = await exportMyData();
-      downloadJson(data, `prio-datos-${new Date().toISOString().slice(0, 10)}.json`);
+      downloadJson(data, `pritio-datos-${new Date().toISOString().slice(0, 10)}.json`);
       toast.success("Descarga iniciada");
     } catch {
       toast.error("Error al exportar tus datos");
@@ -75,6 +77,30 @@ export function PreferencesTab() {
               setSoundsEnabled(next);
             }}
           />
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Vistas</p>
+        <div className="overflow-hidden rounded-xl border border-line divide-y divide-line bg-surface-muted">
+          <ToggleRow
+            label="Plan"
+            description="Muestra la vista de planificación (juntas y pendientes de la semana)."
+            checked={!hiddenViews.includes("plan")}
+            onChange={() => toggleView("plan")}
+          />
+          <ToggleRow
+            label="Tablero (Kanban)"
+            description="Muestra la vista de tablero de tareas."
+            checked={!hiddenViews.includes("kanban")}
+            onChange={() => toggleView("kanban")}
+          />
+          <div className="px-3.5 py-3">
+            <p className="text-sm font-medium text-ink">Vistas fijas</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+              Cuadrantes, Calendario e Indicadores siempre están disponibles y no se pueden ocultar.
+            </p>
+          </div>
         </div>
       </div>
 

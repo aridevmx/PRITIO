@@ -10,12 +10,18 @@ import {
   leaveWorkspace as apiLeaveWorkspace,
   setRecapSchedule as apiSetRecapSchedule,
   updateNotificationPreferences as apiUpdateNotificationPreferences,
+  removeMember as apiRemoveMember,
 } from "@/features/workspaces/api";
 import { listInvitations, cancelInvitation } from "@/features/invitations/api";
 import { InvitationModal } from "@/features/invitations/InvitationModal";
 import { ProjectsManager } from "@/features/projects/ProjectsManager";
 import { useToast } from "@/components/Toast";
+import { getAppUrl } from "@/lib/appUrl";
 import { useTimeFormat, setTimeFormat } from "@/lib/timeFormat";
+import { useBilling } from "@/features/billing/BillingProvider";
+import { parsePlanLimitError } from "@/features/billing/guarded";
+import { openUpgrade } from "@/features/billing/upgrade";
+import { PLAN_LABELS, PLAN_BADGE_CLASSES } from "@/features/billing/plans";
 import type { Invitation, NotificationPreferences, WorkspaceRole } from "@/types";
 
 const TYPE_LABELS: Record<string, string> = {
@@ -30,12 +36,6 @@ const TYPE_GRADIENTS: Record<string, string> = {
   family: "from-green-400 to-emerald-600",
   team: "from-blue-400 to-cyan-600",
   enterprise: "from-orange-400 to-red-500",
-};
-
-const PLAN_LABELS: Record<string, string> = {
-  personal_free: "Gratis",
-  pro: "Pro",
-  enterprise: "Enterprise",
 };
 
 interface WorkspaceSettingsModalProps {
@@ -70,8 +70,8 @@ function ToggleRow({
         aria-label={label}
         onClick={onChange}
         className={cn(
-          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-prio-blue/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
-          checked ? "bg-prio-blue" : "bg-line-strong hover:bg-ink-muted/40",
+          "relative inline-flex h-6 w-11 shrink-0 items-center rounded-full p-0.5 transition-colors duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/50 focus-visible:ring-offset-2 focus-visible:ring-offset-surface",
+          checked ? "bg-pritio-blue" : "bg-line-strong hover:bg-ink-muted/40",
         )}
       >
         <span
@@ -86,7 +86,7 @@ function ToggleRow({
 }
 
 type MemberRow =
-  | { kind: "active"; key: string; assigneeId: string; name: string; color: string }
+  | { kind: "active"; key: string; assigneeId: string; name: string; color: string; userId: string }
   | { kind: "inactive"; key: string; assigneeId: string; name: string; color: string }
   | { kind: "pending"; key: string; id: string; email: string; role: WorkspaceRole };
 
@@ -105,11 +105,17 @@ function MembersManager({
   isOwner: boolean;
 }) {
   const { toast } = useToast();
+  const { canCreate } = useBilling();
+  const { profile, refresh: refreshWorkspace } = useWorkspace();
   const [rows, setRows] = useState<MemberRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [newName, setNewName] = useState("");
   const [adding, setAdding] = useState(false);
   const [inviteOpen, setInviteOpen] = useState(false);
+  const [removeTarget, setRemoveTarget] = useState<MemberRow | null>(null);
+  const [reassignId, setReassignId] = useState("");
+  const [removing, setRemoving] = useState(false);
+  const [rolesByUserId, setRolesByUserId] = useState<Map<string, WorkspaceRole>>(new Map());
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -122,7 +128,7 @@ function MembersManager({
         listInvitations(workspaceId),
         supabase
           .from("workspace_members")
-          .select("user_id")
+          .select("user_id, role")
           .eq("workspace_id", workspaceId),
       ]);
 
@@ -130,8 +136,12 @@ function MembersManager({
       const pending: Invitation[] = (pendingList ?? []).filter((inv) => !inv.acceptedAt);
 
       /* Ensure every confirmed member has a responsable (assignee) linked */
+      const memberRows = membersRes.data ?? [];
       const memberUserIds = new Set(
-        (membersRes.data ?? []).map((m: { user_id: string }) => m.user_id),
+        memberRows.map((m: { user_id: string }) => m.user_id),
+      );
+      const rolesByUserId = new Map<string, WorkspaceRole>(
+        memberRows.map((m: { user_id: string; role: WorkspaceRole }) => [m.user_id, m.role]),
       );
       const linkedUserIds = new Set(
         assignees.filter((a) => a.linked_user_id).map((a) => a.linked_user_id as string),
@@ -157,7 +167,14 @@ function MembersManager({
       const nextRows: MemberRow[] = [];
       assignees.forEach((a) => {
         if (a.linked_user_id) {
-          nextRows.push({ kind: "active", key: `a-${a.id}`, assigneeId: a.id, name: a.name, color: a.color });
+          nextRows.push({
+            kind: "active",
+            key: `a-${a.id}`,
+            assigneeId: a.id,
+            name: a.name,
+            color: a.color,
+            userId: a.linked_user_id,
+          });
         } else {
           nextRows.push({ kind: "inactive", key: `i-${a.id}`, assigneeId: a.id, name: a.name, color: a.color });
         }
@@ -166,6 +183,7 @@ function MembersManager({
         nextRows.push({ kind: "pending", key: `p-${inv.id}`, id: inv.id, email: inv.email, role: inv.role });
       });
       setRows(nextRows);
+      setRolesByUserId(rolesByUserId);
     } catch (err) {
       console.error("[MembersManager] load error:", err);
     } finally {
@@ -179,6 +197,7 @@ function MembersManager({
 
   const handleAdd = async () => {
     if (!newName.trim()) return;
+    if (!canCreate("assignees")) return;
     setAdding(true);
     try {
       const { error } = await supabase.from("assignees").insert({
@@ -190,7 +209,12 @@ function MembersManager({
       setNewName("");
       await load();
       toast.success("Responsable agregado");
-    } catch {
+    } catch (err) {
+      const resource = parsePlanLimitError(err);
+      if (resource) {
+        openUpgrade(resource);
+        return;
+      }
       toast.error("Error al agregar responsable");
     } finally {
       setAdding(false);
@@ -208,6 +232,32 @@ function MembersManager({
     }
   };
 
+  const handleRemoveMember = async () => {
+    if (!removeTarget || removeTarget.kind !== "active") return;
+    setRemoving(true);
+    try {
+      await apiRemoveMember(workspaceId, removeTarget.userId, reassignId || null);
+      await load();
+      await refreshWorkspace();
+      toast.success("Miembro eliminado");
+      setRemoveTarget(null);
+      setReassignId("");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Error al quitar miembro";
+      toast.error(msg);
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  const reassignOptions = rows.filter(
+    (r): r is Extract<MemberRow, { kind: "active" }> =>
+      r.kind === "active" &&
+      removeTarget?.kind === "active" &&
+      r.assigneeId !== removeTarget.assigneeId &&
+      r.userId !== removeTarget.userId,
+  );
+
   const handleCancelInvitation = async (id: string) => {
     try {
       await cancelInvitation(id);
@@ -219,7 +269,7 @@ function MembersManager({
   };
 
   const copyLink = (id: string) => {
-    navigator.clipboard.writeText(`${window.location.origin}/invitacion/${id}`).then(
+    navigator.clipboard.writeText(`${getAppUrl()}/invitacion/${id}`).then(
       () => toast.success("Enlace copiado al portapapeles"),
       () => toast.error("No se pudo copiar el enlace"),
     );
@@ -232,7 +282,7 @@ function MembersManager({
         {isOwner ? (
           <button
             onClick={() => setInviteOpen(true)}
-            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line py-3 text-sm font-semibold text-ink-muted hover:border-prio-blue hover:text-prio-blue transition-colors"
+            className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line py-3 text-sm font-semibold text-ink-muted hover:border-pritio-blue hover:text-pritio-blue transition-colors"
           >
             <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
               <path d="M12 5.5C12 7.985 10 9 8 11C6 9 4 7.985 4 5.5C4 3.5 6 2 8 4C10 2 12 3.5 12 5.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
@@ -274,7 +324,7 @@ function MembersManager({
                       <button
                         type="button"
                         onClick={() => copyLink(row.id)}
-                        className="rounded-lg p-1 text-ink-muted hover:bg-prio-blue/10 hover:text-prio-blue transition-colors"
+                        className="rounded-lg p-1 text-ink-muted hover:bg-pritio-blue/10 hover:text-pritio-blue transition-colors"
                         title="Copiar enlace de invitación"
                       >
                         <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
@@ -302,9 +352,26 @@ function MembersManager({
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {row.kind === "active" ? (
-                        <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
-                          Activo
-                        </span>
+                        <>
+                          <span className="rounded-full bg-green-100 px-2 py-0.5 text-[10px] font-semibold text-green-700">
+                            Activo
+                          </span>
+                          {isOwner && row.userId !== profile?.id && rolesByUserId.get(row.userId) !== "owner" && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setReassignId("");
+                                setRemoveTarget(row);
+                              }}
+                              className="rounded-lg p-1 text-ink-muted hover:bg-red-50 hover:text-red-500 transition-colors"
+                              title="Quitar miembro"
+                            >
+                              <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
+                                <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          )}
+                        </>
                       ) : (
                         <>
                           <span className="rounded-full bg-surface px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
@@ -342,7 +409,7 @@ function MembersManager({
             onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleAdd(); }}
             placeholder="Nombre del responsable"
-            className="flex-1 rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20"
+            className="flex-1 rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20"
           />
           <button
             type="button"
@@ -363,12 +430,68 @@ function MembersManager({
           onSent={() => void load()}
         />
       )}
+
+      {removeTarget?.kind === "active" &&
+        createPortal(
+          <div
+            className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink/30 backdrop-blur-sm"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setRemoveTarget(null);
+            }}
+          >
+            <div className="pritio-modal-enter mx-4 w-full max-w-md rounded-2xl bg-surface p-6 shadow-elevated">
+              <h3 className="text-lg font-bold text-ink">Quitar miembro</h3>
+              <p className="mt-2 text-sm text-ink-soft">
+                ¿Quitar a <span className="font-semibold text-ink">{removeTarget.name}</span> del workspace? Ya no podrá ver las tareas ni los días de este workspace.
+              </p>
+
+              <div className="mt-4">
+                <label className="mb-1.5 block text-xs font-medium text-ink-muted">
+                  Reasignar sus tareas a
+                </label>
+                <select
+                  value={reassignId}
+                  onChange={(e) => setReassignId(e.target.value)}
+                  className="w-full rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20"
+                >
+                  <option value="">Sin responsable</option>
+                  {reassignOptions.map((r) => (
+                    <option key={r.assigneeId} value={r.assigneeId}>{r.name}</option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-ink-muted">
+                  Sus tareas asignadas pasarán al responsable elegido. El responsable queda como inactivo para conservar el historial.
+                </p>
+              </div>
+
+              <div className="mt-6 flex justify-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setRemoveTarget(null)}
+                  className="rounded-xl border border-line px-4 py-2 text-sm font-semibold text-ink-soft hover:bg-surface-muted transition-colors"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void handleRemoveMember()}
+                  disabled={removing}
+                  className="rounded-xl bg-red-500 px-4 py-2 text-sm font-semibold text-white hover:bg-red-600 transition-colors disabled:opacity-50"
+                >
+                  {removing ? "Quitando..." : "Quitar miembro"}
+                </button>
+              </div>
+            </div>
+          </div>,
+          document.body,
+        )}
     </div>
   );
 }
 
 export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettingsModalProps) {
   const { workspaces, currentWorkspace, members, profile, refresh: refreshWorkspace } = useWorkspace();
+  const { effectivePlan } = useBilling();
   const { toast } = useToast();
 
   const ws = workspaces.find((w) => w.id === workspaceId);
@@ -511,7 +634,7 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
   };
 
   const inputClass =
-    "w-full rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-prio-blue focus:ring-1 focus:ring-prio-blue/20";
+    "w-full rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20";
 
   return (
     <>
@@ -520,7 +643,7 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
           className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink/30 backdrop-blur-sm"
           onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}
         >
-          <div className="prio-modal-enter mx-4 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
+          <div className="pritio-modal-enter mx-4 flex max-h-[85vh] w-full max-w-xl flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
             {/* Header: identidad del workspace */}
             <div className="border-b border-line px-6 pt-5 pb-4">
               <div className="flex items-start gap-3">
@@ -538,9 +661,14 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
                     <span className="rounded-full bg-surface-muted px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
                       {ws ? TYPE_LABELS[ws.type] ?? ws.type : "..."}
                     </span>
-                    {ws?.plan && (
-                      <span className="rounded-full bg-emerald-100 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700">
-                        {PLAN_LABELS[ws.plan] ?? ws.plan}
+                    {effectivePlan && (
+                      <span
+                        className={cn(
+                          "rounded-full px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider",
+                          PLAN_BADGE_CLASSES[effectivePlan],
+                        )}
+                      >
+                        {PLAN_LABELS[effectivePlan]}
                       </span>
                     )}
                     {userIsOwner && (
@@ -581,7 +709,7 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
                     ref={(el) => { tabRefs.current[tab.id] = el; }}
                     onClick={() => setActiveTab(tab.id)}
                     className={cn(
-                      "whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-prio-blue/50",
+                      "whitespace-nowrap rounded-lg px-3.5 py-1.5 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/50",
                       currentTab === tab.id
                         ? "bg-white text-ink shadow-sm"
                         : "text-ink-muted hover:bg-surface hover:text-ink",

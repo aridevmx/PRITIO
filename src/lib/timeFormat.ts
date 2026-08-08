@@ -2,8 +2,8 @@ import { useState, useEffect } from "react";
 
 export type TimeFormat = "24h" | "12h";
 
-const STORAGE_KEY = "prio:timeFormat";
-const TIME_FORMAT_EVENT = "prio:timeFormatChanged";
+const STORAGE_KEY = "pritio:timeFormat";
+const TIME_FORMAT_EVENT = "pritio:timeFormatChanged";
 
 export function getTimeFormat(): TimeFormat {
   try {

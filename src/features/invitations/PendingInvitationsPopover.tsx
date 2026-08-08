@@ -101,21 +101,24 @@ export function PendingInvitationsPopover() {
     <div className="relative" ref={panelRef}>
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="relative rounded-lg p-1.5 text-ink-soft hover:bg-surface-muted"
+        aria-label="Invitaciones pendientes"
+        aria-haspopup="dialog"
+        aria-expanded={isOpen}
         title="Invitaciones pendientes"
+        className="relative grid h-9 w-9 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40"
       >
         <svg className="h-5 w-5" viewBox="0 0 16 16" fill="none">
           <path d="M12 5.5C12 7.985 10 9 8 11C6 9 4 7.985 4 5.5C4 3.5 6 2 8 4C10 2 12 3.5 12 5.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
         </svg>
         {invitations.length > 0 && (
-          <span className="absolute -right-1 -top-1 flex h-5 w-5 items-center justify-center rounded-full bg-amber-500 text-[10px] font-bold text-white">
+          <span className="absolute -right-0.5 -top-0.5 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-amber-500 px-1 text-[10px] font-bold leading-none text-white ring-2 ring-surface">
             {invitations.length > 9 ? "9+" : invitations.length}
           </span>
         )}
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-2xl border border-line bg-surface shadow-elevated">
+        <div className="pritio-menu-enter absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
           <div className="border-b border-line px-4 py-3">
             <h3 className="text-sm font-bold text-ink">Invitaciones pendientes</h3>
           </div>
@@ -151,7 +154,7 @@ export function PendingInvitationsPopover() {
                     <button
                       onClick={() => handleAccept(inv)}
                       disabled={processing === inv.id}
-                      className="flex-1 rounded-lg bg-prio-blue py-1.5 text-xs font-semibold text-white hover:bg-prio-blue/90 transition-colors disabled:opacity-50"
+                      className="flex-1 rounded-lg bg-pritio-blue py-1.5 text-xs font-semibold text-white hover:bg-pritio-blue/90 transition-colors disabled:opacity-50"
                     >
                       {processing === inv.id ? "..." : "Aceptar"}
                     </button>

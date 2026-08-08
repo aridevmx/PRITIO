@@ -1,7 +1,7 @@
 import { type FormEvent, useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
-import { PrioLogo } from "@/components/PrioLogo";
+import { PritioLogo } from "@/components/PritioLogo";
 import { Field } from "@/components/Field";
 import { cn } from "@/lib/utils";
 
@@ -78,9 +78,9 @@ export function ResetPasswordScreen() {
         <div className="w-full max-w-sm animate-fade-in">
           <div className="panel p-8 text-center">
             <div className="mb-6 flex justify-center">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-prio-green/10">
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-pritio-green/10">
                 <svg
-                  className="h-8 w-8 text-prio-green"
+                  className="h-8 w-8 text-pritio-green"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -116,7 +116,7 @@ export function ResetPasswordScreen() {
       <div className="w-full max-w-sm animate-fade-in">
         <div className="panel p-8">
           <div className="mb-8 flex flex-col items-center gap-3">
-            <PrioLogo size={48} />
+            <PritioLogo size={48} />
             <h1 className="text-xl font-bold text-ink">Nueva contraseña</h1>
             <p className="text-sm text-ink-soft">
               Ingresa tu nueva contraseña
@@ -125,7 +125,7 @@ export function ResetPasswordScreen() {
 
           {validating ? (
             <div className="flex justify-center py-8">
-              <div className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-prio-blue" />
+              <div className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-pritio-blue" />
             </div>
           ) : error && !newPassword ? (
             <div className="text-center">
@@ -154,7 +154,7 @@ export function ResetPasswordScreen() {
                   required
                   minLength={6}
                   autoFocus
-                  className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-prio-blue focus:ring-2 focus:ring-prio-blue/20"
+                  className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-pritio-blue focus:ring-2 focus:ring-pritio-blue/20"
                 />
               </Field>
 
@@ -169,7 +169,7 @@ export function ResetPasswordScreen() {
                   placeholder="••••••••"
                   required
                   minLength={6}
-                  className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-prio-blue focus:ring-2 focus:ring-prio-blue/20"
+                  className="h-11 w-full rounded-xl border border-line bg-surface px-4 text-sm text-ink outline-none transition-colors placeholder:text-ink-muted focus:border-pritio-blue focus:ring-2 focus:ring-pritio-blue/20"
                 />
               </Field>
 

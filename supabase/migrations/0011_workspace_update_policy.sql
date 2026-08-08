@@ -1,4 +1,4 @@
--- PRIO V1 — Workspace UPDATE policy
+-- PRITIO V1 — Workspace UPDATE policy
 -- Migration 0011: add missing RLS UPDATE policy for workspaces table
 
 DROP POLICY IF EXISTS "workspaces: update if admin" ON public.workspaces;

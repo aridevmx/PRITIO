@@ -6,12 +6,14 @@ const DAYS = ["L", "M", "J", "V", "S", "D"];
 interface MiniCalendarProps {
   taskDates: string[];
   blockedDates: string[];
+  pendingDates?: string[];
   onDayClick?: (dateStr: string) => void;
 }
 
 export function MiniCalendar({
   taskDates,
   blockedDates,
+  pendingDates,
   onDayClick,
 }: MiniCalendarProps) {
   const [viewDate, setViewDate] = useState(() => new Date());
@@ -49,6 +51,10 @@ export function MiniCalendar({
     () => new Set(blockedDates.map((d) => d.slice(0, 10))),
     [blockedDates],
   );
+  const pendingDateSet = useMemo(
+    () => new Set((pendingDates ?? []).map((d) => d.slice(0, 10))),
+    [pendingDates],
+  );
 
   const today = useMemo(() => todayStr(), []);
 
@@ -69,7 +75,7 @@ export function MiniCalendar({
           </svg>
         </button>
 
-        <span className="text-sm font-semibold text-prio-purple capitalize">
+        <span className="text-sm font-semibold text-pritio-purple capitalize">
           {monthName}
         </span>
 
@@ -96,6 +102,7 @@ export function MiniCalendar({
             const isToday = dateStr === today;
             const hasTask = taskDateSet.has(dateStr);
             const isBlocked = blockedDateSet.has(dateStr);
+            const isPending = pendingDateSet.has(dateStr) && !isBlocked;
 
             return (
               <div
@@ -104,7 +111,7 @@ export function MiniCalendar({
                   "relative flex items-center justify-center text-xs py-1",
                   !isCurrentMonth && "text-ink-muted/40",
                   isCurrentMonth && "text-ink-soft",
-                  (isCurrentMonth && (hasTask || isBlocked)) && "cursor-pointer",
+                  (isCurrentMonth && (hasTask || isBlocked || isPending)) && "cursor-pointer",
                 )}
               >
                 <button
@@ -115,20 +122,18 @@ export function MiniCalendar({
                   disabled={!isCurrentMonth}
                   className={cn(
                     "relative flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors",
-                    isToday && "border-2 border-teal-400",
-                    isCurrentMonth && (hasTask || isBlocked) && "hover:bg-surface-muted cursor-pointer",
+                    isBlocked && isCurrentMonth && "bg-rose-500 text-white shadow-sm",
+                    isPending && isCurrentMonth && "bg-amber-400 text-white shadow-sm",
+                    isToday && !isBlocked && !isPending && "border-2 border-teal-400",
+                    isToday && (isBlocked || isPending) && "ring-2 ring-teal-400 ring-offset-1",
+                    isCurrentMonth && (hasTask || isBlocked || isPending) && "hover:brightness-95 cursor-pointer",
                     !isCurrentMonth && "cursor-default",
                   )}
                 >
                   {day.getDate()}
-                  {isCurrentMonth && (hasTask || isBlocked) && (
+                  {isCurrentMonth && hasTask && (
                     <span className="absolute -bottom-0.5 flex gap-[2px]">
-                      {hasTask && (
-                        <span className="block h-1 w-1 rounded-full bg-prio-blue" />
-                      )}
-                      {isBlocked && (
-                        <span className="block h-1 w-1 rounded-full bg-rose-400" />
-                      )}
+                      <span className="block h-1 w-1 rounded-full bg-pritio-blue" />
                     </span>
                   )}
                 </button>

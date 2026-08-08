@@ -1,4 +1,4 @@
--- Priorify V1 — Notification preferences
+-- PRITIO V1 — Notification preferences
 -- Migration 0012: add JSONB column for granular notification preferences
 
 ALTER TABLE workspace_members
