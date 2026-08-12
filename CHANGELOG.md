@@ -6,15 +6,7 @@ este proyecto cumple con [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
-### Añadido
-- Modal "Mi cuenta" con pestañas: Identidad (perfil y avatar por URL), Seguridad (cambio de contraseña), Preferencias (tema, formato de hora, sonidos, descarga de datos, cookies), Mis días bloqueados, Notificaciones (matriz evento×canal con aviso en app por evento) y Acerca de.
-- Sonidos de interfaz con Web Audio API (tarea completada, notificación, recordatorio de junta), activables desde Preferencias.
-- Exportación de datos personales a JSON desde Preferencias.
-- Preferencia local por evento para avisos en la app (campana y/o toast, o desactivado).
-
-### Cambiado
-- Menú de usuario rediseñado: "Mi cuenta" como acción principal, avatar siempre visible y fecha con indicador de despliegue.
-- Modelo open-source + cloud de pago documentado en `PRICING.md`; el frontend ahora mapea el plan del workspace (`personal_free`/`pro`/`enterprise`) y lo muestra en la configuración del workspace.
+## [0.1.1] - 2026-08-12
 
 ## [0.1.0] - 2026-08-02
 
