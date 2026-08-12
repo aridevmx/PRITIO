@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type Stripe from "stripe";
-import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
 import {
   getOrCreateStripeCustomer,
@@ -46,8 +46,6 @@ const PRICE_IDS: Record<
   },
 };
 
-const TRIAL_DAYS = 14;
-
 type Tier = "personal" | "family" | "team";
 type Currency = "usd" | "mxn";
 type BillingPeriod = "monthly" | "yearly";
@@ -65,13 +63,6 @@ const TIERS: Tier[] = ["personal", "family", "team"];
 const CURRENCIES: Currency[] = ["usd", "mxn"];
 const PERIODS: BillingPeriod[] = ["monthly", "yearly"];
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
-  });
-}
-
 async function getAuthenticatedUser(req: Request) {
   const authHeader = req.headers.get("Authorization") ?? "";
   const token = authHeader.startsWith("Bearer ") ? authHeader.slice(7) : authHeader;
@@ -81,7 +72,7 @@ async function getAuthenticatedUser(req: Request) {
   return { user: data.user };
 }
 
-/** Map a workspace type to its purchasable tier (enterprise behaves as team). */
+/** Map a workspace type to its purchasable tier. */
 function tierForWorkspaceType(type: string): Tier {
   if (type === "personal") return "personal";
   if (type === "family") return "family";
@@ -91,6 +82,12 @@ function tierForWorkspaceType(type: string): Tier {
 Deno.serve(async (req: Request) => {
   const cors = handleCors(req);
   if (cors) return cors;
+
+  const json = (body: unknown, status = 200): Response =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+    });
 
   if (req.method !== "POST") {
     return json({ error: "Method not allowed" }, 405);
@@ -167,12 +164,6 @@ Deno.serve(async (req: Request) => {
       }, 400);
     }
 
-    const { data: profile } = await supabaseAdmin
-      .from("profiles")
-      .select("pro_trial_used_at")
-      .eq("id", user.id)
-      .single();
-
     // Quantity = paid seats. Personal has no members; family/team bill per member.
     let quantity = 1;
     if (tier !== "personal") {
@@ -189,8 +180,6 @@ Deno.serve(async (req: Request) => {
     }
 
     const price = await stripe.prices.retrieve(priceId);
-    const trialUsed = profile?.pro_trial_used_at != null;
-    const useTrial = !trialUsed;
 
     const email = user.email ?? "";
     const customerId = await getOrCreateStripeCustomer(user.id, email);
@@ -201,9 +190,6 @@ Deno.serve(async (req: Request) => {
     const subscriptionData: Stripe.Checkout.SessionCreateParams.SubscriptionData = {
       metadata: { user_id: user.id, workspace_id: workspaceId, tier },
     };
-    if (useTrial) {
-      subscriptionData.trial_period_days = TRIAL_DAYS;
-    }
 
     const sessionParams: Stripe.Checkout.SessionCreateParams = {
       mode: "subscription",

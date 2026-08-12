@@ -25,13 +25,13 @@ The Eisenhower Matrix is PRITIO's core interaction, not a separate view. Tasks l
 - Users open PRITIO in a browser tab and keep it alongside email, Slack/Teams, and a calendar.
 - Daily workflow: review quadrants → check calendar → complete/update tasks → review stats.
 - Tasks have due dates, assignees (individuals from workspace members), and optional meeting schedules.
-- Workspaces are typed (personal, family, team, enterprise) to adjust collaboration features.
+- Workspaces are typed (personal, family, team) to adjust collaboration features.
 
 ## Capabilities and Constraints
 
 - **Confirmed:** Tasks with quadrants, due dates, assignees, projects, meetings. Weekly/Daily planning views. Calendar with task overlay. Basic stats (active tasks, completed this week, on-time rate, quadrant load, assignee load). Multi-workspace support. Role-based access (owner, admin, leader, member). Push notifications. Invitations. Per-workspace billing model (free / pro; three Pro tiers by workspace type) with per-workspace-type limits, enforced client-side (gates + upsell prompts) and server-side (quota triggers), documented in `PRICING.md`.
 - **MVP phase:** Calendar integration is built but not synced with external calendars. Approvals workflow exists but is simplified. Blocked days exist.
-- **Open source + hosted cloud:** The product will be released as open source. PRITIO Cloud (pritio.app) runs freemium: Free is always free with limits tied to the Supabase free tier; Pro is paid per workspace (Personal/Familiar/Equipo tiers, USD and MXN, per-member for family/team) with a one-time 14-day trial per account. Lifetime was removed. Checkout, webhook, and billing portal are wired to Stripe (see `PRICING.md`).
+- **Open source + hosted cloud:** The product will be released as open source. PRITIO Cloud (pritio.app) runs freemium: Free is always free with one workspace per type (Personal base + 1 Familia + 1 Equipo); Pro is paid per workspace (Personal/Familiar/Equipo tiers, USD and MXN, per-member for family/team) with a 14-day trial per Familia/Equipo workspace activated on creation. Lifetime was removed. Checkout, webhook, and billing portal are wired to Stripe (see `PRICING.md`).
 - **Language:** UI is in Spanish (Mexico). Code and comments are in English.
 
 ## Brand Commitments

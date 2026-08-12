@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import type Stripe from "stripe";
-import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
+import { PERMISSIVE_CORS_HEADERS, handleCors } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
 import { getStripe, mapStripeStatus } from "../_shared/stripe.ts";
 
@@ -9,7 +9,7 @@ const WEBHOOK_SECRET = Deno.env.get("STRIPE_WEBHOOK_SECRET") ?? "";
 function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+    headers: { ...PERMISSIVE_CORS_HEADERS, "Content-Type": "application/json" },
   });
 }
 
@@ -41,17 +41,8 @@ function subscriptionQuantity(subscription: Stripe.Subscription): number {
   return Math.max(1, Number(q));
 }
 
-async function markTrialUsedIfEligible(userId: string) {
-  const { error } = await supabaseAdmin.rpc("mark_pro_trial_used", {
-    p_user_id: userId,
-  });
-  if (error) {
-    console.warn("stripe-webhook: mark_pro_trial_used failed:", error.message);
-  }
-}
-
 Deno.serve(async (req: Request) => {
-  const cors = handleCors(req);
+  const cors = handleCors(req, PERMISSIVE_CORS_HEADERS);
   if (cors) return cors;
 
   if (req.method !== "POST") {
@@ -83,12 +74,8 @@ Deno.serve(async (req: Request) => {
   try {
     switch (event.type) {
       case "checkout.session.completed": {
-        const session = event.data.object as Stripe.Checkout.Session;
-        const metadata = session.metadata ?? {};
-        if (session.mode === "subscription" && metadata.plan === "pro" && metadata.user_id) {
-          // A Pro purchase of any kind consumes the one-time trial for the account.
-          await markTrialUsedIfEligible(metadata.user_id);
-        }
+        // Trial is granted per-workspace via the `start_pro_trial` RPC (migration
+        // 0025), so a Pro purchase does not consume any account-level trial here.
         break;
       }
 
@@ -111,9 +98,6 @@ Deno.serve(async (req: Request) => {
           subscription.trial_end,
           subscription.id,
         );
-        if (subscription.trial_end) {
-          await markTrialUsedIfEligible(meta.user_id);
-        }
         break;
       }
 

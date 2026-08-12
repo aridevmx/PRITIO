@@ -9,6 +9,7 @@ import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
 import { openUpgrade } from "@/features/billing/upgrade";
+import { startProTrial } from "@/features/billing/api";
 import { useTaskDates } from "@/features/calendar/useTaskDates";
 import {
   blockedDaysEnabled,
@@ -70,7 +71,7 @@ export function Sidebar({
 }: SidebarProps) {
   const { currentWorkspace, createWorkspace, profile, members, isLeader } =
     useWorkspace();
-  const { canCreate } = useBilling();
+  const { canCreate, canCreateWorkspace, refresh: refreshBilling } = useBilling();
   const { toast } = useToast();
   const timeFormat = useTimeFormat();
   const [showWorkspaceMenu, setShowWorkspaceMenu] = useState(false);
@@ -148,7 +149,6 @@ export function Sidebar({
     personal: "#9B7EDC",
     family: "#4FC38A",
     team: "#5BA7D1",
-    enterprise: "#F27D72",
   };
   const [upcomingMeetings, setUpcomingMeetings] = useState<TodayMeeting[]>([]);
   const [selectedMeeting, setSelectedMeeting] = useState<TodayMeeting | null>(null);
@@ -278,6 +278,46 @@ export function Sidebar({
       }
     },
     [profile?.id, currentWorkspace?.id, dayPopover, blockedEnabled, isLeader, toast, canCreate, popoverBlockedBy],
+  );
+
+  const handleCreateWorkspace = useCallback(
+    async (withTrial: boolean) => {
+      if (!newWsName.trim()) return;
+      if (!canCreateWorkspace(newWsType)) return;
+      setCreating(true);
+      try {
+        const ws = await createWorkspace(newWsName.trim(), newWsType);
+        /* Auto-create assignee for the workspace owner */
+        if (newWsType !== "personal" && profile) {
+          const { error: ae } = await supabase
+            .from("assignees")
+            .insert({
+              workspace_id: ws.id,
+              name: profile.fullName || profile.email.split("@")[0],
+              color: "#5BA7D1",
+              linked_user_id: profile.id,
+            });
+          if (ae) console.error("Failed to create owner assignee:", ae);
+        }
+        if (withTrial && (newWsType === "family" || newWsType === "team")) {
+          await startProTrial(ws.id);
+          toast.success("¡Prueba Pro de 14 días activada!");
+          void refreshBilling();
+        }
+        setShowCreateDialog(false);
+        setNewWsName("");
+      } catch (err) {
+        const resource = parsePlanLimitError(err);
+        if (resource) {
+          openUpgrade(resource);
+          return;
+        }
+        toast.error("No se pudo crear el workspace");
+      } finally {
+        setCreating(false);
+      }
+    },
+    [newWsName, newWsType, profile, canCreateWorkspace, createWorkspace, refreshBilling, toast],
   );
 
   return (
@@ -581,52 +621,34 @@ export function Sidebar({
               </button>
             </div>
 
-            <div className="flex gap-2 justify-end">
-              <button
-                onClick={() => {
-                  setShowCreateDialog(false);
-                  setNewWsName("");
-                }}
-                className="rounded-xl border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted"
-              >
-                Cancelar
-              </button>
-              <button
-                disabled={!newWsName.trim() || creating}
-                onClick={async () => {
-                  if (!canCreate("workspaces")) return;
-                  setCreating(true);
-                  try {
-                    const ws = await createWorkspace(newWsName.trim(), newWsType);
-                    /* Auto-create assignee for the workspace owner */
-                    if (newWsType !== "personal" && profile) {
-                      const { error: ae } = await supabase
-                        .from("assignees")
-                        .insert({
-                          workspace_id: ws.id,
-                          name: profile.fullName || profile.email.split("@")[0],
-                          color: "#5BA7D1",
-                          linked_user_id: profile.id,
-                        });
-                      if (ae) console.error("Failed to create owner assignee:", ae);
-                    }
+            <div className="flex flex-col gap-2">
+              {(newWsType === "family" || newWsType === "team") && (
+                <button
+                  disabled={!newWsName.trim() || creating}
+                  onClick={() => void handleCreateWorkspace(true)}
+                  className="w-full rounded-xl bg-gradient-to-r from-pritio-purple to-pritio-blue px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-opacity hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creating ? "Creando..." : "Probar Pro gratis 14 días"}
+                </button>
+              )}
+              <div className="flex gap-2 justify-end">
+                <button
+                  onClick={() => {
                     setShowCreateDialog(false);
                     setNewWsName("");
-                  } catch (err) {
-                    const resource = parsePlanLimitError(err);
-                    if (resource) {
-                      openUpgrade(resource);
-                      return;
-                    }
-                    toast.error("No se pudo crear el workspace");
-                  } finally {
-                    setCreating(false);
-                  }
-                }}
-                className="rounded-xl bg-pritio-blue px-4 py-2 text-sm font-medium text-white transition-all hover:bg-pritio-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {creating ? "Creando..." : "Crear"}
-              </button>
+                  }}
+                  className="rounded-xl border border-line px-4 py-2 text-sm font-medium text-ink-muted transition-colors hover:bg-surface-muted"
+                >
+                  Cancelar
+                </button>
+                <button
+                  disabled={!newWsName.trim() || creating}
+                  onClick={() => void handleCreateWorkspace(false)}
+                  className="rounded-xl bg-pritio-blue px-4 py-2 text-sm font-medium text-white transition-all hover:bg-pritio-blue/90 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {creating ? "Creando..." : "Comenzar gratis"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

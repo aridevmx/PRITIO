@@ -1,4 +1,4 @@
-import Stripe from "stripe";
+import Stripe from "npm:stripe";
 import { supabaseAdmin } from "./supabase-client.ts";
 
 /** Stripe secret key (test mode for local, live for prod). Empty → gateway off. */

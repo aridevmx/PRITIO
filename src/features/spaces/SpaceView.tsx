@@ -8,6 +8,7 @@ import { StatsView } from "@/features/stats/StatsView";
 import { ViewTabs, type ViewKey } from "@/components/layout/ViewTabs";
 import { TaskFormDialog } from "@/features/tasks/TaskFormDialog";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
+import { useBilling } from "@/features/billing/BillingProvider";
 import { useViewPrefs } from "@/lib/viewPrefs";
 import { cn } from "@/lib/utils";
 import { onAppEvent } from "@/lib/appEvents";
@@ -24,6 +25,7 @@ interface SpaceViewProps {
 export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceViewProps) {
   const meta = SPACES[space];
   const { currentWorkspace, workspaces } = useWorkspace();
+  const { hasFeature } = useBilling();
   const { hiddenViews } = useViewPrefs();
   const { tasks, refresh } = useTasks(currentWorkspace?.id ?? null);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -37,7 +39,10 @@ export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceView
   const baseTabs: ViewKey[] = isPersonal
     ? ["cuadrantes", "plan", "kanban", "calendario"]
     : ["cuadrantes", "plan", "kanban", "calendario", "indicadores"];
-  const availableTabs = baseTabs.filter((v) => !hiddenViews.includes(v));
+  const availableTabs = baseTabs
+    .filter((v) => !hiddenViews.includes(v))
+    .filter((v) => v !== "plan" || hasFeature("plan_view"))
+    .filter((v) => v !== "kanban" || hasFeature("board_view"));
 
   useEffect(() => {
     return onAppEvent("pritio:newTask", () => {

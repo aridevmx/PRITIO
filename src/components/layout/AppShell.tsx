@@ -11,13 +11,14 @@ import { PushNotificationInit } from "@/features/pushNotifications/PushNotificat
 import { UpgradeHost } from "@/features/billing/UpgradeHost";
 import { SpaceView } from "@/features/spaces/SpaceView";
 import { useAuth } from "@/features/auth/AuthProvider";
+import { useBilling } from "@/features/billing/BillingProvider";
 import { spacesForWorkspaceType, spacePath, SLUG_TO_SPACE, SPACES } from "@/features/spaces/spaces";
 import type { SpaceKey } from "@/features/spaces/spaces";
 import type { ViewKey } from "@/components/layout/ViewTabs";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { cn } from "@/lib/utils";
 
-function availableViewsFor(workspaceType: string, space: SpaceKey): ViewKey[] {
+function baseViewsFor(workspaceType: string, space: SpaceKey): ViewKey[] {
   const isPersonal = workspaceType === "personal" || space === "personal" || space === "pendientes";
   return isPersonal
     ? ["cuadrantes", "plan", "kanban", "calendario"]
@@ -28,6 +29,7 @@ export function AppShell() {
   const navigate = useNavigate();
   const params = useParams<{ space?: string; view?: string }>();
   const { currentWorkspace, profile } = useWorkspace();
+  const { hasFeature } = useBilling();
   const { signOut } = useAuth();
   const { hiddenViews } = useViewPrefs();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -45,12 +47,19 @@ export function AppShell() {
 
   const activeSpace = params.space ? SLUG_TO_SPACE[params.space] : undefined;
 
+  const tabsForSpace = useCallback(
+    (space: SpaceKey) => {
+      return baseViewsFor(workspaceType, space)
+        .filter((v) => !hiddenViews.includes(v))
+        .filter((v) => v !== "plan" || hasFeature("plan_view"))
+        .filter((v) => v !== "kanban" || hasFeature("board_view"));
+    },
+    [workspaceType, hiddenViews, hasFeature],
+  );
+
   const availableTabs = useMemo(
-    () =>
-      activeSpace
-        ? availableViewsFor(workspaceType, activeSpace).filter((v) => !hiddenViews.includes(v))
-        : [],
-    [workspaceType, activeSpace, hiddenViews],
+    () => (activeSpace ? tabsForSpace(activeSpace) : []),
+    [activeSpace, tabsForSpace],
   );
 
   const viewParam = params.view as ViewKey | undefined;
@@ -83,7 +92,7 @@ export function AppShell() {
     viewParam && (availableTabs as string[]).includes(viewParam) ? viewParam : "cuadrantes";
 
   const handleSpaceChange = (key: SpaceKey) => {
-    const newTabs = availableViewsFor(workspaceType, key).filter((v) => !hiddenViews.includes(v));
+    const newTabs = tabsForSpace(key);
     const view = (newTabs as string[]).includes(activeView) ? activeView : "cuadrantes";
     navigate(spacePath(key, view));
   };

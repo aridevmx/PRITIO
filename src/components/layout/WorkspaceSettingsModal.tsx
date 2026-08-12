@@ -28,14 +28,12 @@ const TYPE_LABELS: Record<string, string> = {
   personal: "Personal",
   family: "Familia",
   team: "Trabajo",
-  enterprise: "Empresa",
 };
 
 const TYPE_GRADIENTS: Record<string, string> = {
   personal: "from-purple-400 to-violet-600",
   family: "from-green-400 to-emerald-600",
   team: "from-blue-400 to-cyan-600",
-  enterprise: "from-orange-400 to-red-500",
 };
 
 interface WorkspaceSettingsModalProps {

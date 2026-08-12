@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
-import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 import { sendEmail } from "../_shared/email.ts";
 import { DEFAULT_PREFS } from "../_shared/notification-prefs.ts";
 import { APP_NAME } from "../_shared/app-info.ts";
@@ -43,7 +43,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -70,7 +70,7 @@ Deno.serve(async (req: Request) => {
 
     if (members.length === 0) {
       return new Response(JSON.stringify({ sent: 0, message: "No members found" }), {
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -186,13 +186,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ sent: sentCount, total: userIds.length }), {
       status: 200,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("daily-digest error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

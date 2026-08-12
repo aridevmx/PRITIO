@@ -1,6 +1,6 @@
 export type Quadrant = "do" | "plan" | "delegate" | "later";
 
-export type WorkspaceType = "personal" | "family" | "team" | "enterprise";
+export type WorkspaceType = "personal" | "family" | "team";
 
 export type WorkspacePlan = "free" | "pro";
 
@@ -86,7 +86,17 @@ export type PlanResource =
   | "projects"
   | "assignees"
   | "blocked_days"
-  | "workspaces";
+  | "agenda_events"
+  | "workspaces"
+  | "meetings";
+
+/** Feature flags driven by plan_limits (no numeric quota). */
+export type PlanFeature =
+  | "plan_view"
+  | "board_view"
+  | "meetings"
+  | "due_date"
+  | "agenda_events";
 
 export interface PlanLimits {
   plan: WorkspacePlan;
@@ -97,6 +107,12 @@ export interface PlanLimits {
   assigneeLimit: number;
   blockedDayLimit: number;
   workspaceLimit: number;
+  agendaEventLimit: number;
+  allowPlanView: boolean;
+  allowBoardView: boolean;
+  allowMeetings: boolean;
+  allowDueDate: boolean;
+  supportTier: string;
 }
 
 export interface WorkspaceUsage {
@@ -105,6 +121,7 @@ export interface WorkspaceUsage {
   projects: number;
   assignees: number;
   blockedDays: number;
+  agendaEvents: number;
   workspaces: number;
 }
 
@@ -324,6 +341,30 @@ export interface PlanLimitsRow {
   assignee_limit: number;
   blocked_day_limit: number;
   workspace_limit: number;
+  agenda_event_limit: number;
+  allow_plan_view: boolean;
+  allow_board_view: boolean;
+  allow_meetings: boolean;
+  allow_due_date: boolean;
+  support_tier: string;
+}
+
+export interface AgendaEvent {
+  id: string;
+  workspaceId: string;
+  title: string;
+  startsAt: string;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface AgendaEventRow {
+  id: string;
+  workspace_id: string;
+  title: string;
+  starts_at: string;
+  created_by: string;
+  created_at: string;
 }
 
 export interface WorkspaceMemberRow {

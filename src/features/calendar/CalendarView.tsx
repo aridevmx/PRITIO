@@ -10,6 +10,7 @@ import {
   listWorkspaceBlockedDays,
 } from "@/features/calendar/blockedDaysApi";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
+import { FamilyAgenda } from "@/features/agenda/FamilyAgenda";
 import type { SpaceKey } from "@/features/spaces/spaces";
 import type { BlockedDayStatus, Task } from "@/types";
 
@@ -441,6 +442,9 @@ export function CalendarView({ workspaceId, space, defaultDate }: CalendarViewPr
           />
         )}
       </div>
+
+      {/* Agenda familiar (workspaces de tipo familia) */}
+      {space === "casa" && <FamilyAgenda workspaceId={workspaceId} />}
 
       {/* Day detail modal */}
       {selectedDay && (

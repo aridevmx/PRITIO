@@ -1,11 +1,16 @@
 #!/usr/bin/env node
 
-// 1. Reemplaza 're_xxxxxxxxx' con tu API key real de Resend
-// 2. Ejecuta: node scripts/test-resend.mjs
+// Requiere la API key en la variable de entorno RESEND_API_KEY.
+// Ejecuta: RESEND_API_KEY=re_xxx node scripts/test-resend.mjs
 
 import { Resend } from "resend";
 
-const RESEND_API_KEY = "re_xxxxxxxxx";
+const RESEND_API_KEY = process.env.RESEND_API_KEY;
+if (!RESEND_API_KEY) {
+  console.error("❌ Define RESEND_API_KEY (no lo pongas en el código).");
+  process.exit(1);
+}
+
 const TO = "pritioappmx@gmail.com";
 const FROM = "onboarding@resend.dev";
 const SUBJECT = "[Pritio] Prueba de Resend";

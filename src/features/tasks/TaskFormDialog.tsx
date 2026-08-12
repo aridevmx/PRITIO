@@ -81,7 +81,7 @@ export function TaskFormDialog({
   defaultStartTime,
 }: TaskFormDialogProps) {
   const { currentWorkspace, profile, members } = useWorkspace();
-  const { canCreate } = useBilling();
+  const { canCreate, hasFeature } = useBilling();
   const { toast } = useToast();
 
   const [title, setTitle] = useState("");
@@ -136,6 +136,9 @@ export function TaskFormDialog({
   const titleRef = useRef<HTMLInputElement>(null);
 
   const isEdit = !!task;
+
+  const canShowMeetings = hasFeature("meetings") || (isEdit && task?.kind === "meeting");
+  const showDueDate = hasFeature("due_date") || (isEdit && !!task?.dueDate);
 
   useEffect(() => {
     if (open) {
@@ -439,44 +442,46 @@ export function TaskFormDialog({
         </h3>
 
         <div className="mt-5 space-y-4">
-          <SegmentedControl
-            value={kind}
-            pill
-            onChange={(k) => {
-              setKind(k);
-              if (k === "task") {
-                if (!dueDate && meetingDay) setDueDate(meetingDay);
-              } else {
-                if (!meetingDay && dueDate) setMeetingDay(dueDate);
-              }
-            }}
-            options={[
-              {
-                value: "task",
-                label: "Tarea",
-                activeClassName: "text-pritio-blue",
-                icon: (
-                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                    <path d="M2.5 4.5l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M2.5 9l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    <rect x="10" y="4.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-                    <rect x="10" y="9.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-                  </svg>
-                ),
-              },
-              {
-                value: "meeting",
-                label: "Junta",
-                activeClassName: "text-pritio-purple",
-                icon: (
-                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                    <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                    <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                  </svg>
-                ),
-              },
-            ]}
-          />
+          {canShowMeetings && (
+            <SegmentedControl
+              value={kind}
+              pill
+              onChange={(k) => {
+                setKind(k);
+                if (k === "task") {
+                  if (!dueDate && meetingDay) setDueDate(meetingDay);
+                } else {
+                  if (!meetingDay && dueDate) setMeetingDay(dueDate);
+                }
+              }}
+              options={[
+                {
+                  value: "task",
+                  label: "Tarea",
+                  activeClassName: "text-pritio-blue",
+                  icon: (
+                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+                      <path d="M2.5 4.5l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      <path d="M2.5 9l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                      <rect x="10" y="4.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+                      <rect x="10" y="9.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+                    </svg>
+                  ),
+                },
+                {
+                  value: "meeting",
+                  label: "Junta",
+                  activeClassName: "text-pritio-purple",
+                  icon: (
+                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+                      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+                      <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                    </svg>
+                  ),
+                },
+              ]}
+            />
+          )}
 
           <Field label="Titulo" error={error}>
             <input
@@ -543,7 +548,7 @@ export function TaskFormDialog({
             </div>
           </Field>
 
-          {kind === "task" && (
+          {kind === "task" && showDueDate && (
             <Field label="Fecha limite" badge="Opcional">
               <div className="flex flex-col gap-1.5">
                 <input

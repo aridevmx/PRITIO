@@ -1,9 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
 import { sendEmail } from "../_shared/email.ts";
 import { buildInviteEmailHtml, buildRoleLabel } from "./template.ts";
 import { APP_NAME } from "../_shared/app-info.ts";
+import { getCaller } from "../_shared/auth.ts";
 
 interface InvitePayload {
   invitationId: string;
@@ -37,7 +38,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -47,7 +48,16 @@ Deno.serve(async (req: Request) => {
     if (!invitationId) {
       return new Response(JSON.stringify({ error: "invitationId is required" }), {
         status: 400,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+
+    // Only a workspace owner/admin may (re)send invitation emails.
+    const caller = getCaller(req);
+    if (!caller.userId) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -60,7 +70,7 @@ Deno.serve(async (req: Request) => {
     if (invError || !invitation) {
       return new Response(JSON.stringify({ error: "Invitation not found" }), {
         status: 404,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -69,7 +79,22 @@ Deno.serve(async (req: Request) => {
     if (inv.accepted_at) {
       return new Response(JSON.stringify({ error: "Invitation already accepted" }), {
         status: 400,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+
+    const { data: member } = await supabaseAdmin
+      .from("workspace_members")
+      .select("user_id")
+      .eq("workspace_id", inv.workspace_id)
+      .eq("user_id", caller.userId)
+      .in("role", ["owner", "admin"])
+      .maybeSingle();
+
+    if (!member) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -82,7 +107,7 @@ Deno.serve(async (req: Request) => {
     if (wsError || !workspace) {
       return new Response(JSON.stringify({ error: "Workspace not found" }), {
         status: 404,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -115,13 +140,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ sent, inviteLink }), {
       status: 200,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("send-invite error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

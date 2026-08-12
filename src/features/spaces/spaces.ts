@@ -88,8 +88,6 @@ export function spacesForWorkspaceType(type: WorkspaceType): SpaceMeta[] {
       return [SPACES.casa];
     case "team":
       return [SPACES.trabajo];
-    case "enterprise":
-      return [SPACES.trabajo, SPACES.personal, SPACES.casa];
   }
 }
 

@@ -10,20 +10,18 @@ const TYPE_LABELS: Record<WorkspaceType, string> = {
   personal: "Personal",
   family: "Familia",
   team: "Trabajo",
-  enterprise: "Empresa",
 };
 
 const TYPE_COLORS: Record<WorkspaceType, string> = {
   personal: "#9B7EDC",
   family: "#4FC38A",
   team: "#5BA7D1",
-  enterprise: "#F27D72",
 };
 
 interface WorkspaceSwitcherProps {
   open: boolean;
   onClose: () => void;
-  onCreateWorkspace: (type: WorkspaceType) => void;
+  onCreateWorkspace: (type: WorkspaceType, withTrial?: boolean) => void;
 }
 
 export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: WorkspaceSwitcherProps) {
@@ -113,7 +111,7 @@ export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: Workspac
             Crear nuevo
           </div>
           <button
-            onClick={() => onCreateWorkspace("family")}
+            onClick={() => onCreateWorkspace("family", true)}
             className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-100 text-green-600 shrink-0">
@@ -123,14 +121,14 @@ export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: Workspac
             </div>
             <div className="flex-1">
               <span className="block font-medium">Nueva familia</span>
-              <span className="block text-xs text-ink-muted">Comparte tareas con tu familia</span>
+              <span className="block text-xs text-ink-muted">Prueba Pro gratis 14 días</span>
             </div>
             <svg className="h-4 w-4 text-ink-muted" viewBox="0 0 16 16" fill="none">
               <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
             </svg>
           </button>
           <button
-            onClick={() => onCreateWorkspace("team")}
+            onClick={() => onCreateWorkspace("team", true)}
             className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-600 shrink-0">
@@ -140,7 +138,7 @@ export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: Workspac
             </div>
             <div className="flex-1">
               <span className="block font-medium">Nuevo equipo</span>
-              <span className="block text-xs text-ink-muted">Organiza proyectos con tu equipo</span>
+              <span className="block text-xs text-ink-muted">Prueba Pro gratis 14 días</span>
             </div>
             <svg className="h-4 w-4 text-ink-muted" viewBox="0 0 16 16" fill="none">
               <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />

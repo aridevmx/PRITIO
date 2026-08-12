@@ -1,6 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
-import { CORS_HEADERS } from "../_shared/cors.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { getCaller } from "../_shared/auth.ts";
 
 const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@pritio.app";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
@@ -20,9 +21,8 @@ interface PushSubscriptionRow {
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: CORS_HEADERS });
-  }
+  const cors = handleCors(req);
+  if (cors) return cors;
 
   if (req.method !== "POST") {
     return new Response("Method not allowed", { status: 405 });
@@ -32,7 +32,7 @@ Deno.serve(async (req) => {
     if (!VAPID_PUBLIC_KEY || !VAPID_PRIVATE_KEY) {
       return new Response(JSON.stringify({ error: "VAPID_PUBLIC_KEY and VAPID_PRIVATE_KEY secrets are required" }), {
         status: 500,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -41,7 +41,16 @@ Deno.serve(async (req) => {
     if (!userId || !title) {
       return new Response(JSON.stringify({ error: "userId and title required" }), {
         status: 400,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+
+    // Only the target user (or service_role, e.g. task-notifications) may push.
+    const caller = getCaller(req);
+    if (caller.role !== "service_role" && caller.userId !== userId) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -55,13 +64,13 @@ Deno.serve(async (req) => {
       console.error("Error fetching subscriptions:", error);
       return new Response(JSON.stringify({ error: error.message }), {
         status: 500,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
     if (!subscriptions || subscriptions.length === 0) {
       return new Response(JSON.stringify({ sent: 0 }), {
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -72,8 +81,20 @@ Deno.serve(async (req) => {
     let sent = 0;
     for (const sub of subscriptions as PushSubscriptionRow[]) {
       try {
+        let endpoint: URL;
+        try {
+          endpoint = new URL(sub.endpoint);
+        } catch {
+          continue;
+        }
+        // SSRF guard: only https (or http localhost for local dev) endpoints.
+        const isHttps = endpoint.protocol === "https:";
+        const isLocal = endpoint.protocol === "http:" &&
+          (endpoint.hostname === "localhost" || endpoint.hostname === "127.0.0.1");
+        if (!isHttps && !isLocal) continue;
+
         const encrypted = await encryptPayload(sub, payloadBytes);
-        const jwt = await generateVapidJwt(VAPID_SUBJECT, vapidPublicKey, vapidPrivateKey, new URL(sub.endpoint).origin);
+        const jwt = await generateVapidJwt(VAPID_SUBJECT, vapidPublicKey, vapidPrivateKey, endpoint.origin);
 
         const res = await fetch(sub.endpoint, {
           method: "POST",
@@ -103,13 +124,13 @@ Deno.serve(async (req) => {
     }
 
     return new Response(JSON.stringify({ sent, total: subscriptions.length }), {
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("send-push error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });

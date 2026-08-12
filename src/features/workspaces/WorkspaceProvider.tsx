@@ -22,18 +22,6 @@ import type {
   WorkspaceType,
 } from "@/types";
 
-function uid(): string {
-  const chars = "0123456789abcdef";
-  const sections = [8, 4, 4, 4, 12];
-  return sections
-    .map((len) => {
-      let s = "";
-      for (let i = 0; i < len; i++) s += chars[Math.floor(Math.random() * 16)];
-      return s;
-    })
-    .join("-");
-}
-
 let bootstrapCreatePromise: Promise<void> | null = null;
 
 interface WorkspaceContextValue {
@@ -91,29 +79,11 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
               p_type: "personal",
               p_user_id: userId,
             });
-            if (error) throw error;
-          } catch (rpcErr) {
-            console.warn("[WorkspaceProvider] RPC failed, trying direct insert:", rpcErr);
-            try {
-              const wsId = uid();
-              const { error: wsErr } = await supabase.from("workspaces").insert({
-                id: wsId,
-                name: "Personal",
-                type: "personal",
-              });
-              if (wsErr) throw wsErr;
-
-              const { error: mErr } = await supabase.from("workspace_members").insert({
-                workspace_id: wsId,
-                user_id: userId,
-              });
-              if (mErr) {
-                console.error("[WorkspaceProvider] member insert error:", mErr);
-                throw mErr;
-              }
-            } catch (directErr) {
-              console.error("[WorkspaceProvider] Direct insert also failed:", directErr);
+            if (error) {
+              console.warn("[WorkspaceProvider] create_workspace failed:", error);
             }
+          } catch (err) {
+            console.warn("[WorkspaceProvider] create_workspace failed:", err);
           }
         })();
         try {
@@ -182,31 +152,23 @@ export function WorkspaceProvider({ children }: WorkspaceProviderProps) {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session?.user) throw new Error("Not authenticated");
 
-      const wsId = uid();
-
-      const { error: wsErr } = await supabase.from("workspaces").insert({
-        id: wsId,
-        name,
-        type,
+      const { data, error } = await supabase.rpc("create_workspace", {
+        p_name: name,
+        p_type: type,
+        p_user_id: session.user.id,
       });
-      if (wsErr) throw wsErr;
+      if (error) throw error;
 
-      const { error: mErr } = await supabase.from("workspace_members").insert({
-        workspace_id: wsId,
-        user_id: session.user.id,
-        role: "owner",
-        agenda_shared: false,
-        recap_timezone: "America/Mexico_City",
-        approval_grace_seconds: 3600,
-      });
-      if (mErr) throw mErr;
+      const created = data as { id?: string } | null;
+      const createdId = created?.id;
 
       await refresh();
-      const ws = workspaces.find((w) => w.id === wsId);
+      const wsList = await listWorkspaces();
+      const ws = wsList.find((w) => w.id === createdId);
       if (!ws) throw new Error("Workspace not found after creation");
       return ws;
     },
-    [refresh, workspaces],
+    [refresh],
   );
 
   const deleteWorkspace = useCallback(

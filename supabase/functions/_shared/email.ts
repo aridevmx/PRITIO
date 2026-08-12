@@ -14,6 +14,21 @@ export interface SendEmailParams {
   html: string;
 }
 
+/** Strip CR/LF from user-derived header values (subject/from) to stop injection. */
+export function sanitizeHeader(value: string): string {
+  return value.replace(/[\r\n]+/g, " ").trim();
+}
+
+/** HTML-escape user-derived content before it reaches an email template. */
+export function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
 export async function sendEmail(params: SendEmailParams): Promise<boolean> {
   if (RESEND_API_KEY) {
     return sendViaResend(params);
@@ -33,9 +48,9 @@ async function sendViaResend({ to, subject, html }: SendEmailParams): Promise<bo
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      from: `${FROM_NAME} <${SMTP_FROM}>`,
-      to,
-      subject,
+      from: `${sanitizeHeader(FROM_NAME)} <${sanitizeHeader(SMTP_FROM)}>`,
+      to: sanitizeHeader(to),
+      subject: sanitizeHeader(subject),
       html,
     }),
   });
@@ -61,9 +76,9 @@ async function sendViaSmtp({ to, subject, html }: SendEmailParams): Promise<bool
   });
 
   await client.send({
-    from: `${FROM_NAME} <${SMTP_FROM}>`,
-    to,
-    subject,
+    from: `${sanitizeHeader(FROM_NAME)} <${sanitizeHeader(SMTP_FROM)}>`,
+    to: sanitizeHeader(to),
+    subject: sanitizeHeader(subject),
     content: html,
     html,
   });

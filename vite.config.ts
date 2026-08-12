@@ -22,7 +22,9 @@ export default defineConfig({
     },
   },
   test: {
-    environment: "jsdom",
+    // `jsdom` loads undici 8.x, which requires Node >= 22 (webidl.util.markAsUncloneable).
+    // Tests that need a DOM must opt in per-file with: // @vitest-environment jsdom
+    environment: "node",
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
 });

@@ -17,6 +17,8 @@ import type {
   Invitation,
   InvitationRow,
   UserBlockedDay,
+  AgendaEvent,
+  AgendaEventRow,
 } from "@/types";
 
 // ─── Plan normalization ───────────────────────────────────
@@ -199,6 +201,17 @@ export function mapInvitation(row: InvitationRow): Invitation {
     role: row.role,
     invitedBy: row.invited_by,
     acceptedAt: row.accepted_at,
+    createdAt: row.created_at,
+  };
+}
+
+export function mapAgendaEvent(row: AgendaEventRow): AgendaEvent {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    title: row.title,
+    startsAt: row.starts_at,
+    createdBy: row.created_by,
     createdAt: row.created_at,
   };
 }

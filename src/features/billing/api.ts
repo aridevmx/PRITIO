@@ -6,6 +6,7 @@ import type {
   BillingTier,
   Subscription,
   SubscriptionRow,
+  WorkspacePlan,
 } from "@/types";
 
 /**
@@ -20,19 +21,15 @@ export async function listSubscriptions(): Promise<Subscription[]> {
   return ((data ?? []) as SubscriptionRow[]).map(mapSubscription);
 }
 
-/** Whether the current user already consumed their one-time Pro trial. */
-export async function fetchProTrialUsed(): Promise<boolean> {
-  const { data, error } = await supabase.rpc("my_pro_trial_used");
-  if (error) throw error;
-  return Boolean(data);
-}
-
 export interface UsageSnapshotResponse {
   members: number;
   activeTasks: number;
   projects: number;
   assignees: number;
   blockedDays: number;
+  agendaEvents: number;
+  plan: WorkspacePlan;
+  trialEndsAt: string | null;
 }
 
 /** Member-guarded usage snapshot for a workspace (RPC `current_usage`). */
@@ -47,7 +44,41 @@ export async function fetchUsageForWorkspace(
     return null;
   }
   if (!data) return null;
-  return data as UsageSnapshotResponse;
+  const raw = data as {
+    members: number;
+    active_tasks: number;
+    projects: number;
+    assignees: number;
+    blocked_days: number;
+    agenda_events: number;
+    plan: string;
+    trial_ends_at: string | null;
+  };
+  return {
+    members: raw.members ?? 0,
+    activeTasks: raw.active_tasks ?? 0,
+    projects: raw.projects ?? 0,
+    assignees: raw.assignees ?? 0,
+    blockedDays: raw.blocked_days ?? 0,
+    agendaEvents: raw.agenda_events ?? 0,
+    plan: raw.plan === "pro" ? "pro" : "free",
+    trialEndsAt: raw.trial_ends_at ?? null,
+  };
+}
+
+/** Start the 14-day per-workspace Pro trial (owner/admin of family/team). */
+export async function startProTrial(workspaceId: string): Promise<void> {
+  const { error } = await supabase.rpc("start_pro_trial", {
+    p_workspace_id: workspaceId,
+  });
+  if (error) {
+    const code =
+      typeof error.message === "string" &&
+      error.message.match(/prio_plan_limit:([a-z_]+)/i)?.[1];
+    const err = new Error(error.message) as Error & { code?: string };
+    if (code) err.code = code;
+    throw err;
+  }
 }
 
 /**

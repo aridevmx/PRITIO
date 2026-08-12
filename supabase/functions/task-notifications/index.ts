@@ -1,9 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
-import { CORS_HEADERS, handleCors } from "../_shared/cors.ts";
-import { sendEmail } from "../_shared/email.ts";
+import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { sendEmail, escapeHtml } from "../_shared/email.ts";
 import { isNotificationEnabled, type NotificationKind } from "../_shared/notification-prefs.ts";
 import { APP_NAME } from "../_shared/app-info.ts";
+import { getCaller } from "../_shared/auth.ts";
 
 const APP_URL = Deno.env.get("APP_URL") ?? "https://pritio.app";
 
@@ -52,7 +53,7 @@ Deno.serve(async (req: Request) => {
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "Method not allowed" }), {
       status: 405,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 
@@ -62,11 +63,42 @@ Deno.serve(async (req: Request) => {
     if (!payload.taskId || !payload.workspaceId || !payload.kind) {
       return new Response(JSON.stringify({ error: "taskId, workspaceId, and kind required" }), {
         status: 400,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
-    const [task, workspace, actor, recipients] = await Promise.all([
+    // The actor comes from the verified JWT, never from the body.
+    const caller = getCaller(req);
+    if (!caller.userId && caller.role !== "service_role") {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+      });
+    }
+    if (caller.role !== "service_role") {
+      if (payload.actorUserId && payload.actorUserId !== caller.userId) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+      payload.actorUserId = caller.userId as string;
+
+      const { data: member } = await supabaseAdmin
+        .from("workspace_members")
+        .select("user_id")
+        .eq("workspace_id", payload.workspaceId)
+        .eq("user_id", caller.userId)
+        .maybeSingle();
+      if (!member) {
+        return new Response(JSON.stringify({ error: "Forbidden" }), {
+          status: 403,
+          headers: { ...corsHeaders(req), "Content-Type": "application/json" },
+        });
+      }
+    }
+
+    const [task, workspace, actor, unfilteredRecipients] = await Promise.all([
       supabaseAdmin.from("tasks").select("id, title, kind, due_date, start_at, end_at, meeting_link, location, description").eq("id", payload.taskId).single().then((r) => r.data as unknown as TaskRecord | null),
       supabaseAdmin.from("workspaces").select("id, name").eq("id", payload.workspaceId).single().then((r) => r.data as unknown as WorkspaceRecord | null),
       supabaseAdmin.from("profiles").select("id, full_name, email").eq("id", payload.actorUserId).single().then((r) => r.data as unknown as ProfileRecord | null),
@@ -76,13 +108,15 @@ Deno.serve(async (req: Request) => {
     if (!task || !workspace) {
       return new Response(JSON.stringify({ error: "Task or workspace not found" }), {
         status: 404,
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
+    const recipients = await filterWorkspaceMembers(payload.workspaceId, unfilteredRecipients);
+
     if (!recipients.length) {
       return new Response(JSON.stringify({ sent: 0, message: "No recipients" }), {
-        headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+        headers: { ...corsHeaders(req), "Content-Type": "application/json" },
       });
     }
 
@@ -135,13 +169,13 @@ Deno.serve(async (req: Request) => {
 
     return new Response(JSON.stringify({ sent }), {
       status: 200,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   } catch (err) {
     console.error("task-notifications error:", err);
     return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500,
-      headers: { ...CORS_HEADERS, "Content-Type": "application/json" },
+      headers: { ...corsHeaders(req), "Content-Type": "application/json" },
     });
   }
 });
@@ -193,6 +227,18 @@ async function getPrefsByUser(workspaceId: string, userIds: string[]): Promise<M
   return map;
 }
 
+async function filterWorkspaceMembers(workspaceId: string, recipients: ProfileRecord[]): Promise<ProfileRecord[]> {
+  if (!recipients.length) return [];
+
+  const { data: members } = await supabaseAdmin
+    .from("workspace_members")
+    .select("user_id")
+    .eq("workspace_id", workspaceId);
+
+  const memberIds = new Set<string>((members ?? []).map((m) => (m as { user_id: string }).user_id));
+  return recipients.filter((r) => memberIds.has(r.id));
+}
+
 function buildNotification(
   kind: NotificationKind,
   task: TaskRecord,
@@ -203,16 +249,22 @@ function buildNotification(
   const taskUrl = `${APP_URL}`;
   const isMeeting = task.kind === "meeting";
   const typeLabel = isMeeting ? "Junta" : "Tarea";
+  const safeWorkspaceName = escapeHtml(workspaceName);
+  const safeActorName = escapeHtml(actorName);
+  const safeTaskTitle = escapeHtml(task.title);
+  const safeDueDate = task.due_date ? escapeHtml(task.due_date) : "";
+  const safeDescription = task.description ? escapeHtml(task.description) : "";
+  const safeChanges = changes?.length ? changes.map((c) => escapeHtml(c)).join(", ") : "";
 
   const subjects: Record<NotificationKind, string> = {
-    assigned: `Te asignaron ${isMeeting ? "una junta" : "una tarea"} en ${workspaceName}`,
-    updated: `${typeLabel} actualizada en ${workspaceName}`,
-    meeting_created: `Nueva junta en ${workspaceName}`,
-    deadline_approaching: `${typeLabel} por vencer en ${workspaceName}`,
-    completed: `${typeLabel} completada en ${workspaceName}`,
-    task_approved: `Tu tarea fue aprobada en ${workspaceName}`,
-    task_rejected: `Tu tarea fue rechazada en ${workspaceName}`,
-    approval_requested: `Tarea por aprobar en ${workspaceName}`,
+    assigned: `Te asignaron ${isMeeting ? "una junta" : "una tarea"} en ${safeWorkspaceName}`,
+    updated: `${typeLabel} actualizada en ${safeWorkspaceName}`,
+    meeting_created: `Nueva junta en ${safeWorkspaceName}`,
+    deadline_approaching: `${typeLabel} por vencer en ${safeWorkspaceName}`,
+    completed: `${typeLabel} completada en ${safeWorkspaceName}`,
+    task_approved: `Tu tarea fue aprobada en ${safeWorkspaceName}`,
+    task_rejected: `Tu tarea fue rechazada en ${safeWorkspaceName}`,
+    approval_requested: `Tarea por aprobar en ${safeWorkspaceName}`,
   };
 
   const titles: Record<NotificationKind, string> = {
@@ -230,11 +282,11 @@ function buildNotification(
     <table role="presentation" cellpadding="0" cellspacing="0" style="background-color:#fafaf9;border-radius:12px;padding:16px;margin:16px 0">
       <tr>
         <td>
-          <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1c1917">${task.title}</p>
-          <p style="margin:0;font-size:12px;color:#71717a">${workspaceName}${task.due_date ? ` · Vence: ${task.due_date}` : ""}</p>
-          ${isMeeting && task.start_at ? `<p style="margin:4px 0 0;font-size:12px;color:#71717a">${new Date(task.start_at).toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" })}${task.end_at ? ` — ${new Date(task.end_at).toLocaleTimeString("es-MX", { timeStyle: "short" })}` : ""}</p>` : ""}
-          ${task.description ? `<p style="margin:8px 0 0;font-size:13px;color:#57534e">${task.description}</p>` : ""}
-          ${changes && changes.length ? `<p style="margin:8px 0 0;font-size:12px;color:#a1a1aa">Cambios: ${changes.join(", ")}</p>` : ""}
+          <p style="margin:0 0 4px;font-size:16px;font-weight:700;color:#1c1917">${safeTaskTitle}</p>
+          <p style="margin:0;font-size:12px;color:#71717a">${safeWorkspaceName}${safeDueDate ? ` · Vence: ${safeDueDate}` : ""}</p>
+          ${isMeeting && task.start_at ? `<p style="margin:4px 0 0;font-size:12px;color:#71717a">${escapeHtml(new Date(task.start_at).toLocaleString("es-MX", { dateStyle: "long", timeStyle: "short" }))}${task.end_at ? ` — ${escapeHtml(new Date(task.end_at).toLocaleTimeString("es-MX", { timeStyle: "short" }))}` : ""}</p>` : ""}
+          ${safeDescription ? `<p style="margin:8px 0 0;font-size:13px;color:#57534e">${safeDescription}</p>` : ""}
+          ${safeChanges ? `<p style="margin:8px 0 0;font-size:12px;color:#a1a1aa">Cambios: ${safeChanges}</p>` : ""}
         </td>
       </tr>
     </table>`;
@@ -267,7 +319,7 @@ function buildNotification(
                 </tr>
               </table>
               <h1 style="margin:16px 0 4px;font-size:20px;font-weight:800;color:#1c1917">${titles[kind]}</h1>
-              <p style="margin:0;font-size:14px;color:#71717a">${actorName} en ${workspaceName}</p>
+              <p style="margin:0;font-size:14px;color:#71717a">${safeActorName} en ${safeWorkspaceName}</p>
             </td>
           </tr>
           <tr>

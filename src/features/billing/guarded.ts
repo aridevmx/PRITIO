@@ -20,6 +20,8 @@ export function parsePlanLimitError(err: unknown): PlanResource | null {
     "assignees",
     "blocked_days",
     "workspaces",
+    "agenda_events",
+    "meetings",
   ];
   return valid.includes(resource) ? resource : null;
 }

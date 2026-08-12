@@ -8,26 +8,28 @@ import {
   type ReactNode,
 } from "react";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
-import { listSubscriptions, fetchProTrialUsed, fetchUsageForWorkspace } from "@/features/billing/api";
+import { listSubscriptions, fetchUsageForWorkspace } from "@/features/billing/api";
 import { effectivePlanForWorkspace } from "@/features/billing/plans";
-import { getLimits, isAtLimit } from "@/features/billing/limits";
+import { getLimits, hasFeature as limitsHasFeature, isAtLimit } from "@/features/billing/limits";
 import { openUpgrade } from "@/features/billing/upgrade";
 import type {
+  PlanFeature,
   PlanLimits,
   PlanResource,
   Subscription,
   WorkspacePlan,
+  WorkspaceType,
 } from "@/types";
 
 interface BillingContextValue {
   subscriptions: Subscription[];
   loading: boolean;
-  /** Plan of the current workspace (pro if it has an active subscription). */
+  /** Plan of the current workspace (pro if it has an active subscription/trial). */
   effectivePlan: WorkspacePlan;
   /** Subscription backing the current workspace, if any. */
   currentSubscription: Subscription | null;
-  /** Whether the account already used its one-time Pro trial. */
-  proTrialUsed: boolean;
+  /** When the current workspace's Pro trial ends (null if none). */
+  trialEndsAt: string | null;
   currentLimits: PlanLimits;
   usage: {
     members: number;
@@ -35,6 +37,7 @@ interface BillingContextValue {
     projects: number;
     assignees: number;
     blockedDays: number;
+    agendaEvents: number;
     workspaces: number;
   };
   refresh: () => Promise<void>;
@@ -44,6 +47,13 @@ interface BillingContextValue {
    * upgrade prompt. Call before performing the mutation.
    */
   canCreate: (resource: PlanResource) => boolean;
+  /** Feature flags from plan_limits (plan/board views, meetings, due date...). */
+  hasFeature: (feature: PlanFeature) => boolean;
+  /**
+   * Whether the user can still create a workspace of the given type (1 of each
+   * type per account). Opens the upgrade prompt when blocked.
+   */
+  canCreateWorkspace: (type: WorkspaceType) => boolean;
 }
 
 const BillingContext = createContext<BillingContextValue | null>(null);
@@ -55,7 +65,6 @@ interface BillingProviderProps {
 export function BillingProvider({ children }: BillingProviderProps) {
   const { currentWorkspace, workspaces } = useWorkspace();
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
-  const [proTrialUsed, setProTrialUsed] = useState(true);
   const [loading, setLoading] = useState(true);
   const [remoteUsage, setRemoteUsage] = useState<{
     members: number;
@@ -63,33 +72,36 @@ export function BillingProvider({ children }: BillingProviderProps) {
     projects: number;
     assignees: number;
     blockedDays: number;
+    agendaEvents: number;
+    plan: WorkspacePlan;
+    trialEndsAt: string | null;
   } | null>(null);
+
+  const loadUsage = useCallback(async (workspaceId: string | undefined) => {
+    if (!workspaceId) {
+      setRemoteUsage(null);
+      return;
+    }
+    const usage = await fetchUsageForWorkspace(workspaceId);
+    if (usage) setRemoteUsage(usage);
+  }, []);
 
   const refresh = useCallback(async () => {
     try {
-      const [subs, trialUsed] = await Promise.all([
-        listSubscriptions(),
-        fetchProTrialUsed(),
-      ]);
+      const subs = await listSubscriptions();
       setSubscriptions(subs);
-      setProTrialUsed(trialUsed);
     } catch (err) {
       console.warn("[billing] refresh failed:", err);
     }
-  }, []);
+    await loadUsage(currentWorkspace?.id);
+  }, [currentWorkspace?.id, loadUsage]);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
-        const [subs, trialUsed] = await Promise.all([
-          listSubscriptions(),
-          fetchProTrialUsed(),
-        ]);
-        if (!cancelled) {
-          setSubscriptions(subs);
-          setProTrialUsed(trialUsed);
-        }
+        const subs = await listSubscriptions();
+        if (!cancelled) setSubscriptions(subs);
       } catch (err) {
         console.warn("[billing] load failed:", err);
       } finally {
@@ -108,7 +120,7 @@ export function BillingProvider({ children }: BillingProviderProps) {
     if (!workspaceId) return;
     void (async () => {
       const usage = await fetchUsageForWorkspace(workspaceId);
-      if (!cancelled) setRemoteUsage(usage);
+      if (!cancelled && usage) setRemoteUsage(usage);
     })();
     return () => {
       cancelled = true;
@@ -116,7 +128,8 @@ export function BillingProvider({ children }: BillingProviderProps) {
   }, [currentWorkspace?.id]);
 
   const workspaceId = currentWorkspace?.id;
-  const plan = effectivePlanForWorkspace(subscriptions, workspaceId);
+  const plan: WorkspacePlan =
+    remoteUsage?.plan ?? effectivePlanForWorkspace(subscriptions, workspaceId);
   const currentSubscription = useMemo(
     () =>
       subscriptions.find((s) => s.workspaceId === workspaceId) ?? null,
@@ -135,6 +148,7 @@ export function BillingProvider({ children }: BillingProviderProps) {
       projects: remoteUsage?.projects ?? 0,
       assignees: remoteUsage?.assignees ?? 0,
       blockedDays: remoteUsage?.blockedDays ?? 0,
+      agendaEvents: remoteUsage?.agendaEvents ?? 0,
       workspaces: workspaces.length,
     }),
     [remoteUsage, workspaces.length],
@@ -151,16 +165,36 @@ export function BillingProvider({ children }: BillingProviderProps) {
     [currentLimits, usage],
   );
 
+  const hasFeature = useCallback(
+    (feature: PlanFeature) => limitsHasFeature(currentLimits, feature),
+    [currentLimits],
+  );
+
+  const canCreateWorkspace = useCallback(
+    (type: WorkspaceType) => {
+      const limits = getLimits("free", type);
+      const owned = workspaces.filter((w) => w.type === type).length;
+      if (owned >= limits.workspaceLimit) {
+        openUpgrade("workspaces");
+        return false;
+      }
+      return true;
+    },
+    [workspaces],
+  );
+
   const value: BillingContextValue = {
     subscriptions,
     loading,
     effectivePlan: plan,
     currentSubscription,
-    proTrialUsed,
+    trialEndsAt: remoteUsage?.trialEndsAt ?? null,
     currentLimits,
     usage,
     refresh,
     canCreate,
+    hasFeature,
+    canCreateWorkspace,
   };
 
   return <BillingContext.Provider value={value}>{children}</BillingContext.Provider>;
