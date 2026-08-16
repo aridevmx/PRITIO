@@ -134,7 +134,7 @@ Deno.serve(async (req: Request) => {
 
     const sent = await sendEmail({
       to: inv.email,
-      subject: `Te invitaron a unirte a ${ws.name} en ${APP_NAME}`,
+      subject: `Te invitaron a ${ws.name} en ${APP_NAME}`,
       html,
     });
 

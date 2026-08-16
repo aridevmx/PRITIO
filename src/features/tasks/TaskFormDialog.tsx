@@ -1,8 +1,8 @@
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn, todayStr, localDateStr } from "@/lib/utils";
 import { Field } from "@/components/Field";
-import { SegmentedControl } from "@/components/SegmentedControl";
+import { SegmentedControl, type SegmentedOption } from "@/components/SegmentedControl";
 import { TimePicker } from "@/components/TimePicker";
 import { QUADRANTS, QUADRANT_ORDER } from "@/features/tasks/quadrants";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
@@ -15,10 +15,69 @@ import { openUpgrade } from "@/features/billing/upgrade";
 import { formatTime, useTimeFormat } from "@/lib/timeFormat";
 import { notifyTaskChange } from "@/features/tasks/notifications";
 import { RecurrenceEditDialog } from "@/features/tasks/RecurrenceEditDialog";
-import type { Task, Quadrant, TaskKind, RecurrenceFreq, CreateTaskPayload } from "@/types";
+import type {
+  Task,
+  Quadrant,
+  TaskKind,
+  TaskVisibility,
+  RecurrenceFreq,
+  CreateTaskPayload,
+} from "@/types";
 
 const MEETING_DURATIONS = [15, 30, 45, 60] as const;
 type MeetingDuration = (typeof MEETING_DURATIONS)[number];
+
+const KIND_LABELS: Record<TaskKind, string> = {
+  task: "Tarea",
+  meeting: "Junta",
+  event: "Evento",
+};
+
+const KIND_ACCENT: Record<TaskKind, { activeClassName: string; icon: ReactNode }> = {
+  task: {
+    activeClassName: "text-pritio-blue",
+    icon: (
+      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+        <path d="M2.5 4.5l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <path d="M2.5 9l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+        <rect x="10" y="4.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+        <rect x="10" y="9.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
+      </svg>
+    ),
+  },
+  meeting: {
+    activeClassName: "text-pritio-purple",
+    icon: (
+      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+        <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+  event: {
+    activeClassName: "text-pritio-coral",
+    icon: (
+      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+        <rect x="2.5" y="2" width="11" height="11.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+        <path d="M2.5 5.5h11M5.5 0.5V3.5M10.5 0.5V3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        <path d="M5.5 8.5h5M8 6.5v5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      </svg>
+    ),
+  },
+};
+
+function allowedKindsFor(type: string | undefined, isEdit: boolean, currentKind: TaskKind): TaskKind[] {
+  const base: TaskKind[] =
+    type === "personal"
+      ? ["task", "meeting", "event"]
+      : type === "team"
+        ? ["task", "meeting"]
+        : type === "family"
+          ? ["task", "event"]
+          : ["task", "meeting", "event"];
+  if (isEdit && currentKind && !base.includes(currentKind)) return [...base, currentKind];
+  return base;
+}
 
 interface TaskFormDialogProps {
   open: boolean;
@@ -80,8 +139,8 @@ export function TaskFormDialog({
   defaultDueDate,
   defaultStartTime,
 }: TaskFormDialogProps) {
-  const { currentWorkspace, profile, members } = useWorkspace();
-  const { canCreate, hasFeature } = useBilling();
+  const { currentWorkspace, currentMember, profile, members } = useWorkspace();
+  const { canCreate, hasFeature, usage, currentLimits } = useBilling();
   const { toast } = useToast();
 
   const [title, setTitle] = useState("");
@@ -94,6 +153,13 @@ export function TaskFormDialog({
   const [meetingDay, setMeetingDay] = useState("");
   const [meetingStartTime, setMeetingStartTime] = useState("");
   const [meetingDuration, setMeetingDuration] = useState<MeetingDuration>(30);
+  const [eventDay, setEventDay] = useState("");
+  const [eventEndDay, setEventEndDay] = useState("");
+  const [eventStartTime, setEventStartTime] = useState("");
+  const [eventEndTime, setEventEndTime] = useState("");
+  const [rangeStartDate, setRangeStartDate] = useState("");
+  const [rangeEndDate, setRangeEndDate] = useState("");
+  const [visibility, setVisibility] = useState<TaskVisibility>("all");
   const [taskStartTime, setTaskStartTime] = useState("");
   const [taskEndTime, setTaskEndTime] = useState("");
   const [showTaskTime, setShowTaskTime] = useState(false);
@@ -112,16 +178,24 @@ export function TaskFormDialog({
   const [error, setError] = useState("");
   const timeFormat = useTimeFormat();
 
-  const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
+  const [assignees, setAssignees] = useState<{ id: string; name: string; linkedUserId: string | null }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string; color: string }[]>([]);
 
   useEffect(() => {
     if (!currentWorkspace?.id) return;
     supabase
       .from("assignees")
-      .select("id, name")
+      .select("id, name, linked_user_id")
       .eq("workspace_id", currentWorkspace.id)
-      .then(({ data }) => setAssignees(data ?? []));
+      .then(({ data }) =>
+        setAssignees(
+          (data ?? []).map((a: { id: string; name: string; linked_user_id: string | null }) => ({
+            id: a.id,
+            name: a.name,
+            linkedUserId: a.linked_user_id,
+          })),
+        ),
+      );
   }, [currentWorkspace?.id]);
 
   useEffect(() => {
@@ -137,8 +211,51 @@ export function TaskFormDialog({
 
   const isEdit = !!task;
 
-  const canShowMeetings = hasFeature("meetings") || (isEdit && task?.kind === "meeting");
+  const workspaceType = currentWorkspace?.type;
+  const kinds = allowedKindsFor(workspaceType, isEdit, task?.kind ?? "task");
+  const currentRole = currentMember?.role ?? "owner";
+  const isRestrictedMember =
+    (workspaceType === "family" || workspaceType === "team") && currentRole === "member";
+
+  const memberRoleByUserId = useMemo(
+    () => new Map(members.map((m) => [m.userId, m.role])),
+    [members],
+  );
+
+  const selfAssignee = useMemo(
+    () => assignees.find((a) => a.linkedUserId === profile?.id) ?? null,
+    [assignees, profile?.id],
+  );
+
+  const allowedAssigneeIds = useMemo<Set<string> | null>(() => {
+    if (currentRole === "owner" || currentRole === "admin") return null;
+    if (currentRole === "leader") {
+      return new Set(
+        assignees
+          .filter((a) => {
+            if (!a.linkedUserId) return true;
+            const r = memberRoleByUserId.get(a.linkedUserId);
+            return !r || r === "member";
+          })
+          .map((a) => a.id),
+      );
+    }
+    if (currentRole === "member") {
+      return selfAssignee ? new Set([selfAssignee.id]) : new Set<string>();
+    }
+    return null;
+  }, [currentRole, assignees, memberRoleByUserId, selfAssignee]);
+
+  const defaultVisibility: TaskVisibility = workspaceType === "family" ? "assigned" : "all";
   const showDueDate = hasFeature("due_date") || (isEdit && !!task?.dueDate);
+  const kindOptions = kinds.map(
+    (k): SegmentedOption<TaskKind> => ({
+      value: k,
+      label: KIND_LABELS[k],
+      activeClassName: KIND_ACCENT[k].activeClassName,
+      icon: KIND_ACCENT[k].icon,
+    }),
+  );
 
   useEffect(() => {
     if (open) {
@@ -153,6 +270,13 @@ export function TaskFormDialog({
         setTaskStartTime("");
         setTaskEndTime("");
         setShowTaskTime(false);
+        setEventDay("");
+        setEventEndDay("");
+        setEventStartTime("");
+        setEventEndTime("");
+        setRangeStartDate(task.startDate ?? "");
+        setRangeEndDate(task.endDate ?? "");
+        setVisibility(task.visibility ?? defaultVisibility);
         if (task.startAt) {
           const start = new Date(task.startAt);
           const time = snapTo5(
@@ -179,6 +303,15 @@ export function TaskFormDialog({
             setMeetingStartTime(time);
             setMeetingDuration(clamped);
             setMeetingLink(task.meetingLink ?? "");
+          } else if (task.kind === "event") {
+            setMeetingDay("");
+            setMeetingStartTime("");
+            setMeetingDuration(30);
+            setMeetingLink("");
+            setEventDay(localDateStr(start));
+            setEventEndDay(task.endDate ?? task.startDate ?? localDateStr(start));
+            setEventStartTime(time);
+            setEventEndTime(endTime);
           } else {
             setMeetingDay("");
             setMeetingStartTime("");
@@ -194,6 +327,10 @@ export function TaskFormDialog({
           setMeetingStartTime("");
           setMeetingDuration(30);
           setMeetingLink(task.meetingLink ?? "");
+          if (task.kind === "event") {
+            setEventDay(task.startDate ?? task.dueDate ?? "");
+            setEventEndDay(task.endDate ?? task.startDate ?? task.dueDate ?? "");
+          }
         }
         setLocation(task.location ?? "");
         setRequiresApproval(task.requiresApproval);
@@ -214,6 +351,13 @@ export function TaskFormDialog({
         setMeetingDay("");
         setMeetingStartTime("");
         setMeetingDuration(30);
+        setEventDay("");
+        setEventEndDay("");
+        setEventStartTime("");
+        setEventEndTime("");
+        setRangeStartDate("");
+        setRangeEndDate("");
+        setVisibility(defaultVisibility);
         setTaskStartTime(defaultStartTime ?? "");
         setTaskEndTime("");
         setShowTaskTime(!!defaultStartTime);
@@ -231,7 +375,7 @@ export function TaskFormDialog({
       setShowMore(false);
       setTimeout(() => titleRef.current?.focus(), 50);
     }
-  }, [open, task, defaultQuadrant, defaultDueDate, defaultStartTime]);
+  }, [open, task, defaultQuadrant, defaultDueDate, defaultStartTime, defaultVisibility]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -252,10 +396,18 @@ export function TaskFormDialog({
   }, [open, handleKeyDown]);
 
   const toggleAssignee = (id: string) => {
+    if (allowedAssigneeIds && !allowedAssigneeIds.has(id)) return;
     setSelectedAssigneeIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   };
+
+  useEffect(() => {
+    if (!open || !isEdit || !isRestrictedMember || !selfAssignee) return;
+    setSelectedAssigneeIds((prev) =>
+      prev.includes(selfAssignee.id) ? prev : [...prev, selfAssignee.id],
+    );
+  }, [open, isEdit, isRestrictedMember, selfAssignee]);
 
   const performSave = useCallback(async (choice: "this" | "all" | null) => {
     if (!title.trim()) {
@@ -264,6 +416,14 @@ export function TaskFormDialog({
     }
     if (kind === "meeting" && meetingStartTime && !meetingDay) {
       setError("Indica el día de la junta");
+      return;
+    }
+    if (kind === "event" && !eventDay) {
+      setError("Indica el día del evento");
+      return;
+    }
+    if (kind === "event" && eventEndDay && eventDay && eventEndDay < eventDay) {
+      setError("La fecha de fin no puede ser anterior a la de inicio");
       return;
     }
     if (kind === "task" && taskStartTime && !blockDay) {
@@ -283,24 +443,54 @@ export function TaskFormDialog({
       setError("La hora de fin debe ser posterior a la de inicio");
       return;
     }
+    if (kind === "task" && rangeStartDate && rangeEndDate && rangeEndDate < rangeStartDate) {
+      setError("La fecha de fin no puede ser anterior a la de inicio");
+      return;
+    }
     if (!currentWorkspace || !profile) {
       setError("No hay workspace o perfil disponible. Cierra sesion y vuelve a entrar.");
       return;
+    }
+
+    if (!isEdit) {
+      if (kind === "meeting" && !canCreate("meetings")) return;
+      if (kind === "event" && !canCreate("events")) return;
     }
 
     setSaving(true);
     setError("");
     setRecurrencePromptOpen(false);
 
-    const effectiveDueDate = kind === "meeting" ? (meetingDay || null) : (dueDate || null);
+    const effectiveDueDate =
+      kind === "meeting" ? (meetingDay || null) : kind === "event" ? (eventDay || null) : (dueDate || null);
     const effectiveStartAt =
       kind === "meeting"
         ? meetingStartISO(meetingDay, meetingStartTime)
-        : meetingStartISO(blockDay, taskStartTime);
+        : kind === "event"
+          ? meetingStartISO(eventDay, eventStartTime)
+          : meetingStartISO(blockDay, taskStartTime);
     const effectiveEndAt =
       kind === "meeting"
         ? meetingEndISO(meetingDay, meetingStartTime, meetingDuration)
-        : meetingStartISO(blockDay, taskEndTime);
+        : kind === "event"
+          ? meetingStartISO(eventEndDay || eventDay, eventEndTime)
+          : meetingStartISO(blockDay, taskEndTime);
+    const effectiveStartDate =
+      kind === "event" ? (eventDay || null) : (rangeStartDate || null);
+    const effectiveEndDate =
+      kind === "event" ? (eventEndDay || eventDay || null) : (rangeEndDate || null);
+    const effectiveVisibility: TaskVisibility =
+      workspaceType === "family"
+        ? isRestrictedMember ? "assigned" : visibility
+        : "all";
+
+    let assigneeIds = selectedAssigneeIds;
+    if (allowedAssigneeIds) {
+      assigneeIds = selectedAssigneeIds.filter((id) => allowedAssigneeIds.has(id));
+      if (isRestrictedMember && selfAssignee && !assigneeIds.includes(selfAssignee.id)) {
+        assigneeIds = [...assigneeIds, selfAssignee.id];
+      }
+    }
 
     const effectiveFreq: RecurrenceFreq | null =
       choice === "this" ? null : recurrenceFreq === "" ? null : recurrenceFreq;
@@ -332,6 +522,9 @@ export function TaskFormDialog({
           description: description.trim() || null,
           quadrant,
           kind,
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          visibility: effectiveVisibility,
           dueDate: effectiveDueDate,
           startAt: effectiveStartAt,
           endAt: effectiveEndAt,
@@ -343,7 +536,7 @@ export function TaskFormDialog({
           rejectionReason: resubmitting ? null : undefined,
           approvalRequestedAt,
           projectId: projectId || null,
-          assigneeIds: selectedAssigneeIds,
+          assigneeIds,
           recurrenceFreq: effectiveFreq,
           recurrenceInterval: recurrenceFreq === "" ? 1 : recurrenceInterval,
           recurrenceEndDate: recurrenceFreq === "" ? null : recurrenceEndDate || null,
@@ -356,6 +549,9 @@ export function TaskFormDialog({
           description: description.trim() || null,
           quadrant,
           kind,
+          startDate: effectiveStartDate,
+          endDate: effectiveEndDate,
+          visibility: effectiveVisibility,
           dueDate: effectiveDueDate,
           startAt: effectiveStartAt,
           endAt: effectiveEndAt,
@@ -364,7 +560,7 @@ export function TaskFormDialog({
           requiresApproval,
           approvalRequestedAt,
           projectId: projectId || null,
-          assigneeIds: selectedAssigneeIds,
+          assigneeIds,
           recurrenceFreq: effectiveFreq,
           recurrenceInterval: recurrenceFreq === "" ? 1 : recurrenceInterval,
           recurrenceEndDate: recurrenceFreq === "" ? null : recurrenceEndDate || null,
@@ -376,17 +572,17 @@ export function TaskFormDialog({
 
       if (isEdit) {
         const assigneesChanged =
-          selectedAssigneeIds.length !== (task?.assigneeIds.length ?? 0) ||
-          selectedAssigneeIds.some((id) => !task?.assigneeIds.includes(id));
+          assigneeIds.length !== (task?.assigneeIds.length ?? 0) ||
+          assigneeIds.some((id) => !task?.assigneeIds.includes(id));
         if (assigneesChanged) {
-          void notifyTaskChange("assigned", saved.id, currentWorkspace.id, selectedAssigneeIds);
+          void notifyTaskChange("assigned", saved.id, currentWorkspace.id, assigneeIds);
         } else {
-          void notifyTaskChange("updated", saved.id, currentWorkspace.id, selectedAssigneeIds);
+          void notifyTaskChange("updated", saved.id, currentWorkspace.id, assigneeIds);
         }
       } else if (kind === "meeting") {
-        void notifyTaskChange("meeting_created", saved.id, currentWorkspace.id, selectedAssigneeIds);
-      } else if (selectedAssigneeIds.length > 0) {
-        void notifyTaskChange("assigned", saved.id, currentWorkspace.id, selectedAssigneeIds);
+        void notifyTaskChange("meeting_created", saved.id, currentWorkspace.id, assigneeIds);
+      } else if (assigneeIds.length > 0) {
+        void notifyTaskChange("assigned", saved.id, currentWorkspace.id, assigneeIds);
       }
 
       if (shouldNotifyApproval && managerUserIds.length > 0) {
@@ -396,8 +592,8 @@ export function TaskFormDialog({
       onSaved(saved);
       toast.success(
         isEdit
-          ? kind === "meeting" ? "Junta actualizada" : "Tarea actualizada"
-          : kind === "meeting" ? "Junta creada" : "Tarea creada",
+          ? kind === "meeting" ? "Junta actualizada" : kind === "event" ? "Evento actualizado" : "Tarea actualizada"
+          : kind === "meeting" ? "Junta creada" : kind === "event" ? "Evento creado" : "Tarea creada",
       );
       onClose();
     } catch (err) {
@@ -414,7 +610,9 @@ export function TaskFormDialog({
     }
   }, [
     title, description, quadrant, kind, dueDate, blockDay, meetingDay, meetingStartTime, meetingDuration,
-    taskStartTime, taskEndTime, location, meetingLink, requiresApproval, projectId, selectedAssigneeIds,
+    eventDay, eventEndDay, eventStartTime, eventEndTime, rangeStartDate, rangeEndDate, visibility,
+    taskStartTime, taskEndTime, location, meetingLink, requiresApproval, projectId,
+    selfAssignee, isRestrictedMember, workspaceType, allowedAssigneeIds,
     recurrenceFreq, recurrenceInterval, recurrenceEndDate, currentWorkspace, profile, members, isEdit, task,
     canCreate, onSaved, onClose, toast,
   ]);
@@ -442,46 +640,40 @@ export function TaskFormDialog({
         </h3>
 
         <div className="mt-5 space-y-4">
-          {canShowMeetings && (
+          <div>
             <SegmentedControl
               value={kind}
               pill
               onChange={(k) => {
                 setKind(k);
                 if (k === "task") {
-                  if (!dueDate && meetingDay) setDueDate(meetingDay);
+                  if (!dueDate && (meetingDay || eventDay)) setDueDate(meetingDay || eventDay);
                 } else {
-                  if (!meetingDay && dueDate) setMeetingDay(dueDate);
+                  if (k === "meeting" && !meetingDay && dueDate) setMeetingDay(dueDate);
+                  if (k === "event" && !eventDay && dueDate) setEventDay(dueDate);
                 }
               }}
-              options={[
-                {
-                  value: "task",
-                  label: "Tarea",
-                  activeClassName: "text-pritio-blue",
-                  icon: (
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <path d="M2.5 4.5l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                      <path d="M2.5 9l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                      <rect x="10" y="4.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-                      <rect x="10" y="9.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-                    </svg>
-                  ),
-                },
-                {
-                  value: "meeting",
-                  label: "Junta",
-                  activeClassName: "text-pritio-purple",
-                  icon: (
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                      <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  ),
-                },
-              ]}
+              options={kindOptions as [SegmentedOption<TaskKind>, SegmentedOption<TaskKind>, ...SegmentedOption<TaskKind>[]]}
             />
-          )}
+            {kind === "meeting" && currentLimits.meetingsPerMonth !== null && (
+              <p className="mt-2 text-xs text-ink-soft">
+                Juntas este mes:{" "}
+                <span className="font-semibold tabular-nums text-pritio-purple">
+                  {usage.meetingsThisMonth}/{currentLimits.meetingsPerMonth}
+                </span>
+                {!isEdit && usage.meetingsThisMonth >= currentLimits.meetingsPerMonth && " · Plan alcanzado"}
+              </p>
+            )}
+            {kind === "event" && currentLimits.eventsPerMonth !== null && (
+              <p className="mt-2 text-xs text-ink-soft">
+                Eventos este mes:{" "}
+                <span className="font-semibold tabular-nums text-pritio-coral">
+                  {usage.eventsThisMonth}/{currentLimits.eventsPerMonth}
+                </span>
+                {!isEdit && usage.eventsThisMonth >= currentLimits.eventsPerMonth && " · Plan alcanzado"}
+              </p>
+            )}
+          </div>
 
           <Field label="Titulo" error={error}>
             <input
@@ -653,6 +845,50 @@ export function TaskFormDialog({
             </>
           )}
 
+          {/* Event fields */}
+          {kind === "event" && (
+            <>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Día de inicio">
+                  <input
+                    type="date"
+                    value={eventDay}
+                    onChange={(e) => setEventDay(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-coral focus:outline-none focus:ring-2 focus:ring-pritio-coral/20"
+                  />
+                </Field>
+                <Field label="Hora de inicio" badge="Opcional">
+                  <TimePicker value={eventStartTime} onChange={setEventStartTime} accent="coral" />
+                </Field>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Día de fin" badge="Opcional">
+                  <input
+                    type="date"
+                    value={eventEndDay}
+                    onChange={(e) => setEventEndDay(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-coral focus:outline-none focus:ring-2 focus:ring-pritio-coral/20"
+                  />
+                </Field>
+                <Field label="Hora de fin" badge="Opcional">
+                  <TimePicker value={eventEndTime} onChange={setEventEndTime} accent="coral" />
+                </Field>
+              </div>
+              <p className="-mt-1.5 text-xs text-ink-soft">
+                Deja las horas vacías para un evento de todo el día.
+              </p>
+              <Field label="Dirección / Lugar" badge="Opcional">
+                <input
+                  type="text"
+                  value={location}
+                  onChange={(e) => setLocation(e.target.value)}
+                  placeholder="Ej: Casa de la abuela, Parque..."
+                  className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-coral focus:outline-none focus:ring-2 focus:ring-pritio-coral/20"
+                />
+              </Field>
+            </>
+          )}
+
           {/* Project + Assignee row (2 columns) */}
           {(projects.length > 0 || assignees.length > 0) && (
             <div
@@ -689,15 +925,17 @@ export function TaskFormDialog({
                           className="inline-flex items-center gap-1 rounded-full bg-pritio-blue/10 px-2.5 py-1 text-xs font-medium text-pritio-blue"
                         >
                           {a?.name ?? id}
-                          <button
-                            type="button"
-                            onClick={() => toggleAssignee(id)}
-                            className="ml-0.5 text-pritio-blue/60 hover:text-pritio-blue"
-                          >
-                            <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                          </button>
+                          {!(isRestrictedMember && selfAssignee?.id === id) && (
+                            <button
+                              type="button"
+                              onClick={() => toggleAssignee(id)}
+                              className="ml-0.5 text-pritio-blue/60 hover:text-pritio-blue"
+                            >
+                              <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                                <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                              </svg>
+                            </button>
+                          )}
                         </span>
                       );
                     })}
@@ -712,12 +950,56 @@ export function TaskFormDialog({
                     <option value="">Agregar asignado...</option>
                     {assignees
                       .filter((a) => !selectedAssigneeIds.includes(a.id))
+                      .filter((a) => !allowedAssigneeIds || allowedAssigneeIds.has(a.id))
                       .map((a) => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                       ))}
                   </select>
+                  {isRestrictedMember && (
+                    <p className="mt-1.5 text-[11px] leading-relaxed text-ink-muted">
+                      Los miembros solo pueden asignarse tareas a sí mismos.
+                    </p>
+                  )}
                 </Field>
               )}
+            </div>
+          )}
+
+          {/* Visibility toggle (family workspaces) */}
+          {workspaceType === "family" && !isRestrictedMember && (
+            <div className="rounded-xl border border-line bg-surface-subtle/60 p-3">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-muted">Visibilidad</p>
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setVisibility("assigned")}
+                  className={cn(
+                    "flex-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all",
+                    visibility === "assigned"
+                      ? "border-pritio-blue bg-pritio-blue/5 text-pritio-blue"
+                      : "border-line bg-surface text-ink-soft hover:bg-surface-muted",
+                  )}
+                >
+                  Solo asignados
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setVisibility("all")}
+                  className={cn(
+                    "flex-1 rounded-lg border px-3 py-1.5 text-xs font-semibold transition-all",
+                    visibility === "all"
+                      ? "border-pritio-blue bg-pritio-blue/5 text-pritio-blue"
+                      : "border-line bg-surface text-ink-soft hover:bg-surface-muted",
+                  )}
+                >
+                  Visible para todos
+                </button>
+              </div>
+              <p className="mt-2 text-[11px] leading-relaxed text-ink-muted">
+                {visibility === "all"
+                  ? "Todos los miembros de la familia pueden ver este elemento."
+                  : "Solo los miembros asignados podrán ver este elemento."}
+              </p>
             </div>
           )}
 
@@ -798,6 +1080,36 @@ export function TaskFormDialog({
                     Agregar bloque de tiempo
                   </button>
                 ))}
+
+              {/* Date range for tasks */}
+              {kind === "task" && (
+                <div className="rounded-xl border border-line bg-surface-subtle/60 p-3">
+                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-muted">
+                    Rango de fechas
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <Field label="Desde" badge="Opcional">
+                      <input
+                        type="date"
+                        value={rangeStartDate}
+                        onChange={(e) => setRangeStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                      />
+                    </Field>
+                    <Field label="Hasta" badge="Opcional">
+                      <input
+                        type="date"
+                        value={rangeEndDate}
+                        onChange={(e) => setRangeEndDate(e.target.value)}
+                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                      />
+                    </Field>
+                  </div>
+                  <p className="mt-2 text-[11px] leading-relaxed text-ink-muted">
+                    Muestra la tarea en todos los días del rango en el calendario.
+                  </p>
+                </div>
+              )}
 
               {/* Recurrence */}
               <div className="rounded-xl border border-line bg-surface-subtle/60 p-3">

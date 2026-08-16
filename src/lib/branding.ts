@@ -5,6 +5,6 @@ export const APP_VERSION = "0.1.1";
 export const APP_TAGLINE =
   "Tu trabajo, tu casa y lo personal en una sola vista. Prioriza con claridad.";
 
-export const APP_URL = "https://pritio.app";
+export const APP_URL = "https://app.pritio.com.mx";
 
 export const APP_DESCRIPTION = `${APP_NAME} — ${APP_TAGLINE}`;

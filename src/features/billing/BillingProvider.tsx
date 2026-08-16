@@ -37,7 +37,8 @@ interface BillingContextValue {
     projects: number;
     assignees: number;
     blockedDays: number;
-    agendaEvents: number;
+    meetingsThisMonth: number;
+    eventsThisMonth: number;
     workspaces: number;
   };
   refresh: () => Promise<void>;
@@ -72,7 +73,8 @@ export function BillingProvider({ children }: BillingProviderProps) {
     projects: number;
     assignees: number;
     blockedDays: number;
-    agendaEvents: number;
+    meetingsThisMonth: number;
+    eventsThisMonth: number;
     plan: WorkspacePlan;
     trialEndsAt: string | null;
   } | null>(null);
@@ -148,7 +150,8 @@ export function BillingProvider({ children }: BillingProviderProps) {
       projects: remoteUsage?.projects ?? 0,
       assignees: remoteUsage?.assignees ?? 0,
       blockedDays: remoteUsage?.blockedDays ?? 0,
-      agendaEvents: remoteUsage?.agendaEvents ?? 0,
+      meetingsThisMonth: remoteUsage?.meetingsThisMonth ?? 0,
+      eventsThisMonth: remoteUsage?.eventsThisMonth ?? 0,
       workspaces: workspaces.length,
     }),
     [remoteUsage, workspaces.length],

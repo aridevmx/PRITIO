@@ -64,6 +64,61 @@ jobs:
       - name: Push bump + tags
         run: git push --follow-tags origin main
 
+  desktop:
+    name: Build & publish desktop (Windows)
+    needs: version
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      - name: Package & publish to GitHub Releases
+        run: npx electron-builder --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  desktop-linux:
+    name: Build & publish desktop (Linux)
+    needs: version
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: AppImage tooling (fuse)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64 || true
+
+      - run: npm ci
+
+      - name: Build web
+        run: npm run build
+
+      - name: Package & publish AppImage to GitHub Releases
+        run: npx electron-builder --linux AppImage --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   deploy:
     name: Deploy a Vercel (producción)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -71,6 +126,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: amondnet/vercel-action@v20
         with:

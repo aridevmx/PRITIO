@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import { acceptInvitation } from "@/features/invitations/api";
 import { PritioLogo } from "@/components/PritioLogo";
+import type { Invitation, MemberType, WorkspaceRole } from "@/types";
 
 type JoinState = "loading" | "not_authenticated" | "not_found" | "accepted" | "error";
 
@@ -31,7 +32,7 @@ export function JoinScreen() {
       try {
         const { data: inv } = await supabase
           .from("invitations")
-          .select("id, workspace_id, accepted_at")
+          .select("id, workspace_id, accepted_at, role, member_type")
           .eq("id", id)
           .maybeSingle();
 
@@ -69,11 +70,12 @@ export function JoinScreen() {
           id: inv.id,
           workspaceId: inv.workspace_id,
           email: "",
-          role: "member",
+          role: inv.role as WorkspaceRole,
+          memberType: inv.member_type as MemberType | null,
           invitedBy: "",
           acceptedAt: null,
           createdAt: "",
-        });
+        } as Invitation);
 
         setState("accepted");
       } catch {

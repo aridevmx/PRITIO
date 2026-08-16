@@ -3,7 +3,7 @@ import { supabaseAdmin } from "../_shared/supabase-client.ts";
 import { corsHeaders, handleCors } from "../_shared/cors.ts";
 import { getCaller } from "../_shared/auth.ts";
 
-const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@pritio.app";
+const VAPID_SUBJECT = Deno.env.get("VAPID_SUBJECT") ?? "mailto:admin@pritio.com.mx";
 const VAPID_PUBLIC_KEY = Deno.env.get("VAPID_PUBLIC_KEY") ?? "";
 const VAPID_PRIVATE_KEY = Deno.env.get("VAPID_PRIVATE_KEY") ?? "";
 

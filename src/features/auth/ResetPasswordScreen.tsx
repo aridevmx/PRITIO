@@ -20,8 +20,16 @@ export function ResetPasswordScreen() {
     const accessToken = params.get("access_token");
 
     if (!accessToken) {
-      setError("Enlace inválido o expirado. Solicita uno nuevo.");
-      setValidating(false);
+      // En desktop el deep link `pritio://auth/reset` ya canjeó el código y la
+      // sesión existe; aquí solo validamos que haya sesión.
+      supabase.auth.getUser().then(({ data }) => {
+        if (data.user) {
+          setValidating(false);
+        } else {
+          setError("Enlace inválido o expirado. Solicita uno nuevo.");
+          setValidating(false);
+        }
+      });
       return;
     }
 

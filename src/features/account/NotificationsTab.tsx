@@ -5,6 +5,11 @@ import type { NotificationPreferences } from "@/types";
 import { useToast } from "@/components/Toast";
 import { ToggleRow } from "@/features/account/AccountToggle";
 import {
+  initializePushNotifications,
+  isPushSupported,
+  unregisterSubscription,
+} from "@/lib/pushNotifications";
+import {
   IN_APP_EVENTS,
   getInAppDelivery,
   setInAppDelivery,
@@ -36,6 +41,9 @@ export function NotificationsTab() {
   const [prefs, setPrefs] = useState<NotificationPreferences>(DEFAULT_PREFS);
   const [inApp, setInApp] = useState<Record<string, InAppDelivery>>({});
   const [saving, setSaving] = useState(false);
+  const [pushSupported] = useState(() => isPushSupported());
+  const [pushEnabled, setPushEnabled] = useState(false);
+  const [pushBusy, setPushBusy] = useState(false);
 
   useEffect(() => {
     if (currentMember?.notificationPreferences) {
@@ -48,6 +56,56 @@ export function NotificationsTab() {
     for (const ev of IN_APP_EVENTS) next[ev.kind] = getInAppDelivery(ev.kind);
     setInApp(next);
   }, []);
+
+  useEffect(() => {
+    if (!pushSupported) return;
+    let mounted = true;
+    navigator.serviceWorker
+      .ready
+      .then((registration) => registration.pushManager.getSubscription())
+      .then((subscription) => {
+        if (mounted) setPushEnabled(Boolean(subscription));
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, [pushSupported]);
+
+  async function handleEnablePush() {
+    setPushBusy(true);
+    try {
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        toast.error("Permiso de notificaciones denegado");
+        return;
+      }
+      const ok = await initializePushNotifications();
+      setPushEnabled(ok);
+      if (ok) {
+        toast.success("Notificaciones push activadas en este dispositivo");
+      } else {
+        toast.error("No se pudo activar las notificaciones push");
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  }
+
+  async function handleDisablePush() {
+    setPushBusy(true);
+    try {
+      const ok = await unregisterSubscription();
+      setPushEnabled(!ok);
+      if (ok) {
+        toast.success("Notificaciones push desactivadas en este dispositivo");
+      } else {
+        toast.error("Error al desactivar notificaciones");
+      }
+    } finally {
+      setPushBusy(false);
+    }
+  }
 
   function toggle(key: keyof NotificationPreferences) {
     setPrefs((prev) => ({ ...prev, [key]: !prev[key] }));
@@ -106,6 +164,30 @@ export function NotificationsTab() {
 
       <div>
         <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Notificaciones push</p>
+        {pushSupported && (
+          <div className="mb-2 flex items-center justify-between gap-3 rounded-xl border border-line bg-surface-muted px-3.5 py-3">
+            <div>
+              <p className="text-sm font-medium text-ink">Este dispositivo</p>
+              <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+                {pushEnabled
+                  ? "Suscrito: recibirá avisos aunque la app esté cerrada."
+                  : "No está suscrito a notificaciones push."}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={pushEnabled ? handleDisablePush : handleEnablePush}
+              disabled={pushBusy}
+              className={`shrink-0 rounded-lg px-3 py-1.5 text-xs font-semibold text-white transition-colors disabled:cursor-not-allowed disabled:opacity-50 ${
+                pushEnabled
+                  ? "bg-ink/80 hover:bg-ink/70"
+                  : "bg-pritio-blue hover:bg-pritio-blue/90"
+              }`}
+            >
+              {pushBusy ? "..." : pushEnabled ? "Desactivar" : "Activar"}
+            </button>
+          </div>
+        )}
         <div className="overflow-hidden rounded-xl border border-line divide-y divide-line bg-surface-muted">
           <ToggleRow
             label="Tarea asignada"

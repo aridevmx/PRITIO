@@ -7,6 +7,11 @@
 /dist
 /dist-ssr
 
+# electron
+/release
+/build/*
+!/build/icon.png
+
 # environment
 .env
 .env.local
@@ -38,3 +43,6 @@ supabase/functions/.env
 .codex/
 .cursor/
 .impeccable/
+
+.vercel
+.env*

@@ -17,8 +17,6 @@ import type {
   Invitation,
   InvitationRow,
   UserBlockedDay,
-  AgendaEvent,
-  AgendaEventRow,
 } from "@/types";
 
 // ─── Plan normalization ───────────────────────────────────
@@ -45,6 +43,9 @@ export const TASK_COLUMNS = [
   "description",
   "quadrant",
   "kind",
+  "start_date",
+  "end_date",
+  "visibility",
   "due_date",
   "start_at",
   "end_at",
@@ -123,6 +124,9 @@ export function mapTask(row: TaskRow, assigneeIds: string[]): Task {
     description: row.description,
     quadrant: row.quadrant,
     kind: row.kind,
+    startDate: row.start_date,
+    endDate: row.end_date,
+    visibility: row.visibility,
     dueDate: row.due_date,
     startAt: row.start_at,
     endAt: row.end_at,
@@ -199,19 +203,9 @@ export function mapInvitation(row: InvitationRow): Invitation {
     workspaceId: row.workspace_id,
     email: row.email,
     role: row.role,
+    memberType: row.member_type,
     invitedBy: row.invited_by,
     acceptedAt: row.accepted_at,
-    createdAt: row.created_at,
-  };
-}
-
-export function mapAgendaEvent(row: AgendaEventRow): AgendaEvent {
-  return {
-    id: row.id,
-    workspaceId: row.workspace_id,
-    title: row.title,
-    startsAt: row.starts_at,
-    createdBy: row.created_by,
     createdAt: row.created_at,
   };
 }

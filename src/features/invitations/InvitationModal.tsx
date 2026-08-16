@@ -1,11 +1,13 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { createInvitation, sendInvitationEmail } from "@/features/invitations/api";
 import { useToast } from "@/components/Toast";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
 import { openUpgrade } from "@/features/billing/upgrade";
-import type { WorkspaceRole } from "@/types";
+import { MEMBER_TYPE_LABELS } from "@/lib/constants";
+import { supabase } from "@/lib/supabase";
+import type { MemberType, WorkspaceRole, WorkspaceType } from "@/types";
 
 interface InvitationModalProps {
   workspaceId: string;
@@ -19,7 +21,26 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
   const { canCreate } = useBilling();
   const [email, setEmail] = useState("");
   const [role, setRole] = useState<WorkspaceRole>("member");
+  const [memberType, setMemberType] = useState<MemberType | null>(null);
+  const [workspaceType, setWorkspaceType] = useState<WorkspaceType | null>(null);
   const [sending, setSending] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      const { data } = await supabase
+        .from("workspaces")
+        .select("type")
+        .eq("id", workspaceId)
+        .single();
+      if (active && data) setWorkspaceType((data as { type: WorkspaceType }).type);
+    })().catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, [workspaceId]);
+
+  const isFamily = workspaceType === "family";
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -27,7 +48,7 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
     if (!canCreate("members")) return;
     setSending(true);
     try {
-      const inv = await createInvitation(workspaceId, email.trim(), role);
+      const inv = await createInvitation(workspaceId, email.trim(), role, memberType);
       setEmail("");
 
       const sent = await sendInvitationEmail(inv.id);
@@ -110,6 +131,26 @@ export function InvitationModal({ workspaceId, workspaceName, onClose, onSent }:
               ))}
             </div>
           </div>
+
+          {isFamily && (
+            <div>
+              <label className="block text-xs font-medium text-ink-muted mb-1">
+                Parentesco
+              </label>
+              <select
+                value={memberType ?? ""}
+                onChange={(e) => setMemberType((e.target.value || null) as MemberType | null)}
+                className="w-full rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none transition-colors focus:border-pritio-blue focus:ring-1 focus:ring-pritio-blue/20"
+              >
+                <option value="">Selecciona…</option>
+                {Object.entries(MEMBER_TYPE_LABELS).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <div className="flex gap-2 pt-1">
             <button

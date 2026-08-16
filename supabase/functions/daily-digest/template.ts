@@ -61,7 +61,7 @@ export function buildDigestHtml(params: {
           <!-- Footer -->
           <tr>
             <td style="padding:24px 32px;text-align:center;border-top:1px solid #e7e5e4">
-              <p style="margin:0;font-size:11px;color:#a1a1aa">${APP_NAME} — Open source task management</p>
+              <p style="margin:0;font-size:11px;color:#a1a1aa">${APP_NAME} — Prioriza con claridad</p>
             </td>
           </tr>
         </table>

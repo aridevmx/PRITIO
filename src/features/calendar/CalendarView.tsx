@@ -10,7 +10,6 @@ import {
   listWorkspaceBlockedDays,
 } from "@/features/calendar/blockedDaysApi";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
-import { FamilyAgenda } from "@/features/agenda/FamilyAgenda";
 import type { SpaceKey } from "@/features/spaces/spaces";
 import type { BlockedDayStatus, Task } from "@/types";
 
@@ -104,6 +103,23 @@ function dayMinutesToISO(key: string, minutes: number): string {
   return dt.toISOString();
 }
 
+function taskDateKeys(t: Task): string[] {
+  const start =
+    t.startDate ?? (t.startAt ? dateToKey(new Date(t.startAt)) : null) ?? t.dueDate;
+  const end =
+    t.endDate ?? (t.endAt ? dateToKey(new Date(t.endAt)) : null) ?? start;
+  if (!start || !end) return [];
+  if (end < start) return [start];
+  const keys: string[] = [];
+  const cur = new Date(`${start}T12:00:00`);
+  const last = new Date(`${end}T12:00:00`);
+  while (cur.getTime() <= last.getTime()) {
+    keys.push(dateToKey(cur));
+    cur.setDate(cur.getDate() + 1);
+  }
+  return keys;
+}
+
 export function CalendarView({ workspaceId, space, defaultDate }: CalendarViewProps) {
   const { profile, members } = useWorkspace();
   const { tasks, isLoading } = useTasks(workspaceId);
@@ -125,11 +141,11 @@ export function CalendarView({ workspaceId, space, defaultDate }: CalendarViewPr
   const tasksByDate = useMemo(() => {
     const map = new Map<string, Task[]>();
     tasks.forEach((t) => {
-      const key = t.startAt ? dateToKey(new Date(t.startAt)) : t.dueDate;
-      if (!key) return;
-      const arr = map.get(key) ?? [];
-      arr.push(t);
-      map.set(key, arr);
+      taskDateKeys(t).forEach((key) => {
+        const arr = map.get(key) ?? [];
+        arr.push(t);
+        map.set(key, arr);
+      });
     });
     return map;
   }, [tasks]);
@@ -397,7 +413,11 @@ export function CalendarView({ workspaceId, space, defaultDate }: CalendarViewPr
                                 "truncate rounded px-1 py-0.5 text-[10px] font-medium leading-tight",
                                 t.completed
                                   ? "bg-green-50 text-pritio-green line-through"
-                                  : "bg-pritio-blue/10 text-pritio-blue",
+                                  : t.kind === "meeting"
+                                    ? "bg-pritio-purple/10 text-pritio-purple"
+                                    : t.kind === "event"
+                                      ? "bg-pritio-coral/10 text-pritio-coral"
+                                      : "bg-pritio-blue/10 text-pritio-blue",
                               )}
                             >
                               {t.title}
@@ -442,9 +462,6 @@ export function CalendarView({ workspaceId, space, defaultDate }: CalendarViewPr
           />
         )}
       </div>
-
-      {/* Agenda familiar (workspaces de tipo familia) */}
-      {space === "casa" && <FamilyAgenda workspaceId={workspaceId} />}
 
       {/* Day detail modal */}
       {selectedDay && (
@@ -641,7 +658,11 @@ function TimeGrid({
                           "block w-full truncate rounded px-1.5 py-0.5 text-left text-[10px] font-medium transition-colors",
                           t.completed
                             ? "bg-green-50 text-pritio-green line-through"
-                            : "bg-pritio-blue/10 text-pritio-blue hover:bg-pritio-blue/20",
+                            : t.kind === "meeting"
+                              ? "bg-pritio-purple/10 text-pritio-purple hover:bg-pritio-purple/20"
+                              : t.kind === "event"
+                                ? "bg-pritio-coral/10 text-pritio-coral hover:bg-pritio-coral/20"
+                                : "bg-pritio-blue/10 text-pritio-blue hover:bg-pritio-blue/20",
                         )}
                       >
                         {t.title}
@@ -723,7 +744,9 @@ function TimeGrid({
                             "h-full w-full overflow-hidden rounded-md border px-1.5 py-0.5 text-left text-[10px] font-medium leading-tight transition-colors",
                             t.kind === "meeting"
                               ? "border-pritio-purple/30 bg-pritio-purple/10 text-pritio-purple hover:bg-pritio-purple/20"
-                              : "border-pritio-blue/30 bg-pritio-blue/10 text-pritio-blue hover:bg-pritio-blue/20",
+                              : t.kind === "event"
+                                ? "border-pritio-coral/30 bg-pritio-coral/10 text-pritio-coral hover:bg-pritio-coral/20"
+                                : "border-pritio-blue/30 bg-pritio-blue/10 text-pritio-blue hover:bg-pritio-blue/20",
                             t.completed && "opacity-60 line-through",
                           )}
                         >
@@ -881,8 +904,15 @@ function DayTaskList({
             className="w-full p-3 text-left hover:bg-surface-muted transition-colors"
           >
             <div className="flex items-start gap-2">
-              {task.kind === "meeting" && (
-                <svg className="mt-0.5 h-4 w-4 shrink-0 text-pritio-purple" viewBox="0 0 12 12" fill="none">
+              {(task.kind === "meeting" || task.kind === "event") && (
+                <svg
+                  className={cn(
+                    "mt-0.5 h-4 w-4 shrink-0",
+                    task.kind === "meeting" ? "text-pritio-purple" : "text-pritio-coral",
+                  )}
+                  viewBox="0 0 12 12"
+                  fill="none"
+                >
                   <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
                   <path d="M6 3.5V6.5L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
                 </svg>
@@ -892,7 +922,7 @@ function DayTaskList({
                   {task.title}
                 </p>
                 <p className="mt-0.5 text-xs text-ink-muted capitalize">
-                  {task.kind === "meeting" ? "Junta" : "Tarea"} · {task.quadrant}
+                  {task.kind === "meeting" ? "Junta" : task.kind === "event" ? "Evento" : "Tarea"} · {task.quadrant}
                 </p>
                 {task.startAt && (
                   <p className="mt-0.5 text-xs text-ink-soft">
@@ -909,7 +939,7 @@ function DayTaskList({
             </div>
           </button>
 
-          {task.kind === "meeting" && (
+          {(task.kind === "meeting" || task.kind === "event") && (
             <div className="flex flex-wrap items-center gap-1.5 border-t border-line px-3 py-2 bg-surface-muted/30">
               {task.location && (
                 <>

@@ -5,7 +5,7 @@ cloud gestionado (hosting, notificaciones, correo, respaldos y mantenimiento).
 
 - **Self-host / uso propio:** gratis, sin límite. Descarga el código, despliéguelo
   donde quieras (Vercel, Netlify, tu servidor) y conéctalo a tu instancia de Supabase.
-- **Cloud gestionado (pritio.app):** freemium. Un plan gratuito para siempre y un plan
+- **Cloud gestionado (app.pritio.com.mx):** freemium. Un plan gratuito para siempre y un plan
   **Pro** de pago, facturado **por workspace** (no por cuenta), con tres niveles según el
   tipo de workspace.
 
@@ -52,11 +52,14 @@ a un workspace gratuito por tipo.
 | pro | family | 10 | 300 | 100 | 100 | 50 | 30 | ✓ | ✓ | ✓ |
 | pro | team | 50 | 5,000 | 0 | 500 | 500 | 90 | ✓ | ✓ | ✓ |
 
-- **Juntas** no cuentan contra el límite de tareas activas y están bloqueadas en Gratis
-  (server-side, error `prio_plan_limit:meetings`).
+- **Juntas y eventos** tienen cuotas **mensuales** por workspace (no cuentan contra el
+  límite de tareas activas): Gratis 5/mes en los tipos donde aplican; Pro ilimitado.
+  Server-side, error `prio_plan_limit:meetings` / `prio_plan_limit:events`.
 - **Fecha límite** se oculta en la UI en Gratis (sin bloqueo en servidor).
-- **Agenda familiar** (`family_agenda_events`) disponible en workspaces tipo Familia
-  (10 eventos gratis / 100 Pro).
+- **Eventos de familia** viven en `tasks` con `kind = 'event'` (la tabla
+  `family_agenda_events` se migró y se eliminó en 0027). Disponibles en workspaces tipo
+  Familia y Personal; por defecto `visibility = 'assigned'` (solo los asignados los ven),
+  los administradores/líderes pueden marcarlos "visibles para todos".
 - **Vistas Plan y Tablero** se ocultan en Gratis.
 - Fase 1 (entregada): catálogo Stripe, checkout/webhook, límites diferenciados, prueba por
   workspace y feature flags. Los datos existentes que superen un límite tras bajar de plan

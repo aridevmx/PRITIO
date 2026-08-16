@@ -1,0 +1,12 @@
+# Generado por bubblewrap — no versionar el proyecto Android ni el keystore.
+android.keystore
+*.aab
+*.apk
+assetlinks.json
+build/
+app/
+gradle/
+gradlew
+gradlew.bat
+settings.gradle
+build.gradle

@@ -7,12 +7,16 @@ import type {
 } from "@/types";
 
 /**
- * Client-side copy of the `plan_limits` table (see supabase/migrations/0025).
- * The server enforces quotas via triggers reading the DB table; this module
- * powers the UX (progress, disabled actions, feature flags, upsell prompts).
+ * Client-side copy of the `plan_limits` table (see supabase/migrations/0025
+ * and 0027). The server enforces quotas via triggers reading the DB table;
+ * this module powers the UX (progress, disabled actions, feature flags,
+ * upsell prompts).
  *
  * Model: 1 workspace of each type (personal base + family + team). Free limits
  * scale with the workspace type; Pro lifts them all.
+ *
+ * Monthly quotas: meetings_per_month / events_per_month (NULL = ilimitado).
+ * free: personal 5 juntas + 5 eventos, team 5 juntas, family 5 eventos.
  */
 
 const ROW = (
@@ -24,10 +28,10 @@ const ROW = (
   assigneeLimit: number,
   blockedDayLimit: number,
   workspaceLimit: number,
-  agendaEventLimit: number,
+  meetingsPerMonth: number | null,
+  eventsPerMonth: number | null,
   allowPlanView: boolean,
   allowBoardView: boolean,
-  allowMeetings: boolean,
   allowDueDate: boolean,
   supportTier: string,
 ): PlanLimits => ({
@@ -39,21 +43,21 @@ const ROW = (
   assigneeLimit,
   blockedDayLimit,
   workspaceLimit,
-  agendaEventLimit,
+  meetingsPerMonth,
+  eventsPerMonth,
   allowPlanView,
   allowBoardView,
-  allowMeetings,
   allowDueDate,
   supportTier,
 });
 
 export const PLAN_LIMITS: PlanLimits[] = [
-  ROW("free", "personal", 1, 50, 3, 0, 10, 1, 0, false, false, false, false, "mail"),
-  ROW("pro", "personal", 1, 300, 100, 0, 30, 1, 0, true, true, true, true, "mail+chat"),
-  ROW("free", "family", 4, 50, 5, 5, 10, 1, 10, false, false, false, false, "mail"),
-  ROW("pro", "family", 10, 300, 100, 50, 30, 1, 100, true, true, true, true, "email+chat"),
-  ROW("free", "team", 5, 100, 5, 10, 10, 1, 0, false, false, false, false, "mail"),
-  ROW("pro", "team", 50, 5000, 500, 500, 90, 1, 0, true, true, true, true, "chat+mail+phone"),
+  ROW("free", "personal", 1, 50, 3, 0, 10, 1, 5, 5, false, false, false, "mail"),
+  ROW("pro", "personal", 1, 300, 100, 0, 30, 1, null, null, true, true, true, "mail+chat"),
+  ROW("free", "family", 4, 50, 5, 5, 10, 1, 0, 5, false, false, false, "mail"),
+  ROW("pro", "family", 10, 300, 100, 50, 30, 1, null, null, true, true, true, "email+chat"),
+  ROW("free", "team", 5, 100, 5, 10, 10, 1, 5, 0, false, false, false, "mail"),
+  ROW("pro", "team", 50, 5000, 500, 500, 90, 1, null, null, true, true, true, "chat+mail+phone"),
 ];
 
 export function getLimits(plan: WorkspacePlan, workspaceType: WorkspaceType): PlanLimits {
@@ -69,14 +73,22 @@ export interface UsageSnapshot {
   projects: number;
   assignees: number;
   blockedDays: number;
-  agendaEvents: number;
+  meetingsThisMonth: number;
+  eventsThisMonth: number;
   workspaces: number;
 }
 
 const RESOURCE_LIMIT_KEY: Partial<
   Record<
     PlanResource,
-    "memberLimit" | "activeTaskLimit" | "projectLimit" | "assigneeLimit" | "blockedDayLimit" | "workspaceLimit" | "agendaEventLimit"
+    | "memberLimit"
+    | "activeTaskLimit"
+    | "projectLimit"
+    | "assigneeLimit"
+    | "blockedDayLimit"
+    | "workspaceLimit"
+    | "meetingsPerMonth"
+    | "eventsPerMonth"
   >
 > = {
   members: "memberLimit",
@@ -84,7 +96,8 @@ const RESOURCE_LIMIT_KEY: Partial<
   projects: "projectLimit",
   assignees: "assigneeLimit",
   blocked_days: "blockedDayLimit",
-  agenda_events: "agendaEventLimit",
+  meetings: "meetingsPerMonth",
+  events: "eventsPerMonth",
   workspaces: "workspaceLimit",
 };
 
@@ -94,7 +107,8 @@ const RESOURCE_USAGE_KEY: Partial<Record<PlanResource, keyof UsageSnapshot>> = {
   projects: "projects",
   assignees: "assignees",
   blocked_days: "blockedDays",
-  agenda_events: "agendaEvents",
+  meetings: "meetingsThisMonth",
+  events: "eventsThisMonth",
   workspaces: "workspaces",
 };
 
@@ -104,9 +118,9 @@ export const PLAN_RESOURCE_LABELS: Record<PlanResource, string> = {
   projects: "Proyectos",
   assignees: "Responsables",
   blocked_days: "Días bloqueados",
-  agenda_events: "Eventos de agenda",
-  workspaces: "Workspaces",
   meetings: "Juntas",
+  events: "Eventos",
+  workspaces: "Workspaces",
 };
 
 /** True when the current usage already reached the plan limit (block next insert). */
@@ -115,32 +129,27 @@ export function isAtLimit(
   usage: UsageSnapshot,
   resource: PlanResource,
 ): boolean {
-  if (resource === "meetings") {
-    return !limits.allowMeetings;
-  }
   const limitKey = RESOURCE_LIMIT_KEY[resource];
   const usageKey = RESOURCE_USAGE_KEY[resource];
   if (!limitKey || !usageKey) return false;
-  return usage[usageKey] >= limits[limitKey];
+  const limit = limits[limitKey];
+  if (limit === null) return false;
+  return usage[usageKey] >= limit;
 }
 
+/** Number limit for a resource; Infinity when unlimited. */
 export function limitFor(limits: PlanLimits, resource: PlanResource): number {
-  if (resource === "meetings") {
-    return limits.allowMeetings ? Number.POSITIVE_INFINITY : 0;
-  }
   const key = RESOURCE_LIMIT_KEY[resource];
-  return key ? limits[key] : 0;
+  const limit = key ? limits[key] : 0;
+  return limit === null ? Number.POSITIVE_INFINITY : limit;
 }
 
 export function usageFor(usage: UsageSnapshot, resource: PlanResource): number {
-  if (resource === "meetings") {
-    return 0;
-  }
   const key = RESOURCE_USAGE_KEY[resource];
   return key ? usage[key] : 0;
 }
 
-/** Feature flags from plan_limits (views, meetings, due date, agenda). */
+/** Feature flags from plan_limits (views, meetings, events, due date). */
 export function hasFeature(limits: PlanLimits, feature: PlanFeature): boolean {
   switch (feature) {
     case "plan_view":
@@ -148,15 +157,15 @@ export function hasFeature(limits: PlanLimits, feature: PlanFeature): boolean {
     case "board_view":
       return limits.allowBoardView;
     case "meetings":
-      return limits.allowMeetings;
+      return limits.meetingsPerMonth !== 0;
+    case "events":
+      return limits.eventsPerMonth !== 0;
     case "due_date":
       return limits.allowDueDate;
-    case "agenda_events":
-      return limits.agendaEventLimit > 0;
   }
 }
 
-/** Human-friendly value, e.g. "10", "1,000", "25,000". */
+/** Human-friendly value, e.g. "10", "1,000", "Ilimitadas". */
 export function formatLimit(value: number): string {
   return new Intl.NumberFormat("es-MX").format(value);
 }

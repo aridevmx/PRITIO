@@ -22,7 +22,8 @@ import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
 import { openUpgrade } from "@/features/billing/upgrade";
 import { PLAN_LABELS, PLAN_BADGE_CLASSES } from "@/features/billing/plans";
-import type { Invitation, NotificationPreferences, WorkspaceRole } from "@/types";
+import { MEMBER_TYPE_LABELS } from "@/lib/constants";
+import type { Invitation, MemberType, NotificationPreferences, WorkspaceRole } from "@/types";
 
 const TYPE_LABELS: Record<string, string> = {
   personal: "Personal",
@@ -84,9 +85,9 @@ function ToggleRow({
 }
 
 type MemberRow =
-  | { kind: "active"; key: string; assigneeId: string; name: string; color: string; userId: string }
+  | { kind: "active"; key: string; assigneeId: string; name: string; color: string; userId: string; memberType: MemberType | null }
   | { kind: "inactive"; key: string; assigneeId: string; name: string; color: string }
-  | { kind: "pending"; key: string; id: string; email: string; role: WorkspaceRole };
+  | { kind: "pending"; key: string; id: string; email: string; role: WorkspaceRole; memberType: MemberType | null };
 
 /**
  * Member manager for workspace settings.
@@ -126,7 +127,7 @@ function MembersManager({
         listInvitations(workspaceId),
         supabase
           .from("workspace_members")
-          .select("user_id, role")
+          .select("user_id, role, member_type")
           .eq("workspace_id", workspaceId),
       ]);
 
@@ -140,6 +141,9 @@ function MembersManager({
       );
       const rolesByUserId = new Map<string, WorkspaceRole>(
         memberRows.map((m: { user_id: string; role: WorkspaceRole }) => [m.user_id, m.role]),
+      );
+      const memberTypeByUserId = new Map<string, MemberType | null>(
+        memberRows.map((m: { user_id: string; member_type: MemberType | null }) => [m.user_id, m.member_type]),
       );
       const linkedUserIds = new Set(
         assignees.filter((a) => a.linked_user_id).map((a) => a.linked_user_id as string),
@@ -172,13 +176,14 @@ function MembersManager({
             name: a.name,
             color: a.color,
             userId: a.linked_user_id,
+            memberType: memberTypeByUserId.get(a.linked_user_id) ?? null,
           });
         } else {
           nextRows.push({ kind: "inactive", key: `i-${a.id}`, assigneeId: a.id, name: a.name, color: a.color });
         }
       });
       pending.forEach((inv) => {
-        nextRows.push({ kind: "pending", key: `p-${inv.id}`, id: inv.id, email: inv.email, role: inv.role });
+        nextRows.push({ kind: "pending", key: `p-${inv.id}`, id: inv.id, email: inv.email, role: inv.role, memberType: inv.memberType ?? null });
       });
       setRows(nextRows);
       setRolesByUserId(rolesByUserId);
@@ -312,7 +317,12 @@ function MembersManager({
                       </div>
                       <div className="min-w-0">
                         <span className="block truncate text-sm font-medium text-ink">{row.email}</span>
-                        <span className="block text-xs text-ink-muted capitalize">{row.role}</span>
+                        <span className="block text-xs text-ink-muted capitalize">
+                          {row.role}
+                          {row.memberType
+                            ? ` · ${MEMBER_TYPE_LABELS[row.memberType] ?? row.memberType}`
+                            : ""}
+                        </span>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -347,6 +357,11 @@ function MembersManager({
                     <div className="flex items-center gap-2.5 min-w-0">
                       <div className="h-3 w-3 rounded-full shrink-0" style={{ backgroundColor: row.color }} />
                       <span className="truncate text-sm font-medium text-ink">{row.name}</span>
+                      {row.kind === "active" && row.memberType && (
+                        <span className="shrink-0 rounded-full bg-surface-subtle px-2 py-0.5 text-[10px] font-semibold text-ink-muted">
+                          {MEMBER_TYPE_LABELS[row.memberType] ?? row.memberType}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       {row.kind === "active" ? (

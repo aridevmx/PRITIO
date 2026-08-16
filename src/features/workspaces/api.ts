@@ -16,6 +16,7 @@ function mapWorkspaceMember(row: WorkspaceMemberRow): WorkspaceMember {
     workspaceId: row.workspace_id,
     userId: row.user_id,
     role: row.role,
+    memberType: row.member_type,
     agendaShared: row.agenda_shared,
     recapMorningAt: row.recap_morning_at,
     recapEveningAt: row.recap_evening_at,

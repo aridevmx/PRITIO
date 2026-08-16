@@ -1,0 +1,37 @@
+{
+  "packageId": "com.pritio.app",
+  "host": "app.pritio.com.mx",
+  "name": "Pritio",
+  "launcherName": "Pritio",
+  "display": "standalone",
+  "themeColor": "#F4F7F8",
+  "navigationColor": "#F4F7F8",
+  "backgroundColor": "#F4F7F8",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://app.pritio.com.mx/brand/icon-512.png",
+  "maskableIconUrl": "https://app.pritio.com.mx/brand/icon-maskable-512.png",
+  "splashScreenFadeOutDuration": 300,
+  "signingKey": {
+    "path": "android.keystore",
+    "alias": "pritio"
+  },
+  "appVersionCode": 1,
+  "appVersionName": "0.1.1",
+  "shortcuts": [],
+  "generatorApp": "bubblewrap-cli",
+  "webManifestUrl": "https://app.pritio.com.mx/manifest.webmanifest",
+  "fallbackType": "customtabs",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullScopeUrl": "https://app.pritio.com.mx/",
+  "minSdkVersion": 21,
+  "orientation": "default",
+  "fingerprints": [],
+  "additionalTrustedOrigins": []
+}

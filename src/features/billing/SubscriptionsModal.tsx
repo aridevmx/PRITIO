@@ -719,15 +719,21 @@ export function SubscriptionsModal({ onClose }: SubscriptionsModalProps) {
   );
 }
 
+function limitLabel(limit: number | null): string {
+  if (limit === null) return "Ilimitadas";
+  if (limit === 0) return "—";
+  return `${formatLimit(limit)}/mes`;
+}
+
 function LimitList({ limits, highlight }: { limits: PlanLimits; highlight?: boolean }) {
   const rows = [
     { label: "Miembros", value: formatLimit(limits.memberLimit) },
     { label: "Tareas activas", value: formatLimit(limits.activeTaskLimit) },
-    { label: "Eventos de agenda", value: formatLimit(limits.agendaEventLimit) },
+    { label: "Juntas", value: limitLabel(limits.meetingsPerMonth) },
+    { label: "Eventos", value: limitLabel(limits.eventsPerMonth) },
     { label: "Proyectos", value: formatLimit(limits.projectLimit) },
     { label: "Responsables", value: formatLimit(limits.assigneeLimit) },
     { label: "Días bloqueados", value: formatLimit(limits.blockedDayLimit) },
-    { label: "Juntas", value: limits.allowMeetings ? "Disponibles" : "Solo Pro" },
     { label: "Vistas Plan y Tablero", value: limits.allowPlanView ? "Disponibles" : "Solo Pro" },
   ];
   return (

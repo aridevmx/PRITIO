@@ -10,6 +10,7 @@ import { BillingProvider } from "@/features/billing/BillingProvider";
 import { AppShell } from "@/components/layout/AppShell";
 import { LoadingState } from "@/components/State";
 import { JoinScreen } from "@/features/invitations/JoinScreen";
+import { DownloadScreen } from "@/features/download/DownloadScreen";
 
 function PendingInvitationRedirect() {
   const { user } = useAuth();
@@ -67,6 +68,7 @@ export default function App() {
             <Routes>
               <Route path="/invitacion/:id" element={<JoinScreen />} />
               <Route path="/reset-password" element={<ResetPasswordScreen />} />
+              <Route path="/download" element={<DownloadScreen />} />
               <Route element={<Root />}>
                 <Route index element={<Navigate to="/pendiente" replace />} />
                 <Route path=":space/:view?" element={<AppShell />} />
