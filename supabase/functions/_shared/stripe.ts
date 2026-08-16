@@ -10,7 +10,7 @@ export function getStripe(): Stripe | null {
 
 export const APP_URL = Deno.env.get("PUBLIC_APP_URL") ??
   Deno.env.get("APP_URL") ??
-  "https://pritio.app";
+  "https://app.pritio.com.mx";
 
 /** Map a Stripe subscription.status to the app's allowed statuses. */
 export function mapStripeStatus(status: string): string {

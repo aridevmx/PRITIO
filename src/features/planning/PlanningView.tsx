@@ -81,15 +81,24 @@ export function PlanningView({ workspaceId, space }: PlanningViewProps) {
   const tasksByDay = useMemo(() => {
     const map = new Map<string, { meetings: Task[]; tasks: Task[] }>();
     activeTasks.forEach((t) => {
-      const key = t.startAt ? localDateStr(new Date(t.startAt)) : t.dueDate;
-      if (!key) return;
-      const entry = map.get(key) ?? { meetings: [], tasks: [] };
-      if (t.kind === "meeting") {
-        entry.meetings.push(t);
-      } else {
-        entry.tasks.push(t);
+      const start =
+        t.startDate ?? (t.startAt ? localDateStr(new Date(t.startAt)) : null) ?? t.dueDate;
+      const end =
+        t.endDate ?? (t.endAt ? localDateStr(new Date(t.endAt)) : null) ?? start;
+      if (!start || !end) return;
+      const cur = new Date(`${start}T12:00:00`);
+      const last = new Date(`${end}T12:00:00`);
+      while (cur.getTime() <= last.getTime()) {
+        const key = localDateStr(cur);
+        const entry = map.get(key) ?? { meetings: [], tasks: [] };
+        if (t.kind === "meeting" || t.kind === "event") {
+          entry.meetings.push(t);
+        } else {
+          entry.tasks.push(t);
+        }
+        map.set(key, entry);
+        cur.setDate(cur.getDate() + 1);
       }
-      map.set(key, entry);
     });
     map.forEach((entry) => {
       entry.meetings.sort((a, b) => {
@@ -235,7 +244,9 @@ export function PlanningView({ workspaceId, space }: PlanningViewProps) {
             <div className="space-y-4">
               {todayMeetings.length > 0 && (
                 <div>
-                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-pritio-purple">Juntas</p>
+                  <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-pritio-purple">
+                    Juntas y eventos
+                  </p>
                   <ul className="space-y-2">
                     {todayMeetings.map((t) => (
                       <li

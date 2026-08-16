@@ -7,7 +7,7 @@ const MINUTES = Array.from({ length: 12 }, (_, i) => String(i * 5).padStart(2, "
 interface TimePickerProps {
   value: string;
   onChange: (value: string) => void;
-  accent: "blue" | "purple";
+  accent: "blue" | "purple" | "coral";
   compact?: boolean;
 }
 
@@ -40,13 +40,17 @@ export function TimePicker({ value, onChange, accent, compact }: TimePickerProps
     "w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:outline-none focus:ring-2",
     accent === "blue"
       ? "focus:border-pritio-blue focus:ring-pritio-blue/20"
-      : "focus:border-pritio-purple focus:ring-pritio-purple/20",
+      : accent === "purple"
+        ? "focus:border-pritio-purple focus:ring-pritio-purple/20"
+        : "focus:border-pritio-coral focus:ring-pritio-coral/20",
   );
 
   const activePeriodClass =
     accent === "blue"
       ? "bg-pritio-blue text-white"
-      : "bg-pritio-purple text-white";
+      : accent === "purple"
+        ? "bg-pritio-purple text-white"
+        : "bg-pritio-coral text-white";
 
   if (compact) {
     return (

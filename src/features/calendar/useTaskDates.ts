@@ -24,13 +24,17 @@ export function useTaskDates(
       const fromStr = localDateStr(from);
       const toStr = localDateStr(to);
 
-      /* Fetch task dates */
+      /* Fetch task dates (rows whose anchors fall inside the window) */
       let taskQuery = supabase
         .from("tasks")
-        .select("due_date, start_at")
-        .gte("due_date", fromStr)
-        .lte("due_date", toStr)
-        .eq("is_active", true);
+        .select("due_date, start_date, end_date, start_at, end_at")
+        .eq("is_active", true)
+        .or(
+          `due_date.gte.${fromStr},due_date.lte.${toStr},` +
+            `start_date.gte.${fromStr},start_date.lte.${toStr},` +
+            `end_date.gte.${fromStr},end_date.lte.${toStr},` +
+            `start_at.gte.${fromStr}T00:00:00,start_at.lte.${toStr}T23:59:59.999`,
+        );
 
       if (workspaceId) {
         taskQuery = taskQuery.eq("workspace_id", workspaceId);
@@ -54,8 +58,28 @@ export function useTaskDates(
 
       const dateSet = new Set<string>();
       (taskRows ?? []).forEach((row) => {
-        if (row.due_date) dateSet.add(row.due_date.slice(0, 10));
-        if (row.start_at) dateSet.add(row.start_at.slice(0, 10));
+        const startDate =
+          row.start_date ?? row.due_date ?? (row.start_at ? row.start_at.slice(0, 10) : null);
+        const endDate =
+          row.end_date ??
+          row.due_date ??
+          (row.end_at ? row.end_at.slice(0, 10) : null) ??
+          startDate;
+        [row.due_date, row.start_date, row.end_date, row.start_at?.slice(0, 10), row.end_at?.slice(0, 10)].forEach(
+          (d) => {
+            if (d && d >= fromStr && d <= toStr) dateSet.add(d.slice(0, 10));
+          },
+        );
+        if (startDate && endDate) {
+          const s = startDate < fromStr ? fromStr : startDate;
+          const e = endDate > toStr ? toStr : endDate;
+          const cur = new Date(`${s}T12:00:00`);
+          const last = new Date(`${e}T12:00:00`);
+          while (cur.getTime() <= last.getTime()) {
+            dateSet.add(localDateStr(cur));
+            cur.setDate(cur.getDate() + 1);
+          }
+        }
       });
       setTaskDates(Array.from(dateSet));
     } catch (err) {

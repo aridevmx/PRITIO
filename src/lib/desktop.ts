@@ -7,6 +7,16 @@
  * también pueda ser compilado por el tsconfig de Electron.
  */
 
+export type UpdateStatus =
+  | { status: "idle" }
+  | { status: "disabled" }
+  | { status: "checking" }
+  | { status: "available"; version: string }
+  | { status: "not-available" }
+  | { status: "downloading"; percent: number }
+  | { status: "downloaded"; version: string }
+  | { status: "error"; message: string };
+
 export interface DesktopApi {
   platform: string;
   appVersion: () => Promise<string>;
@@ -16,6 +26,11 @@ export interface DesktopApi {
   getAgentEnabled: () => Promise<boolean>;
   setAgentEnabled: (enabled: boolean) => Promise<boolean>;
   onNewTask: (callback: () => void) => () => void;
+  onAuthCallback: (callback: (url: string) => void) => () => void;
+  getUpdateStatus: () => Promise<UpdateStatus>;
+  checkForUpdates: () => Promise<UpdateStatus>;
+  installUpdate: () => Promise<void>;
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
 }
 
 export function isDesktop(): boolean {
@@ -36,6 +51,11 @@ export const desktopApi: DesktopApi = {
   getAgentEnabled: noop,
   setAgentEnabled: noop,
   onNewTask: () => () => {},
+  onAuthCallback: () => () => {},
+  getUpdateStatus: async () => ({ status: "disabled" }),
+  checkForUpdates: async () => ({ status: "disabled" }),
+  installUpdate: async () => {},
+  onUpdateStatus: () => () => {},
 };
 
 export function getDesktopApi(): DesktopApi {

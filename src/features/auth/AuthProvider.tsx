@@ -6,10 +6,12 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/lib/supabase";
 import type { User } from "@supabase/supabase-js";
 import { fetchProfile, upsertProfile } from "@/features/auth/api";
-import { getAppUrl } from "@/lib/appUrl";
+import { getAuthRedirectUrl, getResetRedirectUrl } from "@/lib/appUrl";
+import { isDesktop, getDesktopApi } from "@/lib/desktop";
 import type { Profile } from "@/types";
 
 interface AuthContextValue {
@@ -35,6 +37,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
 
   const loadProfile = useCallback(async (userId: string) => {
     const p = await fetchProfile(userId);
@@ -79,7 +82,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const { error } = await supabase.auth.signInWithOtp({
       email,
       options: {
-        emailRedirectTo: getAppUrl(),
+        emailRedirectTo: getAuthRedirectUrl(),
       },
     });
     if (error) throw error;
@@ -87,7 +90,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const resetPassword = useCallback(async (email: string) => {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${getAppUrl()}/reset-password`,
+      redirectTo: getResetRedirectUrl(),
     });
     if (error) throw error;
   }, []);
@@ -169,6 +172,35 @@ export function AuthProvider({ children }: AuthProviderProps) {
       subscription.unsubscribe();
     };
   }, [loadProfile]);
+
+  // Desktop: completa el flujo de auth cuando el wrapper recibe un deep link
+  // `pritio://auth...` (magic link o recuperación de contraseña).
+  useEffect(() => {
+    if (!isDesktop()) return;
+
+    return getDesktopApi().onAuthCallback(async (url) => {
+      try {
+        const parsed = new URL(url);
+        const code = parsed.searchParams.get("code");
+        if (!code) return;
+
+        const { error } = await supabase.auth.exchangeCodeForSession(code);
+        if (error) {
+          console.error(
+            "[AuthProvider] Error al canjear el código de sesión:",
+            error,
+          );
+          return;
+        }
+
+        if (parsed.searchParams.get("type") === "recovery") {
+          navigate("/reset-password", { replace: true });
+        }
+      } catch (err) {
+        console.error("[AuthProvider] Error al procesar deep link de auth:", err);
+      }
+    });
+  }, [navigate]);
 
   const value: AuthContextValue = {
     user,

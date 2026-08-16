@@ -46,14 +46,15 @@ interface TodayMeeting {
   location: string | null;
   description: string | null;
   due_date: string | null;
+  kind: string | null;
 }
 
-function upcomingMeetingsQuery(workspaceId: string, from: string, to: string) {
+function upcomingMeetingsQuery(workspaceId: string, from: string, to: string, kinds: string[]) {
   return supabase
     .from("tasks")
-    .select("id, title, start_at, end_at, meeting_link, location, description, due_date")
+    .select("id, title, start_at, end_at, meeting_link, location, description, due_date, kind")
     .eq("workspace_id", workspaceId)
-    .eq("kind", "meeting")
+    .in("kind", kinds)
     .gte("due_date", from)
     .lte("due_date", to)
     .eq("is_active", true)
@@ -159,11 +160,17 @@ export function Sidebar({
     if (!currentWorkspace?.id) return;
     const from = todayStr();
     const to = localDateStr(new Date(new Date().getTime() + 6 * 24 * 3600 * 1000));
-    upcomingMeetingsQuery(currentWorkspace.id, from, to).then(({ data }) => {
+    const kinds =
+      currentWorkspace.type === "family"
+        ? ["event"]
+        : currentWorkspace.type === "personal"
+          ? ["meeting", "event"]
+          : ["meeting"];
+    upcomingMeetingsQuery(currentWorkspace.id, from, to, kinds).then(({ data }) => {
       setUpcomingMeetings(data ?? []);
       setShowAllMeetings(false);
     });
-  }, [currentWorkspace?.id]);
+  }, [currentWorkspace?.id, currentWorkspace?.type]);
 
   useEffect(() => {
     loadUpcomingMeetings();
@@ -182,6 +189,19 @@ export function Sidebar({
   const spaces = currentWorkspace
     ? spacesForWorkspaceType(currentWorkspace.type)
     : [];
+
+  const upcomingLabel =
+    currentWorkspace?.type === "family"
+      ? "Próximos eventos"
+      : currentWorkspace?.type === "personal"
+        ? "Juntas y eventos"
+        : "Próximas juntas";
+  const upcomingEmpty =
+    currentWorkspace?.type === "family"
+      ? "Sin eventos en 7 días"
+      : currentWorkspace?.type === "personal"
+        ? "Nada en 7 días"
+        : "Sin juntas en 7 días";
 
   const handleDayClick = useCallback(
     async (dateStr: string) => {
@@ -412,10 +432,10 @@ export function Sidebar({
             </nav>
           </div>
 
-          {/* Juntas próximas */}
+          {/* Juntas/eventos próximos */}
           <div>
             <p className="text-xs text-ink-muted uppercase tracking-wide mb-2">
-              Juntas próximas
+              {upcomingLabel}
             </p>
             {upcomingMeetings.length === 0 ? (
               <div className="rounded-2xl bg-surface shadow-sm border border-line p-4">
@@ -425,7 +445,7 @@ export function Sidebar({
                       <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                     </svg>
                   </div>
-                  <p className="text-sm text-ink-muted">Sin juntas en 7 días</p>
+                  <p className="text-sm text-ink-muted">{upcomingEmpty}</p>
                 </div>
               </div>
             ) : (
@@ -440,7 +460,14 @@ export function Sidebar({
                     className="w-full rounded-2xl bg-surface shadow-sm border border-line p-4 text-left hover:shadow-soft hover:border-ink-muted/30 transition-all"
                   >
                     <div className="flex items-start gap-3">
-                      <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-pritio-purple/10 text-pritio-purple shrink-0 mt-0.5">
+                      <div
+                        className={cn(
+                          "flex h-9 w-9 items-center justify-center rounded-lg shrink-0 mt-0.5",
+                          m.kind === "event"
+                            ? "bg-pritio-coral/10 text-pritio-coral"
+                            : "bg-pritio-purple/10 text-pritio-purple",
+                        )}
+                      >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
                           <path strokeLinecap="round" strokeLinejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                         </svg>

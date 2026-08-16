@@ -19,7 +19,39 @@ export type SubscriptionStatus =
 
 export type WorkspaceRole = "owner" | "admin" | "leader" | "member";
 
-export type TaskKind = "task" | "meeting";
+/** Authority levels shown in the UI (owner renders as "Admin"). */
+export type AuthorityLevel = "admin" | "leader" | "member";
+
+export type TaskKind = "task" | "meeting" | "event";
+
+export type TaskVisibility = "all" | "assigned";
+
+/** Parentesco/relación para workspaces de tipo Familia. */
+export type MemberType =
+  | "abuelo"
+  | "abuela"
+  | "mama"
+  | "papa"
+  | "tio"
+  | "tia"
+  | "cunado"
+  | "cunada"
+  | "primo"
+  | "prima"
+  | "hermano"
+  | "hermana"
+  | "hijo"
+  | "hija"
+  | "nieto"
+  | "nieta"
+  | "sobrino"
+  | "sobrina"
+  | "pareja"
+  | "yerno"
+  | "nuera"
+  | "suegro"
+  | "suegra"
+  | "otro";
 
 export type RecurrenceFreq = "daily" | "weekly" | "monthly";
 
@@ -86,9 +118,9 @@ export type PlanResource =
   | "projects"
   | "assignees"
   | "blocked_days"
-  | "agenda_events"
   | "workspaces"
-  | "meetings";
+  | "meetings"
+  | "events";
 
 /** Feature flags driven by plan_limits (no numeric quota). */
 export type PlanFeature =
@@ -96,7 +128,7 @@ export type PlanFeature =
   | "board_view"
   | "meetings"
   | "due_date"
-  | "agenda_events";
+  | "events";
 
 export interface PlanLimits {
   plan: WorkspacePlan;
@@ -107,10 +139,10 @@ export interface PlanLimits {
   assigneeLimit: number;
   blockedDayLimit: number;
   workspaceLimit: number;
-  agendaEventLimit: number;
+  meetingsPerMonth: number | null;
+  eventsPerMonth: number | null;
   allowPlanView: boolean;
   allowBoardView: boolean;
-  allowMeetings: boolean;
   allowDueDate: boolean;
   supportTier: string;
 }
@@ -121,7 +153,8 @@ export interface WorkspaceUsage {
   projects: number;
   assignees: number;
   blockedDays: number;
-  agendaEvents: number;
+  meetingsThisMonth: number;
+  eventsThisMonth: number;
   workspaces: number;
 }
 
@@ -150,6 +183,7 @@ export interface WorkspaceMember {
   workspaceId: string;
   userId: string;
   role: WorkspaceRole;
+  memberType: MemberType | null;
   agendaShared: boolean;
   recapMorningAt: string | null;
   recapEveningAt: string | null;
@@ -194,6 +228,9 @@ export interface Task {
   description: string | null;
   quadrant: Quadrant;
   kind: TaskKind;
+  startDate: string | null;
+  endDate: string | null;
+  visibility: TaskVisibility;
   dueDate: string | null;
   startAt: string | null;
   endAt: string | null;
@@ -257,6 +294,7 @@ export interface Invitation {
   workspaceId: string;
   email: string;
   role: WorkspaceRole;
+  memberType: MemberType | null;
   invitedBy: string;
   acceptedAt: string | null;
   createdAt: string;
@@ -341,30 +379,12 @@ export interface PlanLimitsRow {
   assignee_limit: number;
   blocked_day_limit: number;
   workspace_limit: number;
-  agenda_event_limit: number;
+  meetings_per_month: number | null;
+  events_per_month: number | null;
   allow_plan_view: boolean;
   allow_board_view: boolean;
-  allow_meetings: boolean;
   allow_due_date: boolean;
   support_tier: string;
-}
-
-export interface AgendaEvent {
-  id: string;
-  workspaceId: string;
-  title: string;
-  startsAt: string;
-  createdBy: string;
-  createdAt: string;
-}
-
-export interface AgendaEventRow {
-  id: string;
-  workspace_id: string;
-  title: string;
-  starts_at: string;
-  created_by: string;
-  created_at: string;
 }
 
 export interface WorkspaceMemberRow {
@@ -372,6 +392,7 @@ export interface WorkspaceMemberRow {
   workspace_id: string;
   user_id: string;
   role: WorkspaceRole;
+  member_type: MemberType | null;
   agenda_shared: boolean;
   recap_morning_at: string | null;
   recap_evening_at: string | null;
@@ -406,6 +427,9 @@ export interface TaskRow {
   description: string | null;
   quadrant: Quadrant;
   kind: TaskKind;
+  start_date: string | null;
+  end_date: string | null;
+  visibility: TaskVisibility;
   due_date: string | null;
   start_at: string | null;
   end_at: string | null;
@@ -452,6 +476,7 @@ export interface InvitationRow {
   workspace_id: string;
   email: string;
   role: WorkspaceRole;
+  member_type: MemberType | null;
   invited_by: string;
   accepted_at: string | null;
   created_at: string;
@@ -466,6 +491,9 @@ export interface CreateTaskPayload {
   description?: string | null;
   quadrant: Quadrant;
   kind?: TaskKind;
+  startDate?: string | null;
+  endDate?: string | null;
+  visibility?: TaskVisibility;
   dueDate?: string | null;
   startAt?: string | null;
   endAt?: string | null;
@@ -486,6 +514,9 @@ export interface UpdateTaskPayload {
   description?: string | null;
   quadrant?: Quadrant;
   kind?: TaskKind;
+  startDate?: string | null;
+  endDate?: string | null;
+  visibility?: TaskVisibility;
   dueDate?: string | null;
   startAt?: string | null;
   endAt?: string | null;
@@ -493,6 +524,7 @@ export interface UpdateTaskPayload {
   meetingLink?: string | null;
   projectId?: string | null;
   completed?: boolean;
+  completedAt?: string | null;
   requiresApproval?: boolean;
   approved?: boolean;
   rejected?: boolean;

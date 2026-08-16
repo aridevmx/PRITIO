@@ -61,6 +61,9 @@ export async function createTask(payload: CreateTaskPayload): Promise<Task> {
       description: payload.description ?? null,
       quadrant: payload.quadrant,
       kind: payload.kind ?? "task",
+      start_date: payload.startDate ?? null,
+      end_date: payload.endDate ?? null,
+      visibility: payload.visibility ?? "all",
       due_date: payload.dueDate ?? null,
       start_at: payload.startAt ?? null,
       end_at: payload.endAt ?? null,
@@ -107,12 +110,19 @@ export async function updateTask(
   if (payload.description !== undefined) updateData.description = payload.description;
   if (payload.quadrant !== undefined) updateData.quadrant = payload.quadrant;
   if (payload.kind !== undefined) updateData.kind = payload.kind;
+  if (payload.startDate !== undefined) updateData.start_date = payload.startDate;
+  if (payload.endDate !== undefined) updateData.end_date = payload.endDate;
+  if (payload.visibility !== undefined) updateData.visibility = payload.visibility;
   if (payload.dueDate !== undefined) updateData.due_date = payload.dueDate;
   if (payload.startAt !== undefined) updateData.start_at = payload.startAt;
   if (payload.endAt !== undefined) updateData.end_at = payload.endAt;
   if (payload.location !== undefined) updateData.location = payload.location;
   if (payload.meetingLink !== undefined) updateData.meeting_link = payload.meetingLink;
   if (payload.completed !== undefined) updateData.completed = payload.completed;
+  if (payload.completedAt !== undefined) {
+    updateData.completed_at = payload.completedAt;
+    if (payload.completed === undefined) updateData.completed = Boolean(payload.completedAt);
+  }
   if (payload.requiresApproval !== undefined) updateData.requires_approval = payload.requiresApproval;
   if (payload.approved !== undefined) updateData.approved = payload.approved;
   if (payload.rejected !== undefined) updateData.rejected = payload.rejected;

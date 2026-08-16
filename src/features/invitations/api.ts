@@ -1,11 +1,12 @@
 import { supabase } from "@/lib/supabase";
 import { mapInvitation } from "@/lib/mappers";
-import type { Invitation, InvitationRow, WorkspaceRole } from "@/types";
+import type { Invitation, InvitationRow, MemberType, WorkspaceRole } from "@/types";
 
 export async function createInvitation(
   workspaceId: string,
   email: string,
   role: WorkspaceRole,
+  memberType?: MemberType | null,
 ): Promise<Invitation> {
   const user = (await supabase.auth.getUser()).data.user;
   if (!user) throw new Error("Not authenticated");
@@ -16,6 +17,7 @@ export async function createInvitation(
       workspace_id: workspaceId,
       email: email.toLowerCase().trim(),
       role,
+      member_type: memberType ?? null,
       invited_by: user.id,
     })
     .select()
@@ -69,6 +71,7 @@ export async function acceptInvitation(invitation: Invitation): Promise<void> {
       workspace_id: invitation.workspaceId,
       user_id: user.id,
       role: invitation.role,
+      member_type: invitation.memberType ?? null,
     });
 
   if (memberErr) throw memberErr;

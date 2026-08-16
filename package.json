@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.1",
   "type": "module",
+  "description": "Pritio — tu trabajo, tu casa y lo personal en una sola vista. Prioriza con claridad.",
+  "author": "PRITIO",
+  "main": "electron/main.mjs",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
@@ -11,7 +14,69 @@
     "format": "prettier --write",
     "typecheck": "tsc -b --noEmit",
     "test": "vitest run",
-    "check:supabase": "node scripts/check-supabase.mjs"
+    "check:supabase": "node scripts/check-supabase.mjs",
+    "desktop:dev": "node scripts/desktop-dev.mjs",
+    "desktop:build": "npm run build && electron-builder",
+    "desktop:dir": "npm run build && electron-builder --dir",
+    "twa:init": "bubblewrap init",
+    "twa:build": "bubblewrap build",
+    "twa:update-assetlinks": "node scripts/update-assetlinks.mjs"
+  },
+  "build": {
+    "appId": "app.pritio.desktop",
+    "productName": "Pritio",
+    "asar": true,
+    "electronDist": "./node_modules/electron/dist",
+    "directories": {
+      "output": "release"
+    },
+    "publish": {
+      "provider": "github",
+      "owner": "aridevmx",
+      "repo": "PRITIO"
+    },
+    "files": [
+      "dist/**/*",
+      "electron/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Pritio"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.productivity"
+    },
+    "protocols": [
+      {
+        "name": "Pritio",
+        "schemes": [
+          "pritio"
+        ]
+      }
+    ],
+    "linux": {
+      "target": [
+        "AppImage"
+      ],
+      "category": "Utility"
+    }
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -19,6 +84,7 @@
     "@sentry/react": "^9.32.0",
     "@supabase/supabase-js": "^2.49.8",
     "clsx": "^2.1.1",
+    "electron-updater": "^6.8.9",
     "react": "^19.2.7",
     "react-dom": "^19.2.7",
     "react-router-dom": "^7.6.3",
@@ -26,12 +92,16 @@
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@bubblewrap/cli": "^1.25.0",
     "@eslint/js": "^10.0.1",
+    "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^24.13.2",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^4.5.2",
     "autoprefixer": "^10.4.21",
+    "electron": "^41.7.1",
+    "electron-builder": "^26.15.3",
     "eslint": "^10.8.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
@@ -44,7 +114,14 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~5.7.3",
     "typescript-eslint": "^8.65.0",
+    "vercel": "^58.9.4",
     "vite": "^6.3.5",
-    "vitest": "^4.1.10"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.10",
+    "workbox-cacheable-response": "^7.4.1",
+    "workbox-expiration": "^7.4.1",
+    "workbox-precaching": "^7.4.1",
+    "workbox-routing": "^7.4.1",
+    "workbox-strategies": "^7.4.1"
   }
 }

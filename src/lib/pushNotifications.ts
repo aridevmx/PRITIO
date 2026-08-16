@@ -14,10 +14,7 @@ export async function registerServiceWorker(): Promise<ServiceWorkerRegistration
   if (!isPushSupported()) return null;
 
   try {
-    const registration = await navigator.serviceWorker.register("/sw.js", {
-      scope: "/",
-    });
-    return registration;
+    return await navigator.serviceWorker.ready;
   } catch {
     return null;
   }

@@ -8,13 +8,7 @@ export function PushNotificationInit() {
     if (ready) return;
     if (!isPushSupported()) return;
 
-    if (Notification.permission === "default") {
-      Notification.requestPermission().then((permission) => {
-        if (permission === "granted") {
-          initializePushNotifications().then(setReady);
-        }
-      });
-    } else if (Notification.permission === "granted") {
+    if (Notification.permission === "granted") {
       initializePushNotifications().then(setReady);
     }
   }, [ready]);
