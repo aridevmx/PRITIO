@@ -1,6 +1,6 @@
 export const APP_NAME = "Pritio";
 
-export const APP_VERSION = "0.1.2";
+export const APP_VERSION = "0.1.3";
 
 export const APP_TAGLINE =
   "Tu trabajo, tu casa y lo personal en una sola vista. Prioriza con claridad.";
