@@ -202,12 +202,27 @@ function createMainWindow() {
 
   mainWindow = new BrowserWindow(windowOptions);
 
-  mainWindow.once("ready-to-show", () => mainWindow.show());
+  let shown = false;
+  const showWindow = () => {
+    if (shown || mainWindow.isDestroyed()) return;
+    shown = true;
+    mainWindow.show();
+    mainWindow.focus();
+  };
+
+  mainWindow.once("ready-to-show", showWindow);
   mainWindow.on("closed", () => {
     mainWindow = null;
   });
 
-  mainWindow.webContents.on("did-finish-load", flushDeepLink);
+  // Red de seguridad: si la ventana nunca pinta, mostrarla igualmente para
+  // evitar un arranque invisible (síntoma "no pasó nada").
+  setTimeout(showWindow, 2500);
+
+  mainWindow.webContents.on("did-finish-load", () => {
+    showWindow();
+    flushDeepLink();
+  });
   mainWindow.webContents.on(
     "did-fail-load",
     (_event, errorCode, errorDescription, validatedURL) => {
@@ -216,9 +231,14 @@ function createMainWindow() {
       );
     },
   );
+  mainWindow.webContents.on("render-process-gone", (_event, details) => {
+    console.error(
+      `[Pritio-desktop] renderer process gone (${details.reason}, exitCode ${details.exitCode})`,
+    );
+  });
 
   if (app.isPackaged) {
-    mainWindow.loadURL(`${APP_SCHEME}://bundle/index.html`);
+    mainWindow.loadURL(`${APP_SCHEME}://bundle/`);
   } else {
     mainWindow.loadURL(DEV_SERVER_URL);
   }

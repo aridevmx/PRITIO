@@ -151,7 +151,7 @@ export function NotificationBell() {
   };
 
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative" ref={panelRef} data-tour="notificaciones">
       <button
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Notificaciones"

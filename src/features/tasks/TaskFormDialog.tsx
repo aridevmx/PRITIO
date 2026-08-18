@@ -3,18 +3,17 @@ import { createPortal } from "react-dom";
 import { cn, todayStr, localDateStr } from "@/lib/utils";
 import { Field } from "@/components/Field";
 import { SegmentedControl, type SegmentedOption } from "@/components/SegmentedControl";
-import { TimePicker } from "@/components/TimePicker";
-import { QUADRANTS, QUADRANT_ORDER } from "@/features/tasks/quadrants";
+import { QUADRANTS, QUADRANT_ORDER, type QuadrantIconKey } from "@/features/tasks/quadrants";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { useToast } from "@/components/Toast";
 import { supabase } from "@/lib/supabase";
-import { createTask as apiCreateTask, updateTask as apiUpdateTask } from "@/features/tasks/api";
+import { createTask as apiCreateTask, updateTask as apiUpdateTask, listTaskReminders, saveTaskReminders } from "@/features/tasks/api";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
 import { openUpgrade } from "@/features/billing/upgrade";
-import { formatTime, useTimeFormat } from "@/lib/timeFormat";
 import { notifyTaskChange } from "@/features/tasks/notifications";
 import { RecurrenceEditDialog } from "@/features/tasks/RecurrenceEditDialog";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
 import type {
   Task,
   Quadrant,
@@ -24,8 +23,7 @@ import type {
   CreateTaskPayload,
 } from "@/types";
 
-const MEETING_DURATIONS = [15, 30, 45, 60] as const;
-type MeetingDuration = (typeof MEETING_DURATIONS)[number];
+const MEETING_FALLBACK_MINUTES = 30 as const;
 
 const KIND_LABELS: Record<TaskKind, string> = {
   task: "Tarea",
@@ -66,6 +64,35 @@ const KIND_ACCENT: Record<TaskKind, { activeClassName: string; icon: ReactNode }
   },
 };
 
+const QUADRANT_ICONS: Record<QuadrantIconKey, ReactNode> = {
+  zap: (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+      <path d="M9 1.5L3.5 9H8L7 14.5L12.5 7H8L9 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
+    </svg>
+  ),
+  calendar: (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  users: (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+      <circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2.5 13c.5-2.2 2-3.2 3.5-3.2s3 1 3.5 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <circle cx="11.2" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M9.5 13c.4-1.7 1.4-2.5 2.5-2.5 1 0 1.8.6 2.2 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+  archive: (
+    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+      <path d="M2.5 8h3L7 10h2l1.5-2h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <rect x="2.5" y="3" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M4 4.5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+    </svg>
+  ),
+};
+
 function allowedKindsFor(type: string | undefined, isEdit: boolean, currentKind: TaskKind): TaskKind[] {
   const base: TaskKind[] =
     type === "personal"
@@ -95,23 +122,19 @@ function addDays(days: number): string {
   return localDateStr(d);
 }
 
-function meetingStartISO(day: string, time: string): string | null {
+function reminderWithOffset(anchor: string, minutes: number): string {
+  const d = new Date(anchor);
+  if (isNaN(d.getTime())) return "";
+  d.setMinutes(d.getMinutes() - minutes);
+  const t = d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false });
+  return `${localDateStr(d)}T${t}`;
+}
+
+function timeISO(day: string, time: string): string | null {
   if (!day || !time) return null;
   const d = new Date(`${day}T${time}`);
   if (isNaN(d.getTime())) return null;
   return d.toISOString();
-}
-
-function meetingEndISO(day: string, time: string, duration: MeetingDuration): string | null {
-  if (!day || !time) return null;
-  const start = new Date(`${day}T${time}`);
-  if (isNaN(start.getTime())) return null;
-  const end = new Date(start);
-  end.setMinutes(end.getMinutes() + duration);
-  if (isNaN(end.getTime())) return null;
-  const dayEnd = new Date(`${day}T23:59`);
-  if (end.getTime() > dayEnd.getTime()) return dayEnd.toISOString();
-  return end.toISOString();
 }
 
 function snapTo5(time: string): string {
@@ -149,20 +172,12 @@ export function TaskFormDialog({
   const [quadrant, setQuadrant] = useState<Quadrant>(defaultQuadrant);
   const [kind, setKind] = useState<TaskKind>("task");
   const [dueDate, setDueDate] = useState("");
-  const [blockDay, setBlockDay] = useState("");
-  const [meetingDay, setMeetingDay] = useState("");
-  const [meetingStartTime, setMeetingStartTime] = useState("");
-  const [meetingDuration, setMeetingDuration] = useState<MeetingDuration>(30);
-  const [eventDay, setEventDay] = useState("");
-  const [eventEndDay, setEventEndDay] = useState("");
-  const [eventStartTime, setEventStartTime] = useState("");
-  const [eventEndTime, setEventEndTime] = useState("");
-  const [rangeStartDate, setRangeStartDate] = useState("");
-  const [rangeEndDate, setRangeEndDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [allDay, setAllDay] = useState(true);
   const [visibility, setVisibility] = useState<TaskVisibility>("all");
-  const [taskStartTime, setTaskStartTime] = useState("");
-  const [taskEndTime, setTaskEndTime] = useState("");
-  const [showTaskTime, setShowTaskTime] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [location, setLocation] = useState("");
   const [meetingLink, setMeetingLink] = useState("");
@@ -172,11 +187,16 @@ export function TaskFormDialog({
   const [recurrenceFreq, setRecurrenceFreq] = useState<RecurrenceFreq | "">("");
   const [recurrenceInterval, setRecurrenceInterval] = useState(1);
   const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
+  const [recurrenceEndMode, setRecurrenceEndMode] = useState<"none" | "date" | "count">("none");
+  const [recurrenceCount, setRecurrenceCount] = useState(1);
   const [recurrenceChoice, setRecurrenceChoice] = useState<"this" | "all" | null>(null);
   const [recurrencePromptOpen, setRecurrencePromptOpen] = useState(false);
+  const [pendingKind, setPendingKind] = useState<TaskKind | null>(null);
+  const [reminders, setReminders] = useState<string[]>([]);
+  const [newReminder, setNewReminder] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
-  const timeFormat = useTimeFormat();
+  const [isCompleted, setIsCompleted] = useState(false);
 
   const [assignees, setAssignees] = useState<{ id: string; name: string; linkedUserId: string | null }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string; color: string }[]>([]);
@@ -210,6 +230,11 @@ export function TaskFormDialog({
   const titleRef = useRef<HTMLInputElement>(null);
 
   const isEdit = !!task;
+
+  const applyKind = (k: TaskKind) => {
+    setKind(k);
+    if (!startDate && dueDate) setStartDate(dueDate);
+  };
 
   const workspaceType = currentWorkspace?.type;
   const kinds = allowedKindsFor(workspaceType, isEdit, task?.kind ?? "task");
@@ -257,6 +282,8 @@ export function TaskFormDialog({
     }),
   );
 
+  const reminderAnchor = startTime && startDate ? `${startDate}T${startTime}` : dueDate ? `${dueDate}T09:00` : "";
+
   useEffect(() => {
     if (open) {
       if (task) {
@@ -266,79 +293,53 @@ export function TaskFormDialog({
         setQuadrant(task.quadrant);
         setKind(task.kind);
         setDueDate(task.dueDate ?? "");
-        setBlockDay("");
-        setTaskStartTime("");
-        setTaskEndTime("");
-        setShowTaskTime(false);
-        setEventDay("");
-        setEventEndDay("");
-        setEventStartTime("");
-        setEventEndTime("");
-        setRangeStartDate(task.startDate ?? "");
-        setRangeEndDate(task.endDate ?? "");
         setVisibility(task.visibility ?? defaultVisibility);
         if (task.startAt) {
           const start = new Date(task.startAt);
-          const time = snapTo5(
+          const sTime = snapTo5(
             start.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }),
           );
-          const endTime = task.endAt
-            ? snapTo5(
-                new Date(task.endAt).toLocaleTimeString("es-MX", {
-                  hour: "2-digit",
-                  minute: "2-digit",
-                  hour12: false,
-                }),
-              )
-            : "";
-          const minutes = task.endAt
-            ? Math.round((new Date(task.endAt).getTime() - start.getTime()) / 60000)
-            : 30;
-          const clamped = MEETING_DURATIONS.reduce(
-            (best, d) => (Math.abs(d - minutes) < Math.abs(best - minutes) ? d : best),
-            MEETING_DURATIONS[0],
-          );
-          if (task.kind === "meeting") {
-            setMeetingDay(localDateStr(start));
-            setMeetingStartTime(time);
-            setMeetingDuration(clamped);
-            setMeetingLink(task.meetingLink ?? "");
-          } else if (task.kind === "event") {
-            setMeetingDay("");
-            setMeetingStartTime("");
-            setMeetingDuration(30);
-            setMeetingLink("");
-            setEventDay(localDateStr(start));
-            setEventEndDay(task.endDate ?? task.startDate ?? localDateStr(start));
-            setEventStartTime(time);
-            setEventEndTime(endTime);
+          setStartDate(localDateStr(start));
+          setStartTime(sTime);
+          setAllDay(false);
+          if (task.endAt) {
+            const end = new Date(task.endAt);
+            setEndDate(localDateStr(end));
+            setEndTime(
+              snapTo5(
+                end.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }),
+              ),
+            );
           } else {
-            setMeetingDay("");
-            setMeetingStartTime("");
-            setMeetingDuration(30);
-            setBlockDay(localDateStr(start));
-            setTaskStartTime(time);
-            setTaskEndTime(endTime);
-            setShowTaskTime(true);
-            setMeetingLink("");
+            setEndDate("");
+            setEndTime("");
           }
+        } else if (task.startDate) {
+          setStartDate(task.startDate);
+          setEndDate(task.endDate ?? task.startDate);
+          setStartTime("");
+          setEndTime("");
+          setAllDay(true);
         } else {
-          setMeetingDay(task.dueDate ?? "");
-          setMeetingStartTime("");
-          setMeetingDuration(30);
-          setMeetingLink(task.meetingLink ?? "");
-          if (task.kind === "event") {
-            setEventDay(task.startDate ?? task.dueDate ?? "");
-            setEventEndDay(task.endDate ?? task.startDate ?? task.dueDate ?? "");
-          }
+          setStartDate(task.dueDate ?? "");
+          setEndDate("");
+          setStartTime("");
+          setEndTime("");
+          setAllDay(task.kind !== "meeting");
         }
+        setMeetingLink(task.meetingLink ?? "");
         setLocation(task.location ?? "");
         setRequiresApproval(task.requiresApproval);
+        setIsCompleted(task.completed);
         setProjectId(task.projectId ?? "");
         setSelectedAssigneeIds(task.assigneeIds);
         setRecurrenceFreq(task.recurrenceFreq ?? "");
         setRecurrenceInterval(task.recurrenceInterval || 1);
         setRecurrenceEndDate(task.recurrenceEndDate ?? "");
+        setRecurrenceEndMode(
+          task.recurrenceCount != null ? "count" : task.recurrenceEndDate ? "date" : "none",
+        );
+        setRecurrenceCount(task.recurrenceCount ?? 1);
         setRecurrenceChoice(null);
       } else {
         setTitle("");
@@ -347,35 +348,63 @@ export function TaskFormDialog({
         setQuadrant(defaultQuadrant);
         setKind("task");
         setDueDate(defaultStartTime ? "" : (defaultDueDate ?? ""));
-        setBlockDay(defaultStartTime ? (defaultDueDate ?? "") : "");
-        setMeetingDay("");
-        setMeetingStartTime("");
-        setMeetingDuration(30);
-        setEventDay("");
-        setEventEndDay("");
-        setEventStartTime("");
-        setEventEndTime("");
-        setRangeStartDate("");
-        setRangeEndDate("");
+        setStartDate(defaultDueDate ?? "");
+        setEndDate("");
+        setStartTime(defaultStartTime ?? "");
+        setEndTime("");
+        setAllDay(!defaultStartTime);
         setVisibility(defaultVisibility);
-        setTaskStartTime(defaultStartTime ?? "");
-        setTaskEndTime("");
-        setShowTaskTime(!!defaultStartTime);
         setLocation("");
         setMeetingLink("");
         setRequiresApproval(false);
+        setIsCompleted(false);
         setProjectId("");
         setSelectedAssigneeIds([]);
         setRecurrenceFreq("");
         setRecurrenceInterval(1);
         setRecurrenceEndDate("");
+        setRecurrenceEndMode("none");
+        setRecurrenceCount(1);
         setRecurrenceChoice(null);
+        setReminders([]);
+        setNewReminder("");
       }
       setError("");
       setShowMore(false);
       setTimeout(() => titleRef.current?.focus(), 50);
     }
   }, [open, task, defaultQuadrant, defaultDueDate, defaultStartTime, defaultVisibility]);
+
+  useEffect(() => {
+    if (!open) return;
+    setNewReminder("");
+    if (!task) {
+      setReminders([]);
+      return;
+    }
+    let cancelled = false;
+    void listTaskReminders(task.id)
+      .then((rs) => {
+        if (cancelled) return;
+        setReminders(
+          rs
+            .filter((r) => r.createdBy === profile?.id)
+            .map((r) => {
+              const d = new Date(r.remindAt);
+              const t = snapTo5(
+                d.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit", hour12: false }),
+              );
+              return `${localDateStr(d)}T${t}`;
+            }),
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setReminders([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, task, profile?.id]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -414,37 +443,23 @@ export function TaskFormDialog({
       setError("El titulo es requerido");
       return;
     }
-    if (kind === "meeting" && meetingStartTime && !meetingDay) {
-      setError("Indica el día de la junta");
+    if ((kind === "meeting" || kind === "event") && !startDate) {
+      setError("Indica el día de inicio");
       return;
     }
-    if (kind === "event" && !eventDay) {
-      setError("Indica el día del evento");
-      return;
-    }
-    if (kind === "event" && eventEndDay && eventDay && eventEndDay < eventDay) {
+    if (endDate && startDate && endDate < startDate) {
       setError("La fecha de fin no puede ser anterior a la de inicio");
-      return;
-    }
-    if (kind === "task" && taskStartTime && !blockDay) {
-      setError("Indica el día del bloque de tiempo");
-      return;
-    }
-    if (kind === "task" && taskStartTime && !taskEndTime) {
-      setError("Indica la hora de fin del bloque");
       return;
     }
     if (
-      kind === "task" &&
-      taskStartTime &&
-      taskEndTime &&
-      timeToMinutes(taskEndTime) <= timeToMinutes(taskStartTime)
+      !allDay &&
+      startDate &&
+      startTime &&
+      endDate === startDate &&
+      endTime &&
+      timeToMinutes(endTime) <= timeToMinutes(startTime)
     ) {
       setError("La hora de fin debe ser posterior a la de inicio");
-      return;
-    }
-    if (kind === "task" && rangeStartDate && rangeEndDate && rangeEndDate < rangeStartDate) {
-      setError("La fecha de fin no puede ser anterior a la de inicio");
       return;
     }
     if (!currentWorkspace || !profile) {
@@ -461,24 +476,34 @@ export function TaskFormDialog({
     setError("");
     setRecurrencePromptOpen(false);
 
+    const startISO = allDay ? null : timeISO(startDate, startTime);
+    let endISO = allDay ? null : timeISO(endDate, endTime);
+    if (!endISO && startISO && kind === "meeting") {
+      const fallback = new Date(startISO);
+      fallback.setMinutes(fallback.getMinutes() + MEETING_FALLBACK_MINUTES);
+      endISO = fallback.toISOString();
+    }
+
     const effectiveDueDate =
-      kind === "meeting" ? (meetingDay || null) : kind === "event" ? (eventDay || null) : (dueDate || null);
-    const effectiveStartAt =
       kind === "meeting"
-        ? meetingStartISO(meetingDay, meetingStartTime)
+        ? (startDate || null)
         : kind === "event"
-          ? meetingStartISO(eventDay, eventStartTime)
-          : meetingStartISO(blockDay, taskStartTime);
-    const effectiveEndAt =
-      kind === "meeting"
-        ? meetingEndISO(meetingDay, meetingStartTime, meetingDuration)
-        : kind === "event"
-          ? meetingStartISO(eventEndDay || eventDay, eventEndTime)
-          : meetingStartISO(blockDay, taskEndTime);
+          ? (startDate || null)
+          : (dueDate || null);
     const effectiveStartDate =
-      kind === "event" ? (eventDay || null) : (rangeStartDate || null);
+      kind === "event"
+        ? (startDate || null)
+        : kind === "task" && allDay
+          ? (startDate || null)
+          : null;
     const effectiveEndDate =
-      kind === "event" ? (eventEndDay || eventDay || null) : (rangeEndDate || null);
+      kind === "event"
+        ? (endDate || startDate || null)
+        : kind === "task" && allDay
+          ? (endDate || startDate || null)
+          : null;
+    const effectiveStartAt = startISO;
+    const effectiveEndAt = endISO;
     const effectiveVisibility: TaskVisibility =
       workspaceType === "family"
         ? isRestrictedMember ? "assigned" : visibility
@@ -537,10 +562,16 @@ export function TaskFormDialog({
           approvalRequestedAt,
           projectId: projectId || null,
           assigneeIds,
+          completed: isCompleted,
+          completedAt: isCompleted
+            ? (task?.completedAt ?? new Date().toISOString())
+            : null,
           recurrenceFreq: effectiveFreq,
           recurrenceInterval: recurrenceFreq === "" ? 1 : recurrenceInterval,
-          recurrenceEndDate: recurrenceFreq === "" ? null : recurrenceEndDate || null,
-          recurrenceCount: null,
+          recurrenceEndDate:
+            recurrenceFreq === "" || recurrenceEndMode !== "date" ? null : recurrenceEndDate || null,
+          recurrenceCount:
+            recurrenceFreq === "" || recurrenceEndMode !== "count" ? null : recurrenceCount,
         });
       } else {
         const payload: CreateTaskPayload = {
@@ -563,11 +594,18 @@ export function TaskFormDialog({
           assigneeIds,
           recurrenceFreq: effectiveFreq,
           recurrenceInterval: recurrenceFreq === "" ? 1 : recurrenceInterval,
-          recurrenceEndDate: recurrenceFreq === "" ? null : recurrenceEndDate || null,
+          recurrenceEndDate:
+            recurrenceFreq === "" || recurrenceEndMode !== "date" ? null : recurrenceEndDate || null,
+          recurrenceCount:
+            recurrenceFreq === "" || recurrenceEndMode !== "count" ? null : recurrenceCount,
           createdBy: profile.id,
         };
         if (!canCreate("active_tasks")) return;
         saved = await apiCreateTask(payload);
+      }
+
+      if (isEdit || reminders.length > 0) {
+        await saveTaskReminders(saved.id, reminders);
       }
 
       if (isEdit) {
@@ -583,6 +621,10 @@ export function TaskFormDialog({
         void notifyTaskChange("meeting_created", saved.id, currentWorkspace.id, assigneeIds);
       } else if (assigneeIds.length > 0) {
         void notifyTaskChange("assigned", saved.id, currentWorkspace.id, assigneeIds);
+      }
+
+      if (isEdit && isCompleted && !task?.completed) {
+        void notifyTaskChange("completed", saved.id, currentWorkspace.id, assigneeIds);
       }
 
       if (shouldNotifyApproval && managerUserIds.length > 0) {
@@ -609,12 +651,12 @@ export function TaskFormDialog({
       setSaving(false);
     }
   }, [
-    title, description, quadrant, kind, dueDate, blockDay, meetingDay, meetingStartTime, meetingDuration,
-    eventDay, eventEndDay, eventStartTime, eventEndTime, rangeStartDate, rangeEndDate, visibility,
-    taskStartTime, taskEndTime, location, meetingLink, requiresApproval, projectId,
+    title, description, quadrant, kind, dueDate, startDate, startTime, endDate, endTime, allDay,
+    visibility, location, meetingLink, requiresApproval, projectId,
     selfAssignee, isRestrictedMember, workspaceType, allowedAssigneeIds,
-    recurrenceFreq, recurrenceInterval, recurrenceEndDate, currentWorkspace, profile, members, isEdit, task,
-    canCreate, onSaved, onClose, toast,
+    recurrenceFreq, recurrenceInterval, recurrenceEndDate, recurrenceEndMode, recurrenceCount,
+    currentWorkspace, profile, members, isEdit, task,
+    canCreate, onSaved, onClose, toast, isCompleted, reminders,
   ]);
 
   const handleSubmit = useCallback(async () => {
@@ -635,9 +677,40 @@ export function TaskFormDialog({
       }}
     >
       <div className="pritio-modal-enter max-h-[92dvh] w-full overflow-y-auto rounded-t-2xl border border-b-0 border-line bg-surface p-5 shadow-elevated md:mx-4 md:max-h-[90vh] md:max-w-lg md:rounded-b-2xl md:border-b md:p-6">
-        <h3 className="text-lg font-bold text-ink">
-          {isEdit ? "Editar tarea" : "Nueva tarea"}
-        </h3>
+        <div className="flex items-center gap-3">
+          {isEdit && (
+            <button
+              type="button"
+              onClick={() => setIsCompleted((v) => !v)}
+              className={cn(
+                "flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-2 transition-all focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-green/30",
+                isCompleted
+                  ? "border-pritio-green bg-pritio-green text-white"
+                  : "border-line-strong hover:border-pritio-green hover:ring-2 hover:ring-pritio-green/20",
+              )}
+            >
+              {isCompleted && (
+                <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                  <path
+                    d="M2.5 6L5 8.5L9.5 3.5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              )}
+            </button>
+          )}
+          <h3
+            className={cn(
+              "text-lg font-bold text-ink",
+              isCompleted && "line-through text-ink-muted",
+            )}
+          >
+            {isEdit ? "Editar tarea" : "Nueva tarea"}
+          </h3>
+        </div>
 
         <div className="mt-5 space-y-4">
           <div>
@@ -645,13 +718,11 @@ export function TaskFormDialog({
               value={kind}
               pill
               onChange={(k) => {
-                setKind(k);
-                if (k === "task") {
-                  if (!dueDate && (meetingDay || eventDay)) setDueDate(meetingDay || eventDay);
-                } else {
-                  if (k === "meeting" && !meetingDay && dueDate) setMeetingDay(dueDate);
-                  if (k === "event" && !eventDay && dueDate) setEventDay(dueDate);
+                if (isEdit && k !== task?.kind) {
+                  setPendingKind(k);
+                  return;
                 }
+                applyKind(k);
               }}
               options={kindOptions as [SegmentedOption<TaskKind>, SegmentedOption<TaskKind>, ...SegmentedOption<TaskKind>[]]}
             />
@@ -690,7 +761,20 @@ export function TaskFormDialog({
           </Field>
 
           {showDescription ? (
-            <Field label="Descripcion">
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-ink">Descripcion</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDescription("");
+                    setShowDescription(false);
+                  }}
+                  className="text-xs font-medium text-ink-muted hover:text-ink transition-colors"
+                >
+                  Quitar
+                </button>
+              </div>
               <textarea
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
@@ -698,7 +782,7 @@ export function TaskFormDialog({
                 rows={3}
                 className="w-full resize-none rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
               />
-            </Field>
+            </div>
           ) : (
             <button
               type="button"
@@ -729,7 +813,14 @@ export function TaskFormDialog({
                         : cn(meta.classes.border, "bg-surface hover:bg-surface-muted"),
                     )}
                   >
-                    <span className={cn("h-2 w-2 rounded-full", meta.classes.accentBg)} />
+                    <span
+                      className={cn(
+                        "flex h-6 w-6 items-center justify-center rounded-lg",
+                        isActive ? meta.classes.badge : cn(meta.classes.softBg, meta.classes.accentText),
+                      )}
+                    >
+                      {QUADRANT_ICONS[meta.iconKey]}
+                    </span>
                     <span className="text-xs font-semibold leading-tight">{meta.title}</span>
                     <span className={cn("text-[10px] leading-tight", isActive ? "opacity-90" : "text-ink-muted")}>
                       {meta.subtitle}
@@ -740,153 +831,166 @@ export function TaskFormDialog({
             </div>
           </Field>
 
-          {kind === "task" && showDueDate && (
-            <Field label="Fecha limite" badge="Opcional">
-              <div className="flex flex-col gap-1.5">
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
-                />
-                <div className="flex gap-1">
-                  {[
-                    { label: "Hoy", value: todayStr() },
-                    { label: "Mañana", value: addDays(1) },
-                    { label: "1 sem", value: addDays(7) },
-                  ].map((s) => (
-                    <button
-                      key={s.label}
-                      type="button"
-                      onClick={() => setDueDate(s.value)}
-                      className={cn(
-                        "rounded-md border px-2 py-0.5 text-[11px] font-medium transition-all",
-                        dueDate === s.value
-                          ? "border-pritio-blue bg-pritio-blue/5 text-pritio-blue"
-                          : "border-line text-ink-soft hover:bg-surface-muted",
-                      )}
-                    >
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </Field>
-          )}
-
-          {/* Meeting fields */}
-          {kind === "meeting" && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Día de la junta">
+          {/* Fecha y hora */}
+          <div className="rounded-xl border border-line bg-surface-subtle/60 p-3">
+            <div className="mb-2 flex items-center justify-between">
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-muted">Fecha y hora</p>
+              {kind !== "meeting" && (
+                <label className="flex cursor-pointer items-center gap-1.5 text-xs font-medium text-ink-soft">
                   <input
-                    type="date"
-                    value={meetingDay}
-                    onChange={(e) => setMeetingDay(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
+                    type="checkbox"
+                    checked={allDay}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setAllDay(next);
+                      if (next) {
+                        setStartTime("");
+                        setEndTime("");
+                      }
+                    }}
+                    className="h-3.5 w-3.5 rounded border-line text-pritio-blue focus:ring-pritio-blue/20"
                   />
-                </Field>
-                <Field label="Hora de inicio">
-                  <TimePicker value={meetingStartTime} onChange={setMeetingStartTime} accent="purple" />
-                </Field>
-              </div>
-              <Field label="Duración">
-                <div className="flex gap-1.5">
-                  {MEETING_DURATIONS.map((dur) => (
-                    <button
-                      key={dur}
-                      type="button"
-                      onClick={() => setMeetingDuration(dur)}
-                      className={cn(
-                        "rounded-full border px-3 py-1.5 text-sm font-semibold transition-all",
-                        meetingDuration === dur
-                          ? "border-pritio-purple bg-pritio-purple text-white"
-                          : "border-line bg-surface text-ink-soft hover:bg-surface-muted",
-                      )}
-                    >
-                      {dur} m
-                    </button>
-                  ))}
-                </div>
-              </Field>
-              {meetingDay && meetingStartTime && (
-                <p className="-mt-1.5 text-xs text-ink-soft">
-                  Fin:{" "}
-                  {(() => {
-                    const end = new Date(`${meetingDay}T${meetingStartTime}`);
-                    end.setMinutes(end.getMinutes() + meetingDuration);
-                    return formatTime(end, timeFormat);
-                  })()}
-                  {" · "}
-                  {meetingDuration} min
-                </p>
+                  Todo el día
+                </label>
               )}
+            </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Dirección / Lugar" badge="Opcional">
-                  <input
-                    type="text"
-                    value={location}
-                    onChange={(e) => setLocation(e.target.value)}
-                    placeholder="Ej: Sala B, Edificio Principal"
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
-                  />
-                </Field>
-                <Field label="Enlace de la junta" badge="Opcional">
-                  <input
-                    type="url"
-                    value={meetingLink}
-                    onChange={(e) => setMeetingLink(e.target.value)}
-                    placeholder="https://meet.google.com/..."
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
-                  />
-                </Field>
-              </div>
-            </>
-          )}
-
-          {/* Event fields */}
-          {kind === "event" && (
-            <>
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Día de inicio">
+            {allDay ? (
+              <div className="grid grid-cols-2 gap-3">
+                <Field
+                  label={
+                    kind === "meeting" ? "Día de la junta" : kind === "event" ? "Día de inicio" : "Fecha"
+                  }
+                >
                   <input
                     type="date"
-                    value={eventDay}
-                    onChange={(e) => setEventDay(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-coral focus:outline-none focus:ring-2 focus:ring-pritio-coral/20"
+                    value={startDate}
+                    onChange={(e) => setStartDate(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
                   />
                 </Field>
-                <Field label="Hora de inicio" badge="Opcional">
-                  <TimePicker value={eventStartTime} onChange={setEventStartTime} accent="coral" />
-                </Field>
-              </div>
-              <div className="grid grid-cols-2 gap-4">
                 <Field label="Día de fin" badge="Opcional">
                   <input
                     type="date"
-                    value={eventEndDay}
-                    onChange={(e) => setEventEndDay(e.target.value)}
-                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-coral focus:outline-none focus:ring-2 focus:ring-pritio-coral/20"
+                    value={endDate}
+                    onChange={(e) => setEndDate(e.target.value)}
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
                   />
                 </Field>
-                <Field label="Hora de fin" badge="Opcional">
-                  <TimePicker value={eventEndTime} onChange={setEventEndTime} accent="coral" />
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <Field label={kind === "meeting" ? "Inicio de la junta" : "Inicio"}>
+                  <input
+                    type="datetime-local"
+                    value={startDate ? `${startDate}T${startTime || "00:00"}` : ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) {
+                        setStartDate("");
+                        setStartTime("");
+                        return;
+                      }
+                      const [d, t] = v.split("T");
+                      setStartDate(d);
+                      setStartTime(t || "");
+                    }}
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                  />
+                </Field>
+                <Field label="Fin" badge="Opcional">
+                  <input
+                    type="datetime-local"
+                    value={endDate ? `${endDate}T${endTime || "00:00"}` : ""}
+                    onChange={(e) => {
+                      const v = e.target.value;
+                      if (!v) {
+                        setEndDate("");
+                        setEndTime("");
+                        return;
+                      }
+                      const [d, t] = v.split("T");
+                      setEndDate(d);
+                      setEndTime(t || "");
+                    }}
+                    className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                  />
                 </Field>
               </div>
-              <p className="-mt-1.5 text-xs text-ink-soft">
-                Deja las horas vacías para un evento de todo el día.
-              </p>
+            )}
+
+            {kind === "task" && showDueDate && (
+              <div className="mt-3 border-t border-line pt-3">
+                <Field label="Fecha limite" badge="Opcional">
+                  <div className="flex flex-col gap-1.5">
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                    />
+                    <div className="flex gap-1">
+                      {[
+                        { label: "Hoy", value: todayStr() },
+                        { label: "Mañana", value: addDays(1) },
+                        { label: "1 sem", value: addDays(7) },
+                      ].map((s) => (
+                        <button
+                          key={s.label}
+                          type="button"
+                          onClick={() => setDueDate(s.value)}
+                          className={cn(
+                            "rounded-md border px-2 py-0.5 text-[11px] font-medium transition-all",
+                            dueDate === s.value
+                              ? "border-pritio-blue bg-pritio-blue/5 text-pritio-blue"
+                              : "border-line text-ink-soft hover:bg-surface-muted",
+                          )}
+                        >
+                          {s.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Field>
+              </div>
+            )}
+          </div>
+
+          {/* Meeting extras */}
+          {kind === "meeting" && (
+            <div className="grid grid-cols-2 gap-4">
               <Field label="Dirección / Lugar" badge="Opcional">
                 <input
                   type="text"
                   value={location}
                   onChange={(e) => setLocation(e.target.value)}
-                  placeholder="Ej: Casa de la abuela, Parque..."
-                  className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-coral focus:outline-none focus:ring-2 focus:ring-pritio-coral/20"
+                  placeholder="Ej: Sala B, Edificio Principal"
+                  className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
                 />
               </Field>
-            </>
+              <Field label="Enlace de la junta" badge="Opcional">
+                <input
+                  type="url"
+                  value={meetingLink}
+                  onChange={(e) => setMeetingLink(e.target.value)}
+                  placeholder="https://meet.google.com/..."
+                  className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
+                />
+              </Field>
+            </div>
+          )}
+
+          {/* Event extras */}
+          {kind === "event" && (
+            <Field label="Dirección / Lugar" badge="Opcional">
+              <input
+                type="text"
+                value={location}
+                onChange={(e) => setLocation(e.target.value)}
+                placeholder="Ej: Casa de la abuela, Parque..."
+                className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-coral focus:outline-none focus:ring-2 focus:ring-pritio-coral/20"
+              />
+            </Field>
           )}
 
           {/* Project + Assignee row (2 columns) */}
@@ -1034,82 +1138,79 @@ export function TaskFormDialog({
 
           {showMore && (
             <div className="space-y-4">
-              {kind === "task" &&
-                (showTaskTime ? (
-                  <>
-                    <Field label="Fecha">
-                      <input
-                        type="date"
-                        value={blockDay}
-                        onChange={(e) => setBlockDay(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2.5 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
-                      />
-                    </Field>
-                    <Field label="Horario">
-                      <div className="flex items-center gap-2">
-                        <TimePicker value={taskStartTime} onChange={setTaskStartTime} accent="blue" compact />
-                        <span className="text-sm font-semibold text-ink-soft">a</span>
-                        <TimePicker value={taskEndTime} onChange={setTaskEndTime} accent="blue" compact />
-                      </div>
-                    </Field>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setShowTaskTime(false);
-                        setTaskStartTime("");
-                        setTaskEndTime("");
-                        setBlockDay("");
-                      }}
-                      className="flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink transition-colors"
-                    >
-                      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                        <path d="M3 8h10" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                      </svg>
-                      Quitar bloque
-                    </button>
-                  </>
-                ) : (
+              {/* Reminders */}
+              <div className="rounded-xl border border-line bg-surface-subtle/60 p-3">
+                <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-muted">Recordatorios</p>
+                {reminders.length > 0 && (
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    {reminders.map((r, i) => (
+                      <span
+                        key={`${r}-${i}`}
+                        className="inline-flex items-center gap-1 rounded-full bg-pritio-purple/10 px-2.5 py-1 text-xs font-medium text-pritio-purple"
+                      >
+                        {new Date(r).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
+                        <button
+                          type="button"
+                          onClick={() => setReminders((prev) => prev.filter((_, j) => j !== i))}
+                          className="text-pritio-purple/60 hover:text-pritio-purple"
+                          aria-label="Quitar recordatorio"
+                        >
+                          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                            <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex items-center gap-2">
+                  <input
+                    type="datetime-local"
+                    value={newReminder}
+                    onChange={(e) => setNewReminder(e.target.value)}
+                    className="min-w-0 flex-1 rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-purple focus:outline-none focus:ring-2 focus:ring-pritio-purple/20"
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowTaskTime(true)}
-                    className="flex items-center gap-1.5 text-sm font-medium text-ink-soft hover:text-ink transition-colors"
+                    onClick={() => {
+                      if (newReminder && !reminders.includes(newReminder)) {
+                        setReminders((prev) => [...prev, newReminder]);
+                      }
+                      setNewReminder("");
+                    }}
+                    className="rounded-xl bg-pritio-purple px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-pritio-purple/90"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
-                    Agregar bloque de tiempo
+                    Agregar
                   </button>
-                ))}
-
-              {/* Date range for tasks */}
-              {kind === "task" && (
-                <div className="rounded-xl border border-line bg-surface-subtle/60 p-3">
-                  <p className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-muted">
-                    Rango de fechas
-                  </p>
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Desde" badge="Opcional">
-                      <input
-                        type="date"
-                        value={rangeStartDate}
-                        onChange={(e) => setRangeStartDate(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
-                      />
-                    </Field>
-                    <Field label="Hasta" badge="Opcional">
-                      <input
-                        type="date"
-                        value={rangeEndDate}
-                        onChange={(e) => setRangeEndDate(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
-                      />
-                    </Field>
-                  </div>
-                  <p className="mt-2 text-[11px] leading-relaxed text-ink-muted">
-                    Muestra la tarea en todos los días del rango en el calendario.
-                  </p>
                 </div>
-              )}
+                {reminderAnchor && (
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {[
+                      { label: "En el momento", minutes: 0 },
+                      { label: "15 min antes", minutes: 15 },
+                      { label: "1 h antes", minutes: 60 },
+                      { label: "1 día antes", minutes: 1440 },
+                    ].map((p) => {
+                      const v = reminderWithOffset(reminderAnchor, p.minutes);
+                      return (
+                        <button
+                          key={p.label}
+                          type="button"
+                          onClick={() => {
+                            if (v && !reminders.includes(v)) setReminders((prev) => [...prev, v]);
+                          }}
+                          className="rounded-full border border-line px-2 py-0.5 text-[11px] font-medium text-ink-soft transition-all hover:bg-surface-muted"
+                        >
+                          {p.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                <p className="mt-2 text-[11px] leading-relaxed text-ink-muted">
+                  Recibirás una notificación in-app, por correo y push en la fecha elegida.
+                </p>
+              </div>
 
               {/* Recurrence */}
               <div className="rounded-xl border border-line bg-surface-subtle/60 p-3">
@@ -1120,6 +1221,7 @@ export function TaskFormDialog({
                     { value: "daily", label: "Diario" },
                     { value: "weekly", label: "Semanal" },
                     { value: "monthly", label: "Mensual" },
+                    { value: "yearly", label: "Anual" },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -1137,26 +1239,53 @@ export function TaskFormDialog({
                   ))}
                 </div>
                 {recurrenceFreq && (
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <Field label="Cada">
-                      <input
-                        type="number"
-                        min={1}
-                        max={99}
-                        value={recurrenceInterval}
-                        onChange={(e) => setRecurrenceInterval(Math.max(1, Number(e.target.value) || 1))}
-                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
-                      />
-                    </Field>
-                    <Field label="Hasta" badge="Opcional">
-                      <input
-                        type="date"
-                        value={recurrenceEndDate}
-                        onChange={(e) => setRecurrenceEndDate(e.target.value)}
-                        className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
-                      />
-                    </Field>
-                  </div>
+                  <>
+                    <div className="mt-3 grid grid-cols-2 gap-3">
+                      <Field label="Cada">
+                        <input
+                          type="number"
+                          min={1}
+                          max={99}
+                          value={recurrenceInterval}
+                          onChange={(e) => setRecurrenceInterval(Math.max(1, Number(e.target.value) || 1))}
+                          className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                        />
+                      </Field>
+                      <Field label="Finaliza">
+                        <select
+                          value={recurrenceEndMode}
+                          onChange={(e) => setRecurrenceEndMode(e.target.value as "none" | "date" | "count")}
+                          className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                        >
+                          <option value="none">Nunca</option>
+                          <option value="date">En fecha</option>
+                          <option value="count">Tras N veces</option>
+                        </select>
+                      </Field>
+                    </div>
+                    {recurrenceEndMode === "date" && (
+                      <Field label="Fecha final">
+                        <input
+                          type="date"
+                          value={recurrenceEndDate}
+                          onChange={(e) => setRecurrenceEndDate(e.target.value)}
+                          className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                        />
+                      </Field>
+                    )}
+                    {recurrenceEndMode === "count" && (
+                      <Field label="Numero de repeticiones" badge="Opcional">
+                        <input
+                          type="number"
+                          min={1}
+                          max={999}
+                          value={recurrenceCount}
+                          onChange={(e) => setRecurrenceCount(Math.max(1, Number(e.target.value) || 1))}
+                          className="w-full rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+                        />
+                      </Field>
+                    )}
+                  </>
                 )}
               </div>
             </div>
@@ -1185,6 +1314,17 @@ export function TaskFormDialog({
         onThisOne={() => void performSave("this")}
         onAllFuture={() => void performSave("all")}
         onCancel={() => setRecurrencePromptOpen(false)}
+      />
+      <ConfirmDialog
+        open={pendingKind !== null}
+        onClose={() => setPendingKind(null)}
+        onConfirm={() => {
+          if (pendingKind) applyKind(pendingKind);
+          setPendingKind(null);
+        }}
+        title="Cambiar tipo"
+        description={`Al cambiar de ${KIND_LABELS[task?.kind ?? "task"]} a ${KIND_LABELS[pendingKind ?? "task"]} se reorganizaran las fechas. Estas seguro?`}
+        confirmLabel="Cambiar"
       />
     </div>,
     document.body,

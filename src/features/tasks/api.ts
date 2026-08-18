@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { TASK_COLUMNS, mapTask } from "@/lib/mappers";
-import type { Task, CreateTaskPayload, UpdateTaskPayload } from "@/types";
+import type { Task, CreateTaskPayload, UpdateTaskPayload, TaskReminder } from "@/types";
 
 export async function getTask(taskId: string): Promise<Task> {
   const { data: taskRow, error } = await supabase
@@ -118,7 +118,12 @@ export async function updateTask(
   if (payload.endAt !== undefined) updateData.end_at = payload.endAt;
   if (payload.location !== undefined) updateData.location = payload.location;
   if (payload.meetingLink !== undefined) updateData.meeting_link = payload.meetingLink;
-  if (payload.completed !== undefined) updateData.completed = payload.completed;
+  if (payload.completed !== undefined) {
+    updateData.completed = payload.completed;
+    if (payload.completedAt === undefined) {
+      updateData.completed_at = payload.completed ? new Date().toISOString() : null;
+    }
+  }
   if (payload.completedAt !== undefined) {
     updateData.completed_at = payload.completedAt;
     if (payload.completed === undefined) updateData.completed = Boolean(payload.completedAt);
@@ -254,4 +259,69 @@ export async function listMyPendingTasks(): Promise<Task[]> {
 
   if (error) throw error;
   return (taskRows ?? []).map((row) => mapTask(row as never, []));
+}
+
+export async function listTaskReminders(taskId: string): Promise<TaskReminder[]> {
+  try {
+    const { data, error } = await supabase
+      .from("task_reminders")
+      .select("id, task_id, remind_at, created_by, notified")
+      .eq("task_id", taskId)
+      .order("remind_at", { ascending: true });
+
+    if (error) return [];
+    return (data ?? []).map((r: Record<string, unknown>) => ({
+      id: r.id as string,
+      taskId: r.task_id as string,
+      remindAt: r.remind_at as string,
+      createdBy: r.created_by as string,
+      notified: Boolean(r.notified),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+export async function saveTaskReminders(
+  taskId: string,
+  remindAts: string[],
+): Promise<void> {
+  let user;
+  try {
+    const res = await supabase.auth.getUser();
+    user = res.data.user;
+  } catch {
+    return;
+  }
+  if (!user) return;
+
+  const iso = remindAts
+    .filter(Boolean)
+    .map((v) => {
+      const d = new Date(v);
+      return isNaN(d.getTime()) ? null : d.toISOString();
+    })
+    .filter((v): v is string => v !== null);
+
+  try {
+    const { error } = await supabase
+      .from("task_reminders")
+      .delete()
+      .eq("task_id", taskId)
+      .eq("created_by", user.id);
+    if (error) return;
+  } catch {
+    return;
+  }
+
+  if (iso.length === 0) return;
+
+  try {
+    const { error } = await supabase.from("task_reminders").insert(
+      iso.map((remindAt) => ({ task_id: taskId, created_by: user.id, remind_at: remindAt })),
+    );
+    if (error) return;
+  } catch {
+    // table may not exist yet — don't block task save
+  }
 }

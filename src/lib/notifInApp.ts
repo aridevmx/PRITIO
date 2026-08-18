@@ -4,6 +4,7 @@ export const IN_APP_EVENTS: { kind: string; label: string }[] = [
   { kind: "task_assigned", label: "Tarea asignada" },
   { kind: "meeting_created", label: "Junta creada" },
   { kind: "deadline_approaching", label: "Fecha límite próxima" },
+  { kind: "task_reminder", label: "Recordatorios" },
   { kind: "blocked_day_pending_approval", label: "Aprobación de día bloqueado" },
   { kind: "workspace_invitation", label: "Invitación a workspace" },
 ];
@@ -14,6 +15,7 @@ const DEFAULTS: Record<string, InAppDelivery> = {
   task_assigned: "both",
   meeting_created: "both",
   deadline_approaching: "both",
+  task_reminder: "both",
   blocked_day_pending_approval: "bell",
   workspace_invitation: "bell",
 };

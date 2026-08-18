@@ -245,6 +245,7 @@ const RECURRENCE_LABELS: Record<string, string> = {
   daily: "Diario",
   weekly: "Semanal",
   monthly: "Mensual",
+  yearly: "Anual",
 };
 
 interface RecurringRow {

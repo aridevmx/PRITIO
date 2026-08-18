@@ -53,7 +53,7 @@ export type MemberType =
   | "suegra"
   | "otro";
 
-export type RecurrenceFreq = "daily" | "weekly" | "monthly";
+export type RecurrenceFreq = "daily" | "weekly" | "monthly" | "yearly";
 
 export type TaskApprovalStatus = "pending_approval" | "approved" | "rejected";
 
@@ -70,7 +70,8 @@ export type NotificationKind =
   | "blocked_day_rejected"
   | "task_approved"
   | "task_rejected"
-  | "approval_requested";
+  | "approval_requested"
+  | "task_reminder";
 
 export type NotificationDelivery = "toast" | "bell" | "both";
 
@@ -265,6 +266,14 @@ export interface TaskAssignee {
   assigneeId: string;
   isPrimary: boolean;
   addedAt: string;
+}
+
+export interface TaskReminder {
+  id: string;
+  taskId: string;
+  remindAt: string;
+  createdBy: string;
+  notified: boolean;
 }
 
 export interface MeetingParticipant {

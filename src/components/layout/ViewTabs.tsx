@@ -27,7 +27,7 @@ export function ViewTabs({ active, onChange, availableTabs }: ViewTabsProps) {
     : ALL_TABS;
 
   return (
-    <div className="flex items-center gap-1 rounded-full bg-surface-muted p-1">
+    <div className="flex items-center gap-1 rounded-full bg-surface-muted p-1" data-tour="vistas">
       {tabs.map((tab) => (
         <button
           key={tab.key}

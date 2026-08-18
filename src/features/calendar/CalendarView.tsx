@@ -472,6 +472,7 @@ export function CalendarView({ workspaceId, space, defaultDate }: CalendarViewPr
           onClose={() => setSelectedDay(null)}
           onViewDay={viewFullDay}
           onEditTask={openEdit}
+          onAddTask={openCreateOnDay}
         />
       )}
 
@@ -801,9 +802,10 @@ interface DayModalProps {
   onClose: () => void;
   onViewDay: (dateStr: string) => void;
   onEditTask: (task: Task) => void;
+  onAddTask: (dateStr: string) => void;
 }
 
-function DayModal({ dateStr, tasks, blocked, onClose, onViewDay, onEditTask }: DayModalProps) {
+function DayModal({ dateStr, tasks, blocked, onClose, onViewDay, onEditTask, onAddTask }: DayModalProps) {
   const formatted = new Date(dateStr + "T12:00:00").toLocaleDateString("es-MX", {
     weekday: "long",
     day: "numeric",
@@ -862,7 +864,19 @@ function DayModal({ dateStr, tasks, blocked, onClose, onViewDay, onEditTask }: D
         )}
 
         {tasks.length === 0 ? (
-          <p className="text-sm text-ink-soft py-4 text-center">Sin tareas este día</p>
+          <div className="py-4 text-center">
+            <p className="text-sm text-ink-soft">Sin tareas este día</p>
+            <button
+              type="button"
+              onClick={() => onAddTask(dateStr)}
+              className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-pritio-blue/30 bg-pritio-blue/5 px-3 py-1.5 text-xs font-semibold text-pritio-blue transition-colors hover:bg-pritio-blue/10"
+            >
+              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
+                <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+              </svg>
+              Agregar tarea
+            </button>
+          </div>
         ) : (
           <DayTaskList tasks={tasks} onEditTask={onEditTask} />
         )}

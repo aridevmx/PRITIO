@@ -95,6 +95,7 @@ export function MobileBottomNav({ activeView, availableTabs, onViewChange }: Mob
       <nav
         aria-label="Vistas"
         className="fixed inset-x-0 bottom-0 z-50 border-t border-line bg-surface/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-xl lg:hidden"
+        data-tour="vistas"
       >
         <div className="flex items-stretch">
           {availableTabs.map(renderTab)}

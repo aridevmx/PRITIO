@@ -12,6 +12,7 @@ import { QuadrantsDnd } from "@/features/tasks/QuadrantsDnd";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BottomSheet } from "@/components/layout/BottomSheet";
 import { ManageDialog } from "@/components/layout/ManageDialog";
+import { SegmentedControl } from "@/components/SegmentedControl";
 import { updateTask as apiUpdateTask, archiveTask as apiArchiveTask } from "@/features/tasks/api";
 import { notifyTaskChange } from "@/features/tasks/notifications";
 import { groupTasksByDay, formatDateShort } from "@/features/tasks/dates";
@@ -208,28 +209,32 @@ function CompletedSection({
     <div className={cn("border-t border-line pt-4", className)}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="mb-3 flex w-full items-center gap-2 text-left"
+        className="group mb-3 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-muted/60"
       >
-        <svg
-          className={cn("h-4 w-4 text-ink-muted transition-transform", open && "rotate-90")}
-          viewBox="0 0 16 16"
-          fill="none"
-        >
-          <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-        <h2 className="text-sm font-bold uppercase tracking-wider text-ink-muted">Completadas</h2>
-        <div className="h-px flex-1 bg-line" />
-        <span className="text-xs text-ink-muted">{tasks.length}</span>
+        <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-pritio-green/10 text-pritio-green">
+          <svg
+            className={cn("h-3 w-3 transition-transform duration-200", open && "rotate-90")}
+            viewBox="0 0 12 12"
+            fill="none"
+          >
+            <path d="M4.5 2L9 6L4.5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </span>
+        <h2 className="text-sm font-bold text-ink-muted group-hover:text-ink">Completadas</h2>
+        <span className="ml-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-muted px-1.5 text-[10px] font-bold tabular-nums text-ink-muted">
+          {tasks.length}
+        </span>
+        <div className="h-px flex-1 bg-line/50" />
       </button>
 
       {open && (
-        <div className="space-y-4">
+        <div className="space-y-3">
           {[...groupTasksByDay(tasks).entries()].map(([dateKey, dayTasks]) => (
             <div key={dateKey}>
-              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-ink-soft">
+              <p className="mb-1.5 pl-3 text-[11px] font-bold uppercase tracking-wider text-ink-soft">
                 {formatDateShort(dateKey)}
               </p>
-              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-1.5">
                 {dayTasks.map((task) => (
                   <TaskCard
                     key={task.id}
@@ -251,13 +256,14 @@ function CompletedSection({
   );
 }
 
-type DueFilter = "overdue" | "today" | "week" | "none" | "";
+type DueFilter = "overdue" | "today" | "week" | "month" | "none" | "";
 
 const DUE_OPTIONS: { value: DueFilter; label: string }[] = [
   { value: "", label: "Cualquier fecha" },
   { value: "overdue", label: "Vencidas" },
   { value: "today", label: "Hoy" },
   { value: "week", label: "Próximos 7 días" },
+  { value: "month", label: "Este mes" },
   { value: "none", label: "Sin fecha" },
 ];
 
@@ -509,6 +515,11 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
     const q = search.trim().toLowerCase();
     const today = todayStr();
     const weekEnd = addDaysStr(7);
+    const now = new Date();
+    const monthStart = today.slice(0, 7) + "-01";
+    const monthEnd = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+      new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate(),
+    ).padStart(2, "0")}`;
     return tasksSource.filter((t) => {
       if (q && !t.title.toLowerCase().includes(q)) return false;
       if (projectFilter && t.projectId !== projectFilter) return false;
@@ -516,6 +527,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
       if (dueFilter === "overdue" && !(t.dueDate && t.dueDate < today)) return false;
       if (dueFilter === "today" && t.dueDate !== today) return false;
       if (dueFilter === "week" && !(t.dueDate && t.dueDate >= today && t.dueDate <= weekEnd)) return false;
+      if (dueFilter === "month" && !(t.dueDate && t.dueDate >= monthStart && t.dueDate <= monthEnd)) return false;
       if (dueFilter === "none" && t.dueDate) return false;
       return true;
     });
@@ -556,6 +568,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
           "mx-auto flex w-full flex-1 flex-col p-4 lg:p-6",
           variant === "kanban" ? "max-w-7xl" : "max-w-6xl",
         )}
+        data-tour="cuadrantes"
       >
         <div className="flex flex-1 flex-col gap-4">
           {/* Filters (desktop inline for grid, always for kanban) — una sola línea */}
@@ -588,17 +601,19 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
               </option>
             ))}
           </select>
-          <select
-            value={dueFilter}
-            onChange={(e) => setDueFilter(e.target.value as DueFilter)}
-            className={cn(selectClass, "shrink-0")}
-          >
-            {DUE_OPTIONS.map((o) => (
-              <option key={o.value} value={o.value}>
-                {o.label}
-              </option>
-            ))}
-          </select>
+          <SegmentedControl
+            value={dueFilter === "overdue" || dueFilter === "none" ? "" : dueFilter}
+            onChange={(v) => setDueFilter(v as DueFilter)}
+            options={[
+              { value: "" as DueFilter, label: "Todas" },
+              { value: "today" as DueFilter, label: "Hoy" },
+              { value: "week" as DueFilter, label: "Semana" },
+              { value: "month" as DueFilter, label: "Mes" },
+            ]}
+            size="sm"
+            pill
+            className="shrink-0"
+          />
           <select
             value={assigneeFilter}
             onChange={(e) => setAssigneeFilter(e.target.value)}

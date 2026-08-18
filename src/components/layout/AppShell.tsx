@@ -4,6 +4,8 @@ import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { useViewPrefs } from "@/lib/viewPrefs";
 import { Sidebar } from "@/components/layout/Sidebar";
 import { UserMenu } from "@/components/layout/UserMenu";
+import { MemberPresenceStack } from "@/components/layout/MemberPresenceStack";
+import { TourOverlay, hasTourBeenSeen } from "@/features/tour/TourOverlay";
 import { NotificationBell } from "@/features/notifications/NotificationBell";
 import { NotificationToastHost } from "@/features/notifications/NotificationToastHost";
 import { PendingInvitationsPopover } from "@/features/invitations/PendingInvitationsPopover";
@@ -17,6 +19,7 @@ import type { SpaceKey } from "@/features/spaces/spaces";
 import type { ViewKey } from "@/components/layout/ViewTabs";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { cn } from "@/lib/utils";
+import { onAppEvent } from "@/lib/appEvents";
 
 function baseViewsFor(workspaceType: string, space: SpaceKey): ViewKey[] {
   const isPersonal = workspaceType === "personal" || space === "personal" || space === "pendientes";
@@ -34,6 +37,7 @@ export function AppShell() {
   const { hiddenViews } = useViewPrefs();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<string | null>(null);
+  const [tourOpen, setTourOpen] = useState(false);
 
   const workspaceType = currentWorkspace?.type ?? "personal";
   const validSpaces: SpaceKey[] = useMemo(
@@ -84,6 +88,17 @@ export function AppShell() {
     [activeSpace, navigate],
   );
 
+  useEffect(() => {
+    if (currentWorkspace && !hasTourBeenSeen()) {
+      const t = setTimeout(() => setTourOpen(true), 800);
+      return () => clearTimeout(t);
+    }
+  }, [currentWorkspace]);
+
+  useEffect(() => {
+    return onAppEvent("pritio:startTour", () => setTourOpen(true));
+  }, []);
+
   if (!activeSpace || !validSpaces.includes(activeSpace)) {
     return <Navigate to={spacePath(defaultSpace)} replace />;
   }
@@ -114,6 +129,7 @@ export function AppShell() {
       <PushNotificationInit />
       <NotificationToastHost />
       <UpgradeHost />
+      <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line/70 bg-surface/75 px-4 backdrop-blur-xl lg:px-6">
           <button
@@ -144,6 +160,10 @@ export function AppShell() {
           <div className="flex shrink-0 items-center gap-1.5">
             <PendingInvitationsPopover />
             <NotificationBell />
+            <MemberPresenceStack
+              workspaceId={currentWorkspace?.id ?? null}
+              profileId={profile?.id ?? null}
+            />
             {profile && (
               <UserMenu profile={profile} onSignOut={signOut}>
                 {profile.avatarUrl ? (
