@@ -8,6 +8,7 @@ const VIEW_LABELS: Record<ViewKey, string> = {
   plan: "Plan",
   kanban: "Tablero",
   calendario: "Calendario",
+  docs: "Documentos",
   indicadores: "Indicadores",
 };
 
@@ -42,6 +43,14 @@ const VIEW_ICONS: Record<ViewKey, ReactNode> = {
       <path d="M3.5 10h17" strokeLinecap="round" />
       <path d="M8 3v4" strokeLinecap="round" />
       <path d="M16 3v4" strokeLinecap="round" />
+    </svg>
+  ),
+  docs: (
+    <svg className="h-[22px] w-[22px]" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round">
+      <path d="M7 3h7l5 5v11a2 2 0 01-2 2H7a2 2 0 01-2-2V5a2 2 0 012-2z" />
+      <path d="M14 3v5h5" />
+      <path d="M9 13h6" />
+      <path d="M9 17h4" />
     </svg>
   ),
   indicadores: (

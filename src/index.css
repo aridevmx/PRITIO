@@ -233,6 +233,133 @@
   }
 }
 
+/* ─── Rich text editor (Tiptap / ProseMirror) ────────────────
+   Estilos del contenido de notas. Usa los tokens RGB del tema
+   (--ink-rgb, etc.) para que sigan dark mode automáticamente. */
+.pritio-prose-content {
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: rgb(var(--ink-rgb));
+  word-break: break-word;
+}
+.pritio-prose-content p {
+  margin: 0;
+}
+.pritio-prose-content p + p,
+.pritio-prose-content ul,
+.pritio-prose-content ol,
+.pritio-prose-content h2 + *,
+.pritio-prose-content h3 + * {
+  margin-top: 0.375rem;
+}
+.pritio-prose-content h2 {
+  margin: 0.5rem 0 0.125rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+.pritio-prose-content h3 {
+  margin: 0.4rem 0 0.125rem;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.pritio-prose-content ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+}
+.pritio-prose-content ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+}
+.pritio-prose-content li > p {
+  margin: 0;
+}
+.pritio-prose-content li + li {
+  margin-top: 0.125rem;
+}
+.pritio-prose-content strong {
+  font-weight: 700;
+}
+.pritio-prose-content em {
+  font-style: italic;
+}
+.pritio-prose-content a {
+  color: var(--pritio-blue);
+  text-decoration: underline;
+}
+.pritio-prose-content pre {
+  margin: 0.375rem 0;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  background: rgb(var(--surface-muted-rgb));
+  font-family: theme("fontFamily.mono");
+  font-size: 0.8rem;
+  overflow-x: auto;
+}
+.pritio-prose-content code {
+  font-family: theme("fontFamily.mono");
+  font-size: 0.85em;
+}
+/* Placeholder del editor (extensión Placeholder de Tiptap) */
+.pritio-prose-content p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: rgb(var(--ink-muted-rgb));
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+/* Placeholder estilo Notion en la línea vacía activa (menú "/") */
+.pritio-prose-content p.is-empty.has-focus::before,
+.pritio-prose-content h2.is-empty.has-focus::before,
+.pritio-prose-content h3.is-empty.has-focus::before {
+  content: attr(data-placeholder);
+  color: rgb(var(--ink-muted-rgb));
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+.pritio-prose-content blockquote {
+  margin: 0.375rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--pritio-purple);
+  color: rgb(var(--ink-soft-rgb));
+}
+.pritio-prose-content blockquote p + p {
+  margin-top: 0.25rem;
+}
+
+/* Tablas en el editor */
+.pritio-prose-content table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.5rem 0;
+  font-size: 0.85rem;
+}
+.pritio-prose-content th,
+.pritio-prose-content td {
+  border: 1px solid var(--line);
+  padding: 0.375rem 0.5rem;
+  text-align: left;
+  vertical-align: top;
+}
+.pritio-prose-content th {
+  background: rgb(var(--surface-muted-rgb));
+  font-weight: 600;
+}
+.pritio-prose-content .selectedCell:after {
+  background: rgb(var(--pritio-blue-rgb) / 0.1);
+}
+
+/* Divisor horizontal */
+.pritio-prose-content hr {
+  margin: 0.75rem 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+/* Modo lectura (editable=false): sin outline de foco */
+.pritio-prose-content.ProseMirror-focused {
+  outline: none;
+}
+
 /* Disable scroll anchoring en el scroll container principal.
  *
  * Por que: cuando el TaskFormDialog (smartScroll: true) abre y la
@@ -380,5 +507,66 @@
 @media (prefers-reduced-motion: reduce) {
   .pritio-menu-enter {
     animation: none;
+  }
+}
+
+/* Splash de arranque: el logo da una vuelta completa (~40% del ciclo),
+   se queda estático el resto y repite. */
+@keyframes pritio-logo-spin {
+  0% {
+    transform: rotate(0deg);
+    animation-timing-function: cubic-bezier(0.45, 0.05, 0.55, 0.95);
+  }
+  40% {
+    transform: rotate(360deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.pritio-logo-spin {
+  animation: pritio-logo-spin 2s infinite;
+  will-change: transform;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pritio-logo-spin {
+    animation: none;
+  }
+}
+
+/* ─── Impresión del reporte (ReportsDialog vive en un portal de body) ── */
+@media print {
+  /* Ocultar todo lo que no sea el diálogo de reporte (#root y otros portales). */
+  body > :not(.reports-overlay) {
+    display: none !important;
+  }
+  .reports-overlay {
+    position: static !important;
+    background: none !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    display: block !important;
+  }
+  .reports-overlay > div {
+    height: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    overflow: visible !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .report-page {
+    border: none !important;
+    box-shadow: none !important;
+    max-width: none !important;
+    padding: 0 !important;
+    print-color-adjust: exact;
+    -webkit-print-color-adjust: exact;
   }
 }

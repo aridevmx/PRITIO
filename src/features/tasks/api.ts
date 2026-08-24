@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
-import { TASK_COLUMNS, mapTask } from "@/lib/mappers";
-import type { Task, CreateTaskPayload, UpdateTaskPayload, TaskReminder } from "@/types";
+import { TASK_COLUMNS, SUBTASK_COLUMNS, mapTask, mapSubtask } from "@/lib/mappers";
+import type { Task, TaskSubtask, CreateTaskPayload, UpdateTaskPayload, TaskReminder } from "@/types";
 
 export async function getTask(taskId: string): Promise<Task> {
   const { data: taskRow, error } = await supabase
@@ -259,6 +259,118 @@ export async function listMyPendingTasks(): Promise<Task[]> {
 
   if (error) throw error;
   return (taskRows ?? []).map((row) => mapTask(row as never, []));
+}
+
+// ─── Subtareas ────────────────────────────────────────────
+
+export async function listSubtasks(taskId: string): Promise<TaskSubtask[]> {
+  const { data, error } = await supabase
+    .from("task_subtasks")
+    .select(SUBTASK_COLUMNS)
+    .eq("task_id", taskId)
+    .order("position", { ascending: true })
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map(mapSubtask);
+}
+
+export async function createSubtasks(
+  taskId: string,
+  workspaceId: string,
+  createdBy: string,
+  items: { title: string; completed?: boolean; position: number }[],
+): Promise<void> {
+  if (items.length === 0) return;
+  const { error } = await supabase.from("task_subtasks").insert(
+    items.map((item) => ({
+      task_id: taskId,
+      workspace_id: workspaceId,
+      created_by: createdBy,
+      title: item.title,
+      completed: item.completed ?? false,
+      position: item.position,
+    })),
+  );
+  if (error) throw error;
+}
+
+export async function updateSubtask(
+  subtaskId: string,
+  payload: { title?: string; completed?: boolean; position?: number },
+): Promise<void> {
+  const updateData: Record<string, unknown> = {};
+  if (payload.title !== undefined) updateData.title = payload.title;
+  if (payload.completed !== undefined) updateData.completed = payload.completed;
+  if (payload.position !== undefined) updateData.position = payload.position;
+  if (Object.keys(updateData).length === 0) return;
+
+  const { error } = await supabase
+    .from("task_subtasks")
+    .update(updateData)
+    .eq("id", subtaskId);
+  if (error) throw error;
+}
+
+export async function deleteSubtasks(subtaskIds: string[]): Promise<void> {
+  if (subtaskIds.length === 0) return;
+  const { error } = await supabase.from("task_subtasks").delete().in("id", subtaskIds);
+  if (error) throw error;
+}
+
+// ─── Comentarios ──────────────────────────────────────────
+
+export interface TaskComment {
+  id: string;
+  taskId: string;
+  userId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+function mapComment(row: Record<string, unknown>): TaskComment {
+  return {
+    id: row.id as string,
+    taskId: row.task_id as string,
+    userId: row.user_id as string,
+    authorName: (row.author_name as string) || "Miembro",
+    body: row.body as string,
+    createdAt: row.created_at as string,
+  };
+}
+
+export async function listComments(taskId: string): Promise<TaskComment[]> {
+  const { data, error } = await supabase
+    .from("task_comments")
+    .select("id, task_id, user_id, author_name, body, created_at")
+    .eq("task_id", taskId)
+    .order("created_at", { ascending: true });
+
+  if (error) throw error;
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map(mapComment);
+}
+
+export async function createComment(
+  taskId: string,
+  workspaceId: string,
+  userId: string,
+  authorName: string,
+  body: string,
+): Promise<TaskComment> {
+  const { data, error } = await supabase
+    .from("task_comments")
+    .insert({ task_id: taskId, workspace_id: workspaceId, user_id: userId, author_name: authorName, body })
+    .select("id, task_id, user_id, author_name, body, created_at")
+    .single();
+
+  if (error) throw error;
+  return mapComment(data as unknown as Record<string, unknown>);
+}
+
+export async function deleteComment(commentId: string): Promise<void> {
+  const { error } = await supabase.from("task_comments").delete().eq("id", commentId);
+  if (error) throw error;
 }
 
 export async function listTaskReminders(taskId: string): Promise<TaskReminder[]> {

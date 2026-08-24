@@ -1,21 +1,26 @@
 import { defineConfig, type Plugin } from "vitest/config";
+import { loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { fileURLToPath } from "url";
-import { APP_NAME, APP_TAGLINE } from "./src/lib/branding";
+import { resolveBranding } from "./src/lib/branding";
 
-function brandHtml(): Plugin {
+export default defineConfig(({ mode }) => {
+  const env = loadEnv(mode, process.cwd(), "VITE_");
+  const { name: APP_NAME, tagline: APP_TAGLINE } = resolveBranding(env);
+
+  function brandHtml(): Plugin {
+    return {
+      name: "brand-html",
+      transformIndexHtml(html) {
+        return html
+          .replaceAll("__APP_NAME__", APP_NAME)
+          .replaceAll("__APP_TAGLINE__", APP_TAGLINE);
+      },
+    };
+  }
+
   return {
-    name: "brand-html",
-    transformIndexHtml(html) {
-      return html
-        .replaceAll("__APP_NAME__", APP_NAME)
-        .replaceAll("__APP_TAGLINE__", APP_TAGLINE);
-    },
-  };
-}
-
-export default defineConfig({
   plugins: [
     react(),
     brandHtml(),
@@ -83,4 +88,5 @@ export default defineConfig({
     environment: "node",
     include: ["src/**/*.{test,spec}.{ts,tsx}"],
   },
+  };
 });

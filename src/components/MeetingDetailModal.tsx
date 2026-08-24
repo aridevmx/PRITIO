@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { createPortal } from "react-dom";
+import { stripHtml } from "@/lib/utils";
 import { formatTime, useTimeFormat } from "@/lib/timeFormat";
 import { useToast } from "@/components/Toast";
 import { supabase } from "@/lib/supabase";
@@ -100,13 +101,13 @@ export function MeetingDetailModal({ meeting, onClose, onEdit, onDeleted }: Meet
           </div>
 
           {/* Description */}
-          {meeting.description && (
+          {stripHtml(meeting.description) && (
             <div className="flex items-start gap-3">
               <svg className="mt-0.5 h-4 w-4 shrink-0 text-ink-muted" viewBox="0 0 16 16" fill="none">
                 <rect x="2" y="3" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2" />
                 <path d="M5 7H11M5 9.5H9" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
               </svg>
-              <p className="text-sm text-ink-soft leading-relaxed">{meeting.description}</p>
+              <p className="text-sm text-ink-soft leading-relaxed">{stripHtml(meeting.description)}</p>
             </div>
           )}
 

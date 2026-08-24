@@ -8,6 +8,7 @@ import type {
   WorkspacePlan,
   Task,
   TaskRow,
+  TaskSubtask,
   Assignee,
   AssigneeRow,
   Notification,
@@ -73,6 +74,20 @@ export const TASK_COLUMNS = [
   "updated_at",
 ].join(", ");
 
+// ─── Subtask columns for select queries ───────────────────
+
+export const SUBTASK_COLUMNS = [
+  "id",
+  "task_id",
+  "workspace_id",
+  "title",
+  "completed",
+  "position",
+  "created_by",
+  "created_at",
+  "updated_at",
+].join(", ");
+
 // ─── Mappers ──────────────────────────────────────────────
 
 export function mapProfile(row: ProfileRow): Profile {
@@ -115,7 +130,12 @@ export function mapSubscription(row: SubscriptionRow): Subscription {
   };
 }
 
-export function mapTask(row: TaskRow, assigneeIds: string[]): Task {
+export interface SubtaskCounts {
+  total: number;
+  completed: number;
+}
+
+export function mapTask(row: TaskRow, assigneeIds: string[], subtaskCounts?: SubtaskCounts): Task {
   return {
     id: row.id,
     workspaceId: row.workspace_id,
@@ -153,6 +173,23 @@ export function mapTask(row: TaskRow, assigneeIds: string[]): Task {
     createdBy: row.created_by,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    ...(subtaskCounts
+      ? { subtaskTotal: subtaskCounts.total, subtaskCompleted: subtaskCounts.completed }
+      : {}),
+  };
+}
+
+export function mapSubtask(row: Record<string, unknown>): TaskSubtask {
+  return {
+    id: row.id as string,
+    taskId: row.task_id as string,
+    workspaceId: row.workspace_id as string,
+    title: row.title as string,
+    completed: Boolean(row.completed),
+    position: Number(row.position ?? 0),
+    createdBy: row.created_by as string,
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
   };
 }
 
