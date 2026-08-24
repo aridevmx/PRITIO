@@ -5,6 +5,7 @@ import { QuadrantsView } from "@/features/tasks/QuadrantsView";
 import { PlanningView } from "@/features/planning/PlanningView";
 import { CalendarView } from "@/features/calendar/CalendarView";
 import { StatsView } from "@/features/stats/StatsView";
+import { DocsView } from "@/features/docs/DocsView";
 import { ViewTabs, type ViewKey } from "@/components/layout/ViewTabs";
 import { TaskFormDialog } from "@/features/tasks/TaskFormDialog";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
@@ -52,8 +53,8 @@ export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceView
 
   const isPersonal = currentWorkspace?.type === "personal" || space === "personal" || space === "pendientes";
   const baseTabs: ViewKey[] = isPersonal
-    ? ["cuadrantes", "plan", "kanban", "calendario"]
-    : ["cuadrantes", "plan", "kanban", "calendario", "indicadores"];
+    ? ["cuadrantes", "plan", "kanban", "calendario", "docs", "indicadores"]
+    : ["cuadrantes", "plan", "kanban", "calendario", "docs", "indicadores"];
   const availableTabs = baseTabs
     .filter((v) => !hiddenViews.includes(v))
     .filter((v) => v !== "plan" || hasFeature("plan_view"))
@@ -156,6 +157,7 @@ export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceView
         <PlanningView workspaceId={currentWorkspace.id} space={space} />
       )}
       {view === "calendario" && currentWorkspace && <CalendarView workspaceId={currentWorkspace.id} space={space} defaultDate={calendarDate ?? undefined} />}
+      {view === "docs" && currentWorkspace && <DocsView workspaceId={currentWorkspace.id} />}
       {view === "indicadores" && currentWorkspace && <StatsView workspaceId={currentWorkspace.id} />}
 
       {settingsOpen && currentWorkspace && (

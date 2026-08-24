@@ -245,6 +245,9 @@ export interface Task {
   rejectionReason: string | null;
   responsibleAssigneeId: string | null;
   assigneeIds: string[];
+  /** Conteos agregados de subtareas (solo listas que los cargan). */
+  subtaskTotal?: number;
+  subtaskCompleted?: number;
   isActive: boolean;
   blockOverrideId: string | null;
   graceStartedAt: string | null;
@@ -274,6 +277,18 @@ export interface TaskReminder {
   remindAt: string;
   createdBy: string;
   notified: boolean;
+}
+
+export interface TaskSubtask {
+  id: string;
+  taskId: string;
+  workspaceId: string;
+  title: string;
+  completed: boolean;
+  position: number;
+  createdBy: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface MeetingParticipant {
@@ -461,6 +476,18 @@ export interface TaskRow {
   recurrence_count: number | null;
   recurrence_parent_id: string | null;
   approval_requested_at: string | null;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface TaskSubtaskRow {
+  id: string;
+  task_id: string;
+  workspace_id: string;
+  title: string;
+  completed: boolean;
+  position: number;
   created_by: string;
   created_at: string;
   updated_at: string;

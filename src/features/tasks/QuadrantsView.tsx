@@ -4,10 +4,11 @@ import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { QUADRANTS, QUADRANT_ORDER, type QuadrantIconKey } from "@/features/tasks/quadrants";
 import { TASK_COLUMNS, mapTask } from "@/lib/mappers";
+import type { SubtaskCounts } from "@/lib/mappers";
 import { cn, todayStr, localDateStr } from "@/lib/utils";
 import { TaskCard } from "@/features/tasks/TaskCard";
 import { TaskFormDialog } from "@/features/tasks/TaskFormDialog";
-import { useTasks } from "@/features/tasks/useTasks";
+import { useTasks, fetchSubtaskCounts } from "@/features/tasks/useTasks";
 import { QuadrantsDnd } from "@/features/tasks/QuadrantsDnd";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BottomSheet } from "@/components/layout/BottomSheet";
@@ -15,6 +16,7 @@ import { ManageDialog } from "@/components/layout/ManageDialog";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { updateTask as apiUpdateTask, archiveTask as apiArchiveTask } from "@/features/tasks/api";
 import { notifyTaskChange } from "@/features/tasks/notifications";
+import { isOnline, queueOfflineOp } from "@/lib/offline";
 import { groupTasksByDay, formatDateShort } from "@/features/tasks/dates";
 import type { Task, Quadrant } from "@/types";
 
@@ -364,9 +366,19 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
       ids.push(aId);
       assigneeMap.set(tId, ids);
     });
+    let subtaskCounts: Map<string, SubtaskCounts> | undefined;
+    try {
+      subtaskCounts = await fetchSubtaskCounts(wsIds);
+    } catch {
+      // Los conteos son cosméticos.
+    }
     setAllTasks(
       (taskRows as unknown as Record<string, unknown>[] | null ?? []).map((row) =>
-        mapTask(row as never, assigneeMap.get(row.id as string) ?? []),
+        mapTask(
+          row as never,
+          assigneeMap.get(row.id as string) ?? [],
+          subtaskCounts?.get(row.id as string),
+        ),
       ),
     );
     setAllLoading(false);
@@ -403,9 +415,19 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
         ids.push(aId);
         assigneeMap.set(tId, ids);
       });
+      let subtaskCounts: Map<string, SubtaskCounts> | undefined;
+      try {
+        subtaskCounts = await fetchSubtaskCounts(workspaceIds);
+      } catch {
+        // Los conteos son cosméticos.
+      }
       setAllTasks(
         (taskRows as unknown as Record<string, unknown>[] | null ?? []).map((row) =>
-          mapTask(row as never, assigneeMap.get(row.id as string) ?? []),
+          mapTask(
+            row as never,
+            assigneeMap.get(row.id as string) ?? [],
+            subtaskCounts?.get(row.id as string),
+          ),
         ),
       );
       setAllLoading(false);
@@ -426,6 +448,25 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
 
   const handleToggleComplete = useCallback(
     async (task: Task) => {
+      // Sin conexión: encola el toggle y aplica el estado localmente;
+      // el outbox lo sincroniza al reconectar.
+      if (!isOnline() && currentWorkspace) {
+        const nextCompleted = !task.completed;
+        const completedAt = nextCompleted ? new Date().toISOString() : null;
+        void queueOfflineOp(
+          "task_update",
+          currentWorkspace.id,
+          task.id,
+          { completed: nextCompleted, completed_at: completedAt },
+        );
+        const optimistic: Task = { ...task, completed: nextCompleted, completedAt };
+        if (isMultiWs) {
+          setAllTasks((prev) => prev.map((t) => (t.id === task.id ? optimistic : t)));
+        } else {
+          updateLocalTask(optimistic);
+        }
+        return;
+      }
       try {
         const updated = await apiUpdateTask(task.id, { completed: !task.completed });
         if (isMultiWs) {

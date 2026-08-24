@@ -21,11 +21,11 @@ import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { cn } from "@/lib/utils";
 import { onAppEvent } from "@/lib/appEvents";
 
-function baseViewsFor(workspaceType: string, space: SpaceKey): ViewKey[] {
-  const isPersonal = workspaceType === "personal" || space === "personal" || space === "pendientes";
-  return isPersonal
-    ? ["cuadrantes", "plan", "kanban", "calendario"]
-    : ["cuadrantes", "plan", "kanban", "calendario", "indicadores"];
+function baseViewsFor(_workspaceType: string, _space: SpaceKey): ViewKey[] {
+  // Todas las vistas están disponibles en cualquier workspace/espacio.
+  void _workspaceType;
+  void _space;
+  return ["cuadrantes", "plan", "kanban", "calendario", "docs", "indicadores"];
 }
 
 export function AppShell() {

@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { cn } from "@/lib/utils";
+import { cn, stripHtml } from "@/lib/utils";
 import { useDraggable } from "@dnd-kit/core";
 import { isOverdue, isDueToday } from "@/features/tasks/dates";
 import { formatTime, useTimeFormat } from "@/lib/timeFormat";
@@ -224,16 +224,19 @@ export function TaskCard({
             {task.title}
           </span>
 
-          {task.description && task.description.trim() && (
-            <p
-              className={cn(
-                "mt-1 text-xs leading-snug text-ink-soft line-clamp-1",
-                task.completed && "line-through",
-              )}
-            >
-              {task.description}
-            </p>
-          )}
+          {(() => {
+            const descriptionText = stripHtml(task.description);
+            return descriptionText ? (
+              <p
+                className={cn(
+                  "mt-1 text-xs leading-snug text-ink-soft line-clamp-1",
+                  task.completed && "line-through",
+                )}
+              >
+                {descriptionText}
+              </p>
+            ) : null;
+          })()}
         </div>
 
         {/* Three-dot menu */}
@@ -341,6 +344,25 @@ export function TaskCard({
           >
             <RepeatGlyph className="h-3.5 w-3.5" />
             {recurrenceLabel}
+          </span>
+        )}
+
+        {!!task.subtaskTotal && task.subtaskTotal > 0 && (
+          <span
+            title={`Subtareas: ${task.subtaskCompleted ?? 0} de ${task.subtaskTotal} completadas`}
+            aria-label={`Subtareas: ${task.subtaskCompleted ?? 0} de ${task.subtaskTotal} completadas`}
+            className={cn(
+              "inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-semibold tabular-nums",
+              (task.subtaskCompleted ?? 0) >= task.subtaskTotal
+                ? "bg-pritio-green/10 text-pritio-green"
+                : "bg-surface-muted text-ink-muted",
+            )}
+          >
+            <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <rect x="2" y="2" width="12" height="12" rx="3" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M5 8.25L7.25 10.5L11 6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            {task.subtaskCompleted ?? 0}/{task.subtaskTotal}
           </span>
         )}
 

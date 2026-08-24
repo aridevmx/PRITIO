@@ -8,6 +8,12 @@ interface MiniCalendarProps {
   blockedDates: string[];
   pendingDates?: string[];
   onDayClick?: (dateStr: string) => void;
+  /** Fecha seleccionada (yyyy-mm-dd) para resaltarla en modo date-picker. */
+  selectedDate?: string | null;
+  /** Vuelve clicables todos los días del mes actual (modo date-picker). */
+  alwaysClickable?: boolean;
+  /** Mes que el calendario muestra al abrir (yyyy-mm-dd); por defecto hoy. */
+  initialDate?: string;
 }
 
 export function MiniCalendar({
@@ -15,8 +21,13 @@ export function MiniCalendar({
   blockedDates,
   pendingDates,
   onDayClick,
+  selectedDate,
+  alwaysClickable,
+  initialDate,
 }: MiniCalendarProps) {
-  const [viewDate, setViewDate] = useState(() => new Date());
+  const [viewDate, setViewDate] = useState(() =>
+    initialDate ? new Date(`${initialDate}T00:00:00`) : new Date(),
+  );
 
   const weeks = useMemo(() => {
     const year = viewDate.getFullYear();
@@ -103,6 +114,10 @@ export function MiniCalendar({
             const hasTask = taskDateSet.has(dateStr);
             const isBlocked = blockedDateSet.has(dateStr);
             const isPending = pendingDateSet.has(dateStr) && !isBlocked;
+            const clickable =
+              isCurrentMonth && Boolean(alwaysClickable || hasTask || isBlocked || isPending);
+            const isSelected =
+              selectedDate != null && dateStr === selectedDate && !isBlocked && !isPending;
 
             return (
               <div
@@ -111,7 +126,7 @@ export function MiniCalendar({
                   "relative flex items-center justify-center text-xs py-1",
                   !isCurrentMonth && "text-ink-muted/40",
                   isCurrentMonth && "text-ink-soft",
-                  (isCurrentMonth && (hasTask || isBlocked || isPending)) && "cursor-pointer",
+                  clickable && "cursor-pointer",
                 )}
               >
                 <button
@@ -119,15 +134,22 @@ export function MiniCalendar({
                   onClick={() => {
                     if (onDayClick) onDayClick(dateStr);
                   }}
-                  disabled={!isCurrentMonth}
+                  disabled={!clickable}
                   className={cn(
                     "relative flex h-7 w-7 items-center justify-center rounded-full text-xs font-semibold transition-colors",
                     isBlocked && isCurrentMonth && "bg-rose-500 text-white shadow-sm",
                     isPending && isCurrentMonth && "bg-amber-400 text-white shadow-sm",
-                    isToday && !isBlocked && !isPending && "border-2 border-teal-400",
+                    isSelected && "bg-pritio-blue text-white",
+                    isToday && !isBlocked && !isPending && !isSelected && "border-2 border-teal-400",
                     isToday && (isBlocked || isPending) && "ring-2 ring-teal-400 ring-offset-1",
-                    isCurrentMonth && (hasTask || isBlocked || isPending) && "hover:brightness-95 cursor-pointer",
-                    !isCurrentMonth && "cursor-default",
+                    clickable && (hasTask || isBlocked || isPending) && "hover:brightness-95 cursor-pointer",
+                    clickable &&
+                      !hasTask &&
+                      !isBlocked &&
+                      !isPending &&
+                      !isSelected &&
+                      "cursor-pointer hover:bg-surface-muted",
+                    !clickable && "cursor-default",
                   )}
                 >
                   {day.getDate()}

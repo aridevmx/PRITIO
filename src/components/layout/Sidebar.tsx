@@ -22,6 +22,7 @@ import { IS_SELF_HOSTED } from "@/lib/constants";
 import { APP_NAME } from "@/lib/branding";
 import type { SpaceKey } from "@/features/spaces/spaces";
 import type { WorkspaceType } from "@/types";
+import { stripHtml } from "@/lib/utils";
 import { createPortal } from "react-dom";
 import { MeetingDetailModal } from "@/components/MeetingDetailModal";
 import { TaskFormDialog } from "@/features/tasks/TaskFormDialog";
@@ -488,8 +489,8 @@ export function Sidebar({
                             : ""}
                           {m.end_at ? ` - ${formatTime(new Date(m.end_at), timeFormat)}` : ""}
                         </p>
-                        {m.description && (
-                          <p className="text-xs text-ink-soft mt-1 line-clamp-1">{m.description}</p>
+                        {stripHtml(m.description) && (
+                          <p className="text-xs text-ink-soft mt-1 line-clamp-1">{stripHtml(m.description)}</p>
                         )}
                       </div>
                     </div>

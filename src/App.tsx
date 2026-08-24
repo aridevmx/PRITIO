@@ -8,7 +8,8 @@ import { ResetPasswordScreen } from "@/features/auth/ResetPasswordScreen";
 import { WorkspaceProvider, useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { BillingProvider } from "@/features/billing/BillingProvider";
 import { AppShell } from "@/components/layout/AppShell";
-import { LoadingState } from "@/components/State";
+import { LogoLoader } from "@/components/LogoLoader";
+import { OfflineBanner } from "@/components/OfflineBanner";
 import { JoinScreen } from "@/features/invitations/JoinScreen";
 import { DownloadScreen } from "@/features/download/DownloadScreen";
 
@@ -32,7 +33,7 @@ function AuthenticatedApp() {
   const { loading } = useWorkspace();
 
   if (loading) {
-    return <LoadingState />;
+    return <LogoLoader />;
   }
 
   return <Outlet />;
@@ -42,7 +43,7 @@ function Root() {
   const { user, loading: authLoading } = useAuth();
 
   if (authLoading) {
-    return <LoadingState />;
+    return <LogoLoader />;
   }
 
   if (!user) {
@@ -53,6 +54,7 @@ function Root() {
     <WorkspaceProvider>
       <BillingProvider>
         <AuthenticatedApp />
+        <OfflineBanner />
       </BillingProvider>
     </WorkspaceProvider>
   );

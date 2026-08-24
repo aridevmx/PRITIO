@@ -5,6 +5,7 @@ export type ViewKey =
   | "plan"
   | "calendario"
   | "kanban"
+  | "docs"
   | "indicadores";
 
 const ALL_TABS: { key: ViewKey; label: string }[] = [
@@ -12,6 +13,7 @@ const ALL_TABS: { key: ViewKey; label: string }[] = [
   { key: "plan", label: "Plan" },
   { key: "kanban", label: "Tablero" },
   { key: "calendario", label: "Calendario" },
+  { key: "docs", label: "Documentos" },
   { key: "indicadores", label: "Indicadores" },
 ];
 
