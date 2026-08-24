@@ -1,7 +1,7 @@
 {
   "name": "pritio-app",
   "private": true,
-  "version": "0.1.3",
+  "version": "0.1.4",
   "type": "module",
   "description": "Pritio — tu trabajo, tu casa y lo personal en una sola vista. Prioriza con claridad.",
   "author": "PRITIO",
