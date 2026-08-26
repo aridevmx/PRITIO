@@ -12,12 +12,23 @@ import { Table } from "@tiptap/extension-table";
 import { TableCell } from "@tiptap/extension-table-cell";
 import { TableHeader } from "@tiptap/extension-table-header";
 import { TableRow } from "@tiptap/extension-table-row";
+import { TaskItem, TaskList } from "@tiptap/extension-list";
+import { Highlight } from "@tiptap/extension-highlight";
+import { Image } from "@tiptap/extension-image";
+import { NodeRange } from "@tiptap/extension-node-range";
 import DragHandle from "@tiptap/extension-drag-handle";
 import { cn } from "@/lib/utils";
 import {
   filterSlashItems,
+  SLASH_ITEMS,
   type SlashMenuItem,
 } from "@/components/editor/SlashCommands";
+
+/** Elemento del índice de títulos (outline estilo Notion). */
+export interface DocOutlineItem {
+  level: 1 | 2 | 3;
+  text: string;
+}
 
 interface RichTextEditorProps {
   content?: string | null;
@@ -28,6 +39,8 @@ interface RichTextEditorProps {
   contentClassName?: string;
   /** Sin borde ni fondo: para editores de página completa (estilo Notion). */
   unstyled?: boolean;
+  /** Notificado cuando cambian los encabezados H1-H3 del documento. */
+  onOutline?: (items: DocOutlineItem[]) => void;
 }
 
 function ToolButton({
@@ -71,15 +84,45 @@ const ItalicIcon = (
   </svg>
 );
 
-const HeadingIcon = (
+const UnderlineIcon = (
   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 5v14M13 5v14M5 12h8M17 9l3-1v11" />
+    <path d="M6 4v6a6 6 0 0 0 12 0V4M4.5 20h15" />
   </svg>
 );
 
-const HeadingSmallIcon = (
+const StrikeIcon = (
   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 5v14M10 5v14M4 12h6M15 10l3-.8V19" />
+    <path d="M5 12h14M16 7c-.7-1.7-2.2-2.5-4.3-2.5C9 4.5 7.2 5.6 7.2 7.7c0 1.3.6 2.2 1.8 2.9M8 17c.8 1.7 2.4 2.6 4.6 2.6 2.9 0 4.6-1.3 4.6-3.4 0-.9-.3-1.6-.8-2.2" />
+  </svg>
+);
+
+const InlineCodeIcon = (
+  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M9 6L3 12l6 6M15 6l6 6-6 6" />
+  </svg>
+);
+
+const HighlightIcon = (
+  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 20h16M9.5 15.5L18.6 6.4a2.1 2.1 0 0 0-3-3L6.5 12.5l-1 4z" />
+  </svg>
+);
+
+const H1Icon = (
+  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 5v14M11 5v14M4 12h7M17.5 9.5l2.5-1.5V19" />
+  </svg>
+);
+
+const H2Icon = (
+  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 5v14M10 5v14M4 12h6M15 10l3-1v10M14 15.5h4" />
+  </svg>
+);
+
+const H3Icon = (
+  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 5v14M9.5 5v14M4 12h5.5M15 9.5l2.8-.9V19M14 13.8h3.8M14 17h3.8" />
   </svg>
 );
 
@@ -95,6 +138,15 @@ const BulletListIcon = (
 const OrderedListIcon = (
   <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <path d="M10 6h11M10 12h11M10 18h11M4 5.5L5.5 4.5V9M4 14h2.5c.6 0 1 .4 1 .9 0 .5-.4 1-1 1H5.4c-.8 0-1.4.6-1.4 1.3 0 .5.4.8 1 .8h1.8" />
+  </svg>
+);
+
+const TaskListIcon = (
+  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <rect x="3.5" y="4.5" width="7" height="7" rx="1.5" />
+    <path d="M5.2 8l1.6 1.6L9.8 6.6" />
+    <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+    <path d="M14 8h7M14 17h7" />
   </svg>
 );
 
@@ -117,6 +169,12 @@ const LinkIcon = (
   </svg>
 );
 
+const ClearFormatIcon = (
+  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M6 4h12M12 4l-4 13M8 21h8M9.5 17H14" />
+  </svg>
+);
+
 export function RichTextEditor({
   content,
   onChange,
@@ -125,6 +183,7 @@ export function RichTextEditor({
   className,
   contentClassName,
   unstyled = false,
+  onOutline,
 }: RichTextEditorProps) {
   const slashPropsRef = useRef<SuggestionProps<SlashMenuItem> | null>(null);
   const slashSelectedRef = useRef(0);
@@ -135,16 +194,93 @@ export function RichTextEditor({
     left: number;
   } | null>(null);
 
-  // Elemento para el asa de arrastre de bloques (DragHandle de Tiptap).
+  // ── Asa de arrastre + botón "+" (DragHandle de Tiptap) ────────
+  const [plusMenu, setPlusMenu] = useState<{ top: number; left: number } | null>(null);
+  const dragInfoRef = useRef<{ pos: number; size: number }>({ pos: -1, size: 0 });
+  const editorRef = useRef<Editor | null>(null);
+
   const dragHandleElRef = useRef<HTMLDivElement | null>(null);
   if (typeof document !== "undefined" && !dragHandleElRef.current) {
-    const el = document.createElement("div");
-    el.className =
+    const wrap = document.createElement("div");
+    wrap.className = "flex items-center gap-1";
+    wrap.style.pointerEvents = "auto";
+
+    const drag = document.createElement("div");
+    drag.className =
       "grid h-6 w-6 place-items-center rounded-md border border-line bg-surface text-ink-muted shadow-soft cursor-grab hover:text-ink hover:border-line-strong active:cursor-grabbing";
-    el.title = "Arrastrar bloque";
-    el.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>`;
-    dragHandleElRef.current = el;
+    drag.title = "Arrastrar bloque";
+    drag.setAttribute("aria-hidden", "true");
+    drag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>`;
+
+    const plus = document.createElement("button");
+    plus.type = "button";
+    plus.setAttribute("data-plus", "true");
+    plus.title = "Insertar bloque";
+    plus.className =
+      "grid h-6 w-6 place-items-center rounded-md border border-line bg-surface text-ink-muted shadow-soft transition-colors hover:text-ink hover:border-pritio-blue/50";
+    plus.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+
+    // Evitar que el botón "+" inicie un arrastre de bloque.
+    wrap.addEventListener("dragstart", (e) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("[data-plus]")) {
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    });
+    plus.addEventListener("mousedown", (e) => e.stopPropagation());
+
+    wrap.append(drag, plus);
+    dragHandleElRef.current = wrap;
   }
+  useEffect(() => {
+    const wrap = dragHandleElRef.current;
+    const plus = wrap?.querySelector<HTMLButtonElement>("[data-plus]");
+    if (!wrap || !plus) return;
+    const open = () => {
+      const rect = wrap.getBoundingClientRect();
+      // Calcular posición del bloque actual en la posición del asa.
+      if (editorRef.current) {
+        const coords = editorRef.current.view.posAtCoords({
+          left: rect.left + rect.width / 2,
+          top: rect.top,
+        });
+        if (coords) {
+          const node = editorRef.current.state.doc.nodeAt(coords.pos);
+          dragInfoRef.current = { pos: coords.pos, size: node?.nodeSize ?? 0 };
+        }
+      }
+      setPlusMenu({
+        top: rect.bottom + 6,
+        left: Math.max(8, Math.min(rect.left, window.innerWidth - 288 - 8)),
+      });
+    };
+    plus.addEventListener("click", open);
+    return () => plus.removeEventListener("click", open);
+  }, []);
+
+  // Cerrar el menú "+" con click fuera o Escape.
+  useEffect(() => {
+    if (!plusMenu) return;
+    const onDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.closest?.("[data-plus-wrap],[data-plus-menu]")) return;
+      setPlusMenu(null);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        e.stopImmediatePropagation();
+        setPlusMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey, true);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey, true);
+    };
+  }, [plusMenu]);
+
   useEffect(() => {
     return () => {
       dragHandleElRef.current?.remove();
@@ -166,7 +302,7 @@ export function RichTextEditor({
     let left = 0;
     const rect = props.clientRect?.();
     if (rect) {
-      const estimatedHeight = Math.min(items.length * 44 + 12, 300);
+      const estimatedHeight = Math.min(items.length * 44 + 12, 340);
       top = rect.bottom + 6;
       if (top + estimatedHeight > window.innerHeight - 8 && rect.top > estimatedHeight + 8) {
         top = rect.top - estimatedHeight - 6;
@@ -245,8 +381,14 @@ export function RichTextEditor({
   const editor = useEditor({
     extensions: [
       StarterKit.configure({
-        heading: { levels: [2, 3] },
+        heading: { levels: [1, 2, 3] },
       }),
+      // Selección por bloques: necesaria para que el drag handle mueva bloques completos.
+      NodeRange,
+      Highlight.configure({ multicolor: true }),
+      Image.configure({ inline: false, allowBase64: true }),
+      TaskList,
+      TaskItem.configure({ nested: true }),
       Placeholder.configure({
         placeholder: ({ node }) => {
           if (node.type.name !== "paragraph") return unstyled ? "Encabezado" : "";
@@ -277,6 +419,17 @@ export function RichTextEditor({
     },
   });
 
+  // Ejecutar un ítem del menú "+" sobre el bloque actual del asa.
+  const runPlusItem = (item: SlashMenuItem) => {
+    if (!editor) return;
+    const { pos, size } = dragInfoRef.current;
+    setPlusMenu(null);
+    if (pos < 0) return;
+    const endPos = Math.min(pos + Math.max(size - 1, 0), editor.state.doc.content.size);
+    editor.chain().focus().setTextSelection(Math.max(endPos, 1)).run();
+    item.command({ editor: editor as Editor, range: { from: endPos, to: endPos } as Range });
+  };
+
   const state = useEditorState({
     editor,
     selector: ({ editor: e }) =>
@@ -284,10 +437,16 @@ export function RichTextEditor({
         ? {
             bold: e.isActive("bold"),
             italic: e.isActive("italic"),
-            heading: e.isActive("heading", { level: 2 }),
-            headingSmall: e.isActive("heading", { level: 3 }),
+            underline: e.isActive("underline"),
+            strike: e.isActive("strike"),
+            code: e.isActive("code"),
+            highlight: e.isActive("highlight"),
+            h1: e.isActive("heading", { level: 1 }),
+            h2: e.isActive("heading", { level: 2 }),
+            h3: e.isActive("heading", { level: 3 }),
             bulletList: e.isActive("bulletList"),
             orderedList: e.isActive("orderedList"),
+            taskList: e.isActive("taskList"),
             blockquote: e.isActive("blockquote"),
             codeBlock: e.isActive("codeBlock"),
             link: e.isActive("link"),
@@ -295,8 +454,10 @@ export function RichTextEditor({
         : null,
   });
 
+  // Sincronizar contenido externo (nunca mientras el usuario escribe).
   useEffect(() => {
     if (!editor || content === undefined || content === null) return;
+    if (editor.isDestroyed || editor.isFocused) return;
     if (content === editor.getHTML()) return;
     editor.commands.setContent(content, { emitUpdate: false });
   }, [content, editor]);
@@ -304,6 +465,39 @@ export function RichTextEditor({
   useEffect(() => {
     if (editor && editor.isEditable !== editable) editor.setEditable(editable);
   }, [editable, editor]);
+
+  // ── Índice de títulos (outline) ───────────────────────────────
+  const onOutlineRef = useRef(onOutline);
+  useEffect(() => {
+    onOutlineRef.current = onOutline;
+  }, [onOutline]);
+
+  useEffect(() => {
+    if (!editor) return;
+    let lastKey = "";
+    const compute = () => {
+      const items: DocOutlineItem[] = [];
+      editor.state.doc.descendants((node) => {
+        if (node.type.name === "heading") {
+          const level = Number(node.attrs.level) as 1 | 2 | 3;
+          if (level >= 1 && level <= 3) {
+            items.push({ level, text: node.textContent.trim() || "Sin título" });
+          }
+        }
+        return true;
+      });
+      const key = items.map((i) => `${i.level}:${i.text}`).join("|");
+      if (key !== lastKey) {
+        lastKey = key;
+        onOutlineRef.current?.(items);
+      }
+    };
+    compute();
+    editor.on("update", compute);
+    return () => {
+      editor.off("update", compute);
+    };
+  }, [editor]);
 
   if (!editor) {
     return (
@@ -318,6 +512,41 @@ export function RichTextEditor({
       />
     );
   }
+
+  const insertMenu = (menu: { top: number; left: number }, items: SlashMenuItem[], selected: number, onPick: (item: SlashMenuItem) => void, onHover: (i: number) => void) => (
+    <div
+      className="fixed z-[10000] w-64"
+      style={{ top: menu.top, left: menu.left }}
+    >
+      <div className="pritio-menu-enter max-h-[18rem] overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-elevated">
+        {items.map((item, i) => (
+          <button
+            key={item.id}
+            type="button"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => onPick(item)}
+            onMouseEnter={() => onHover(i)}
+            className={cn(
+              "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors",
+              i === selected ? "bg-surface-muted" : "hover:bg-surface-muted/60",
+            )}
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-line bg-surface-subtle text-ink-soft">
+              {item.icon}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-medium leading-tight text-ink">
+                {item.label}
+              </span>
+              <span className="block truncate text-[11px] leading-tight text-ink-muted">
+                {item.hint}
+              </span>
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  );
 
   return (
     <div
@@ -336,8 +565,17 @@ export function RichTextEditor({
           <ToolButton active={state?.italic} label="Cursiva (Ctrl+I)" onClick={() => editor.chain().focus().toggleItalic().run()}>
             {ItalicIcon}
           </ToolButton>
-          <ToolButton active={state?.heading} label="Título" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
-            {HeadingIcon}
+          <ToolButton active={state?.underline} label="Subrayado (Ctrl+U)" onClick={() => editor.chain().focus().toggleUnderline().run()}>
+            {UnderlineIcon}
+          </ToolButton>
+          <ToolButton active={state?.strike} label="Tachado" onClick={() => editor.chain().focus().toggleStrike().run()}>
+            {StrikeIcon}
+          </ToolButton>
+          <ToolButton active={state?.h1} label="Título 1" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
+            {H1Icon}
+          </ToolButton>
+          <ToolButton active={state?.h2} label="Título 2" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+            {H2Icon}
           </ToolButton>
           <ToolButton active={state?.bulletList} label="Lista con viñetas" onClick={() => editor.chain().focus().toggleBulletList().run()}>
             {BulletListIcon}
@@ -353,36 +591,21 @@ export function RichTextEditor({
         slash &&
         slash.items.length > 0 &&
         createPortal(
-          <div
-            className="fixed z-[10000] w-64"
-            style={{ top: slash.top, left: slash.left }}
-          >
-            <div className="pritio-menu-enter max-h-[18rem] overflow-y-auto rounded-xl border border-line bg-surface p-1 shadow-elevated">
-              {slash.items.map((item, i) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => runSlashItem(item)}
-                  className={cn(
-                    "flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors",
-                    i === slash.selected ? "bg-surface-muted" : "hover:bg-surface-muted/60",
-                  )}
-                >
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-line bg-surface-subtle text-ink-soft">
-                    {item.icon}
-                  </span>
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm font-medium leading-tight text-ink">
-                      {item.label}
-                    </span>
-                    <span className="block truncate text-[11px] leading-tight text-ink-muted">
-                      {item.hint}
-                    </span>
-                  </span>
-                </button>
-              ))}
-            </div>
+          <div data-slash-menu>
+            {insertMenu(slash, slash.items, slash.selected, runSlashItem, (i) => {
+              slashSelectedRef.current = i;
+              syncSlashSelection();
+            })}
+          </div>,
+          document.body,
+        )}
+
+      {/* Menú "+" del asa de bloques */}
+      {editable &&
+        plusMenu &&
+        createPortal(
+          <div data-plus-menu>
+            {insertMenu(plusMenu, SLASH_ITEMS, 0, runPlusItem, () => {})}
           </div>,
           document.body,
         )}
@@ -402,17 +625,37 @@ export function RichTextEditor({
               <ToolButton active={state?.italic} label="Cursiva" onClick={() => editor.chain().focus().toggleItalic().run()}>
                 {ItalicIcon}
               </ToolButton>
-              <ToolButton active={state?.heading} label="Título 1" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
-                {HeadingIcon}
+              <ToolButton active={state?.underline} label="Subrayado" onClick={() => editor.chain().focus().toggleUnderline().run()}>
+                {UnderlineIcon}
               </ToolButton>
-              <ToolButton active={state?.headingSmall} label="Título 2" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
-                {HeadingSmallIcon}
+              <ToolButton active={state?.strike} label="Tachado" onClick={() => editor.chain().focus().toggleStrike().run()}>
+                {StrikeIcon}
               </ToolButton>
+              <ToolButton active={state?.code} label="Código en línea" onClick={() => editor.chain().focus().toggleCode().run()}>
+                {InlineCodeIcon}
+              </ToolButton>
+              <ToolButton active={state?.highlight} label="Resaltado" onClick={() => editor.chain().focus().toggleHighlight().run()}>
+                {HighlightIcon}
+              </ToolButton>
+              <span className="mx-0.5 h-5 w-px bg-line" aria-hidden="true" />
+              <ToolButton active={state?.h1} label="Título 1" onClick={() => editor.chain().focus().toggleHeading({ level: 1 }).run()}>
+                {H1Icon}
+              </ToolButton>
+              <ToolButton active={state?.h2} label="Título 2" onClick={() => editor.chain().focus().toggleHeading({ level: 2 }).run()}>
+                {H2Icon}
+              </ToolButton>
+              <ToolButton active={state?.h3} label="Título 3" onClick={() => editor.chain().focus().toggleHeading({ level: 3 }).run()}>
+                {H3Icon}
+              </ToolButton>
+              <span className="mx-0.5 h-5 w-px bg-line" aria-hidden="true" />
               <ToolButton active={state?.bulletList} label="Lista con viñetas" onClick={() => editor.chain().focus().toggleBulletList().run()}>
                 {BulletListIcon}
               </ToolButton>
               <ToolButton active={state?.orderedList} label="Lista numerada" onClick={() => editor.chain().focus().toggleOrderedList().run()}>
                 {OrderedListIcon}
+              </ToolButton>
+              <ToolButton active={state?.taskList} label="Lista de tareas" onClick={() => editor.chain().focus().toggleTaskList().run()}>
+                {TaskListIcon}
               </ToolButton>
               <ToolButton active={state?.blockquote} label="Cita" onClick={() => editor.chain().focus().toggleBlockquote().run()}>
                 {QuoteIcon}
@@ -435,6 +678,13 @@ export function RichTextEditor({
                 }}
               >
                 {LinkIcon}
+              </ToolButton>
+              <span className="mx-0.5 h-5 w-px bg-line" aria-hidden="true" />
+              <ToolButton
+                label="Limpiar formato"
+                onClick={() => editor.chain().focus().unsetAllMarks().clearNodes().run()}
+              >
+                {ClearFormatIcon}
               </ToolButton>
             </div>
           </BubbleMenu>,

@@ -13,6 +13,8 @@ import { useToast } from "@/components/Toast";
 import { supabase } from "@/lib/supabase";
 import { createTask as apiCreateTask, updateTask as apiUpdateTask, listSubtasks, createSubtasks, updateSubtask, deleteSubtasks, listComments, createComment, deleteComment, listTaskReminders, saveTaskReminders, type TaskComment } from "@/features/tasks/api";
 import { listDocsForTask, listDocs, linkDocToTask, unlinkDocFromTask, createDoc } from "@/features/docs/api";
+import { TemplatePicker } from "@/features/docs/TemplatePicker";
+import type { DocTemplate } from "@/features/docs/api";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
 import { openUpgrade } from "@/features/billing/upgrade";
@@ -357,6 +359,7 @@ export function TaskFormDialog({
   const [workspaceDocs, setWorkspaceDocs] = useState<{ id: string; title: string }[]>([]);
   const [pendingDocIds, setPendingDocIds] = useState<string[]>([]);
   const [docsPickerOpen, setDocsPickerOpen] = useState(false);
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
   const docsPickerRef = useRef<HTMLDivElement>(null);
   const subtaskKeyCounter = useRef(0);
   const originalSubtasksRef = useRef<Map<string, { title: string; completed: boolean }>>(new Map());
@@ -795,10 +798,16 @@ export function TaskFormDialog({
     [task, linkedDocs, workspaceDocs, toast],
   );
 
-  const createLinkedDoc = useCallback(async () => {
+  const createLinkedDoc = useCallback(async (template?: DocTemplate | null) => {
     if (!profile || !currentWorkspace) return;
     try {
-      const doc = await createDoc(currentWorkspace.id, profile.id, title.trim() || "Sin título");
+      const doc = await createDoc(
+        currentWorkspace.id,
+        profile.id,
+        template?.name || title.trim() || "Sin título",
+        null,
+        template?.content ?? null,
+      );
       setLinkedDocs((prev) => [...prev, { id: doc.id, title: doc.title }]);
       setWorkspaceDocs((prev) => [{ id: doc.id, title: doc.title }, ...prev]);
       if (task) {
@@ -1394,7 +1403,7 @@ export function TaskFormDialog({
                 )}
                 <button
                   type="button"
-                  onClick={() => void createLinkedDoc().then(() => setDocsPickerOpen(false))}
+                  onClick={() => setTemplatePickerOpen(true)}
                   className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 pb-1 text-left text-sm font-medium text-pritio-blue transition-colors hover:bg-pritio-blue/5"
                 >
                   <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
@@ -2078,6 +2087,16 @@ export function TaskFormDialog({
         title="Cambiar tipo"
         description={`Al cambiar de ${KIND_LABELS[task?.kind ?? "task"]} a ${KIND_LABELS[pendingKind ?? "task"]} se reorganizarán las fechas. ¿Estás seguro?`}
         confirmLabel="Cambiar"
+      />
+      <TemplatePicker
+        open={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
+        onSelect={(template) => {
+          setTemplatePickerOpen(false);
+          setDocsPickerOpen(false);
+          void createLinkedDoc(template);
+        }}
+        workspaceId={currentWorkspace?.id ?? ""}
       />
     </div>,
     document.body,
