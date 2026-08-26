@@ -29,7 +29,7 @@ const brand = resolveBranding(metaEnv);
 
 export const APP_NAME = brand.name;
 
-export const APP_VERSION = "0.1.4";
+export const APP_VERSION = "0.1.5";
 
 export const APP_TAGLINE = brand.tagline;
 
