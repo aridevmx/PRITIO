@@ -79,10 +79,17 @@ export async function createDoc(
   createdBy: string,
   title = "",
   parentFolderId: string | null = null,
+  content?: string | null,
 ): Promise<Doc> {
   const { data, error } = await supabase
     .from("docs")
-    .insert({ workspace_id: workspaceId, created_by: createdBy, title, parent_folder_id: parentFolderId })
+    .insert({
+      workspace_id: workspaceId,
+      created_by: createdBy,
+      title,
+      parent_folder_id: parentFolderId,
+      ...(content !== undefined && content !== null ? { content } : {}),
+    })
     .select(DOC_COLUMNS)
     .single();
 
@@ -443,4 +450,112 @@ export function buildDocTree(folders: DocFolder[], docs: Doc[]): TreeNode[] {
   }
 
   return roots;
+}
+
+// ─── Plantillas de documentos ─────────────────────────────
+
+export interface DocTemplate {
+  id: string;
+  workspaceId: string | null;
+  createdBy: string | null;
+  name: string;
+  description: string | null;
+  icon: string | null;
+  category: string;
+  content: string;
+  isSystem: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+const TEMPLATE_COLUMNS =
+  "id, workspace_id, created_by, name, description, icon, category, content, is_system, created_at, updated_at";
+
+function mapTemplate(row: Record<string, unknown>): DocTemplate {
+  return {
+    id: row.id as string,
+    workspaceId: (row.workspace_id as string | null) ?? null,
+    createdBy: (row.created_by as string | null) ?? null,
+    name: (row.name as string) || "",
+    description: (row.description as string | null) ?? null,
+    icon: (row.icon as string | null) ?? null,
+    category: (row.category as string) || "general",
+    content: (row.content as string) || "",
+    isSystem: Boolean(row.is_system),
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
+}
+
+/** Plantillas del sistema + las del workspace del usuario. */
+export async function listTemplates(workspaceId: string): Promise<DocTemplate[]> {
+  const { data, error } = await supabase
+    .from("doc_templates")
+    .select(TEMPLATE_COLUMNS)
+    .or(`is_system.eq.true,workspace_id.eq.${workspaceId}`)
+    .order("is_system", { ascending: false })
+    .order("name");
+
+  if (error) throw error;
+  return ((data ?? []) as unknown as Record<string, unknown>[]).map(mapTemplate);
+}
+
+export async function getTemplate(templateId: string): Promise<DocTemplate> {
+  const { data, error } = await supabase
+    .from("doc_templates")
+    .select(TEMPLATE_COLUMNS)
+    .eq("id", templateId)
+    .single();
+
+  if (error) throw error;
+  return mapTemplate(data as unknown as Record<string, unknown>);
+}
+
+export async function createTemplate(
+  workspaceId: string,
+  createdBy: string,
+  payload: {
+    name: string;
+    description?: string;
+    icon?: string;
+    category?: string;
+    content?: string;
+  },
+): Promise<DocTemplate> {
+  const { data, error } = await supabase
+    .from("doc_templates")
+    .insert({
+      workspace_id: workspaceId,
+      created_by: createdBy,
+      name: payload.name,
+      description: payload.description ?? null,
+      icon: payload.icon ?? null,
+      category: payload.category ?? "general",
+      content: payload.content ?? "",
+      is_system: false,
+    })
+    .select(TEMPLATE_COLUMNS)
+    .single();
+
+  if (error) throw error;
+  return mapTemplate(data as unknown as Record<string, unknown>);
+}
+
+export async function updateTemplate(
+  templateId: string,
+  payload: {
+    name?: string;
+    description?: string;
+    icon?: string;
+    category?: string;
+    content?: string;
+  },
+): Promise<void> {
+  const { error } = await supabase.from("doc_templates").update(payload).eq("id", templateId);
+  if (error) throw error;
+}
+
+export async function deleteTemplate(templateId: string): Promise<void> {
+  const { error } = await supabase.from("doc_templates").delete().eq("id", templateId);
+  if (error) throw error;
 }

@@ -29,18 +29,27 @@ export const SLASH_ITEMS: SlashMenuItem[] = [
   {
     id: "titulo1",
     label: "Título 1",
-    hint: "Sección grande",
+    hint: "Encabezado grande (H1)",
     keywords: ["titulo", "encabezado", "h1", "grande"],
     icon: glyph(<path d="M5 4v16M15 4v16M5 12h10M19 9v11" />),
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).toggleHeading({ level: 2 }).run(),
+      editor.chain().focus().deleteRange(range).toggleHeading({ level: 1 }).run(),
   },
   {
     id: "titulo2",
     label: "Título 2",
-    hint: "Sección mediana",
+    hint: "Encabezado mediano (H2)",
     keywords: ["titulo", "encabezado", "h2", "mediano"],
     icon: glyph(<path d="M4 4v16M11 4v16M4 12h7M17 9l3-1v12" />),
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).toggleHeading({ level: 2 }).run(),
+  },
+  {
+    id: "titulo3",
+    label: "Título 3",
+    hint: "Encabezado pequeño (H3)",
+    keywords: ["titulo", "encabezado", "h3", "pequeno"],
+    icon: glyph(<path d="M4 4v16M10 4v16M4 12h6M16 9l3-.9v11M14.5 13h4.5" />),
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).toggleHeading({ level: 3 }).run(),
   },
@@ -70,6 +79,22 @@ export const SLASH_ITEMS: SlashMenuItem[] = [
       editor.chain().focus().deleteRange(range).toggleOrderedList().run(),
   },
   {
+    id: "lista-tareas",
+    label: "Lista de tareas",
+    hint: "Casillas de verificación",
+    keywords: ["tarea", "todo", "checkbox", "casilla", "pendiente"],
+    icon: glyph(
+      <>
+        <rect x="3.5" y="4.5" width="7" height="7" rx="1.5" />
+        <path d="M5.2 8l1.6 1.6L9.8 6.6" />
+        <rect x="3.5" y="14.5" width="7" height="7" rx="1.5" />
+        <path d="M14 8h7M14 18h7" />
+      </>,
+    ),
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).toggleTaskList().run(),
+  },
+  {
     id: "cita",
     label: "Cita",
     hint: "Texto destacado",
@@ -86,6 +111,26 @@ export const SLASH_ITEMS: SlashMenuItem[] = [
     icon: glyph(<path d="M8 6L3 12l5 6M16 6l5 6-5 6" />),
     command: ({ editor, range }) =>
       editor.chain().focus().deleteRange(range).toggleCodeBlock().run(),
+  },
+  {
+    id: "imagen",
+    label: "Imagen",
+    hint: "Insertar desde URL",
+    keywords: ["imagen", "foto", "picture", "img"],
+    icon: glyph(
+      <>
+        <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
+        <circle cx="9" cy="10" r="1.6" />
+        <path d="M20.5 15.5l-4.5-4.5-8 8.5" />
+      </>,
+    ),
+    command: ({ editor, range }) => {
+      editor.chain().focus().deleteRange(range).run();
+      const url = window.prompt("URL de la imagen:");
+      if (url?.trim()) {
+        void editor.chain().focus().setImage({ src: url.trim() }).run();
+      }
+    },
   },
   {
     id: "tabla",
@@ -121,4 +166,3 @@ export function filterSlashItems(query: string): SlashMenuItem[] {
       item.keywords.some((k) => k.includes(q)),
   );
 }
-

@@ -42,7 +42,9 @@ import {
   safeFileName,
 } from "@/features/docs/exportUtils";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import type { DocOutlineItem } from "@/components/RichTextEditor";
 import { listProjects } from "@/features/projects/api";
+import { TemplatePicker } from "@/features/docs/TemplatePicker";
 import type { Project } from "@/types";
 
 /* El editor rico (Tiptap) se carga solo al abrir la vista de documentos. */
@@ -139,6 +141,14 @@ export function DocsView({ workspaceId }: DocsViewProps) {
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const tagPickerRef = useRef<HTMLDivElement>(null);
   const projectPickerRef = useRef<HTMLDivElement>(null);
+
+  // Índice de títulos (outline) y contenedor con scroll del área de escritura.
+  const [outline, setOutline] = useState<DocOutlineItem[]>([]);
+  const scrollerRef = useRef<HTMLDivElement>(null);
+
+  // Selector de plantillas al crear documento.
+  const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
+  const [templateParentFolderId, setTemplateParentFolderId] = useState<string | null>(null);
 
   // ─── Carga inicial ────────────────────────────────────────
 
@@ -270,6 +280,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
     setDocProjectIds([]);
     setTagPickerOpen(false);
     setProjectPickerOpen(false);
+    setOutline([]);
     if (!selectedId) return;
     let cancelled = false;
     void listTaskIdsForDoc(selectedId).then((ids) => {
@@ -334,11 +345,11 @@ export function DocsView({ workspaceId }: DocsViewProps) {
 
   // ─── Acciones de documentos ───────────────────────────────
 
-  const handleCreate = async (parentFolderId: string | null = null) => {
+  const handleCreate = async (parentFolderId: string | null = null, templateContent?: string | null) => {
     if (!profile) return;
     try {
       await flushSave();
-      const doc = await createDoc(workspaceId, profile.id, "", parentFolderId);
+      const doc = await createDoc(workspaceId, profile.id, "", parentFolderId, templateContent ?? null);
       setDocs((prev) => [doc, ...prev]);
       if (parentFolderId) {
         setExpandedIds((prev) => new Set(prev).add(parentFolderId));
@@ -348,6 +359,11 @@ export function DocsView({ workspaceId }: DocsViewProps) {
       toast.error("No se pudo crear el documento");
     }
   };
+
+  const openTemplatePicker = useCallback((parentFolderId: string | null = null) => {
+    setTemplateParentFolderId(parentFolderId);
+    setTemplatePickerOpen(true);
+  }, []);
 
   const handleDelete = async () => {
     if (!selectedDoc) return;
@@ -362,8 +378,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
     }
   };
 
-  const toggleLink = async (taskId: string) => {
-    if (!selectedDoc) return;
+  const toggleLink = async (taskId: string) => {    if (!selectedDoc) return;
     const isLinked = linkedTaskIds.includes(taskId);
     setLinkedTaskIds((prev) =>
       isLinked ? prev.filter((id) => id !== taskId) : [...prev, taskId],
@@ -475,6 +490,13 @@ export function DocsView({ workspaceId }: DocsViewProps) {
       toast.error("No se pudo eliminar la carpeta");
     }
   };
+
+  const scrollToHeading = useCallback((index: number) => {
+    const root = scrollerRef.current;
+    if (!root) return;
+    const heads = root.querySelectorAll<HTMLElement>("h1, h2, h3");
+    heads[index]?.scrollIntoView({ behavior: "smooth", block: "start" });
+  }, []);
 
   const toggleExpanded = useCallback((id: string) => {
     setExpandedIds((prev) => {
@@ -728,7 +750,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
         </button>
         <button
           type="button"
-          onClick={() => void handleCreate(null)}
+          onClick={() => openTemplatePicker(null)}
           disabled={isLoading}
           className="flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:opacity-50"
         >
@@ -792,7 +814,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                     </p>
                     <button
                       type="button"
-                      onClick={() => void handleCreate(null)}
+                      onClick={() => openTemplatePicker(null)}
                       className="mt-3 rounded-lg bg-ink px-3 py-1.5 text-xs font-semibold text-white hover:bg-ink/90"
                     >
                       Crear primera nota
@@ -805,7 +827,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                     expandedIds={expandedIds}
                     onToggleFolder={toggleExpanded}
                     onSelectDoc={(id) => void flushSave().then(() => setSelectedId(id))}
-                    onCreateNote={(fid) => void handleCreate(fid)}
+                    onCreateNote={(fid) => openTemplatePicker(fid)}
                     onCreateFolder={(pid) => void handleCreateFolder(pid)}
                     onRenameFolder={(id, name) => void handleRenameFolder(id, name)}
                     onDeleteFolder={(id) =>
@@ -862,7 +884,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
           {/* Editor a área completa (estilo Notion) */}
           <div className={cn("flex min-h-0 flex-col", selectedId ? "flex" : "hidden md:flex")}>
             {selectedDoc ? (
-              <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-1 pb-6 md:px-6">
+              <div className="flex min-h-0 flex-1 flex-col px-1 pb-4 md:px-6">
                 {/* Breadcrumb */}
                 <div className="flex shrink-0 items-center gap-1.5 pb-2">
                   <button
@@ -1144,99 +1166,130 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                   </div>
                 </div>
 
-                {/* Contenido */}
-                <Suspense
-                  fallback={
-                    <div className="mt-4 min-h-[14rem] flex-1 animate-pulse rounded-xl bg-surface-subtle" />
-                  }
-                >
-                  <RichTextEditor
-                    key={selectedDoc.id}
-                    content={selectedDoc.content}
-                    onChange={(html) => queueSave({ content: html })}
-                    placeholder="Empieza a escribir…"
-                    unstyled
-                    className="min-h-0 shrink-0"
-                    contentClassName="min-h-[12rem] px-0 py-3"
-                  />
-                </Suspense>
-
                 {/* Tareas vinculadas */}
-                <div className="mt-6 shrink-0 border-t border-line/60 pt-3">
-                  <div className="relative" ref={pickerRef}>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-                        Tareas vinculadas
-                      </span>
-                      {linkedTasks.map((t) => (
-                        <span
-                          key={t.id}
-                          className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface py-1 pl-2 pr-1.5 text-xs font-medium text-ink"
-                        >
-                          <span
-                            className="h-2 w-2 shrink-0 rounded-full"
-                            style={{ backgroundColor: QUAD_DOT[t.quadrant] ?? "#6B7280" }}
-                          />
-                          <span className="max-w-[10rem] truncate">{t.title}</span>
-                          <button
-                            type="button"
-                            onClick={() => void toggleLink(t.id)}
-                            aria-label={`Desvincular tarea: ${t.title}`}
-                            className="text-ink-muted transition-colors hover:text-pritio-coral"
-                          >
-                            <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
-                          </button>
-                        </span>
-                      ))}
-                      <button
-                        type="button"
-                        onClick={() => setPickerOpen((v) => !v)}
-                        aria-expanded={pickerOpen}
-                        className="rounded-full border border-dashed border-line-strong/70 px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:border-pritio-blue/50 hover:text-pritio-blue"
+                <div className="relative mb-3 shrink-0" ref={pickerRef}>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                      Tareas vinculadas
+                    </span>
+                    {linkedTasks.map((t) => (
+                      <span
+                        key={t.id}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface py-1 pl-2 pr-1.5 text-xs font-medium text-ink"
                       >
-                        + Vincular tarea
-                      </button>
-                    </div>
-
-                    {pickerOpen && (
-                      <div className="pritio-menu-enter absolute bottom-full left-0 z-30 mb-2 max-h-[16rem] w-[19rem] overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-elevated">
-                        {pickerTasks.length === 0 ? (
-                          <p className="px-2 py-3 text-center text-xs text-ink-muted">
-                            No hay tareas activas para vincular.
-                          </p>
-                        ) : (
-                          pickerTasks.map((t) => {
-                            const linked = linkedTaskIds.includes(t.id);
-                            return (
-                              <button
-                                key={t.id}
-                                type="button"
-                                onClick={() => void toggleLink(t.id)}
-                                className={cn(
-                                  "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-muted",
-                                  linked && "bg-pritio-blue/5",
-                                )}
-                              >
-                                <span
-                                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                                  style={{ backgroundColor: QUAD_DOT[t.quadrant] ?? "#6B7280" }}
-                                />
-                                <span className="min-w-0 flex-1 truncate text-sm text-ink">{t.title}</span>
-                                {linked && (
-                                  <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
-                                    <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                                  </svg>
-                                )}
-                              </button>
-                            );
-                          })
-                        )}
-                      </div>
-                    )}
+                        <span
+                          className="h-2 w-2 shrink-0 rounded-full"
+                          style={{ backgroundColor: QUAD_DOT[t.quadrant] ?? "#6B7280" }}
+                        />
+                        <span className="max-w-[10rem] truncate">{t.title}</span>
+                        <button
+                          type="button"
+                          onClick={() => void toggleLink(t.id)}
+                          aria-label={`Desvincular tarea: ${t.title}`}
+                          className="text-ink-muted transition-colors hover:text-pritio-coral"
+                        >
+                          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                            <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      </span>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setPickerOpen((v) => !v)}
+                      aria-expanded={pickerOpen}
+                      className="rounded-full border border-dashed border-line-strong/70 px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:border-pritio-blue/50 hover:text-pritio-blue"
+                    >
+                      + Vincular tarea
+                    </button>
                   </div>
+
+                  {pickerOpen && (
+                    <div className="pritio-menu-enter absolute left-0 top-full z-30 mt-2 max-h-[16rem] w-[19rem] overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-elevated">
+                      {pickerTasks.length === 0 ? (
+                        <p className="px-2 py-3 text-center text-xs text-ink-muted">
+                          No hay tareas activas para vincular.
+                        </p>
+                      ) : (
+                        pickerTasks.map((t) => {
+                          const linked = linkedTaskIds.includes(t.id);
+                          return (
+                            <button
+                              key={t.id}
+                              type="button"
+                              onClick={() => void toggleLink(t.id)}
+                              className={cn(
+                                "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-muted",
+                                linked && "bg-pritio-blue/5",
+                              )}
+                            >
+                              <span
+                                className="h-2.5 w-2.5 shrink-0 rounded-full"
+                                style={{ backgroundColor: QUAD_DOT[t.quadrant] ?? "#6B7280" }}
+                              />
+                              <span className="min-w-0 flex-1 truncate text-sm text-ink">{t.title}</span>
+                              {linked && (
+                                <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
+                                  <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                                </svg>
+                              )}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  )}
                 </div>
+
+                {/* Contenido: solo el área de escritura tiene scroll */}
+                <div className="flex min-h-0 flex-1 gap-6">
+                  <div ref={scrollerRef} className="min-h-0 flex-1 overflow-y-auto pb-10 pr-1">
+                    <Suspense
+                      fallback={
+                        <div className="mt-4 min-h-[14rem] flex-1 animate-pulse rounded-xl bg-surface-subtle" />
+                      }
+                    >
+                      <RichTextEditor
+                        key={selectedDoc.id}
+                        content={selectedDoc.content}
+                        onChange={(html) => queueSave({ content: html })}
+                        onOutline={setOutline}
+                        placeholder="Empieza a escribir…"
+                        unstyled
+                        className="min-h-0 shrink-0"
+                        contentClassName="min-h-[12rem] px-0 py-3"
+                      />
+                    </Suspense>
+                  </div>
+
+                  {/* Índice de títulos estilo Notion */}
+                  {outline.length > 0 && (
+                    <aside className="hidden w-52 shrink-0 overflow-y-auto pt-4 xl:block" aria-label="Índice de títulos">
+                      <p className="pb-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+                        Índice
+                      </p>
+                      <nav className="space-y-0.5 border-l border-line">
+                        {outline.map((h, i) => (
+                          <button
+                            key={`${i}-${h.text}`}
+                            type="button"
+                            onClick={() => scrollToHeading(i)}
+                            title={h.text}
+                            className={cn(
+                              "block w-full truncate rounded-r-md py-1 pr-2 text-left text-xs leading-snug text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink",
+                              h.level === 1 && "pl-2 font-semibold text-ink",
+                              h.level === 2 && "pl-4",
+                              h.level === 3 && "pl-6 text-ink-muted",
+                            )}
+                          >
+                            {h.text}
+                          </button>
+                        ))}
+                      </nav>
+                    </aside>
+                  )}
+                </div>
+
               </div>
             ) : (
               <div className="flex flex-1 items-center justify-center rounded-2xl border border-dashed border-line-strong/50">
@@ -1280,6 +1333,16 @@ export function DocsView({ workspaceId }: DocsViewProps) {
           onClose={() => setShareOpen(false)}
         />
       )}
+
+      <TemplatePicker
+        open={templatePickerOpen}
+        onClose={() => setTemplatePickerOpen(false)}
+        onSelect={(template) => {
+          setTemplatePickerOpen(false);
+          void handleCreate(templateParentFolderId, template?.content ?? null);
+        }}
+        workspaceId={workspaceId}
+      />
     </div>
   );
 }
