@@ -1,24 +1,46 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 
-type Theme = "light" | "dark";
+export type Theme = "light" | "dark" | "system";
+export type ResolvedTheme = "light" | "dark";
 
 const STORAGE_KEY = "pritio-theme";
 
+const prefersDark =
+  typeof window !== "undefined"
+    ? window.matchMedia("(prefers-color-scheme: dark)")
+    : null;
+
+function resolveTheme(theme: Theme): ResolvedTheme {
+  if (theme !== "system") return theme;
+  return prefersDark?.matches ? "dark" : "light";
+}
+
 function getInitialTheme(): Theme {
+  if (typeof window === "undefined") return "system";
   const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored === "light" || stored === "dark") return stored;
-  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+  if (stored === "light" || stored === "dark" || stored === "system") return stored;
+  return "system";
 }
 
 function applyTheme(theme: Theme) {
-  document.documentElement.classList.toggle("dark", theme === "dark");
+  document.documentElement.classList.toggle("dark", resolveTheme(theme) === "dark");
 }
 
 export function useTheme() {
   const [theme, setThemeState] = useState<Theme>(getInitialTheme);
+  const resolvedTheme = useMemo(() => resolveTheme(theme), [theme]);
 
   useEffect(() => {
     applyTheme(theme);
+  }, [theme]);
+
+  useEffect(() => {
+    if (theme !== "system" || !prefersDark) return;
+    const handler = (e: MediaQueryListEvent) => {
+      document.documentElement.classList.toggle("dark", e.matches);
+    };
+    prefersDark.addEventListener("change", handler);
+    return () => prefersDark.removeEventListener("change", handler);
   }, [theme]);
 
   const setTheme = useCallback((t: Theme) => {
@@ -26,13 +48,5 @@ export function useTheme() {
     localStorage.setItem(STORAGE_KEY, t);
   }, []);
 
-  const toggleTheme = useCallback(() => {
-    setThemeState((prev) => {
-      const next = prev === "light" ? "dark" : "light";
-      localStorage.setItem(STORAGE_KEY, next);
-      return next;
-    });
-  }, []);
-
-  return { theme, setTheme, toggleTheme } as const;
+  return { theme, resolvedTheme, setTheme } as const;
 }

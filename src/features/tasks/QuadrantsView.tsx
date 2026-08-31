@@ -69,6 +69,7 @@ function QuadrantColumn({
   onDelete,
   onAddTask,
   profileNameMap,
+  workspaceNameMap,
   variant = "grid",
 }: {
   quadrantKey: Quadrant;
@@ -78,6 +79,7 @@ function QuadrantColumn({
   onDelete: (task: Task) => void;
   onAddTask: (quadrant: Quadrant) => void;
   profileNameMap: Record<string, string>;
+  workspaceNameMap: Record<string, string>;
   variant?: "grid" | "kanban";
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: quadrantKey });
@@ -159,6 +161,7 @@ function QuadrantColumn({
                 onDelete={onDelete}
                 responsableName={task.responsibleAssigneeId ? profileNameMap[task.responsibleAssigneeId] : undefined}
                 creatorName={profileNameMap[task.createdBy]}
+                workspaceName={workspaceNameMap[task.workspaceId]}
               />
             ))}
           </>
@@ -193,6 +196,7 @@ function CompletedSection({
   onDelete,
   onArchive,
   profileNameMap,
+  workspaceNameMap,
   className,
 }: {
   tasks: Task[];
@@ -201,6 +205,7 @@ function CompletedSection({
   onDelete: (task: Task) => void;
   onArchive: (task: Task) => void;
   profileNameMap: Record<string, string>;
+  workspaceNameMap: Record<string, string>;
   className?: string;
 }) {
   const [open, setOpen] = useState(true);
@@ -247,6 +252,7 @@ function CompletedSection({
                     onArchive={onArchive}
                     responsableName={task.responsibleAssigneeId ? profileNameMap[task.responsibleAssigneeId] : undefined}
                     creatorName={profileNameMap[task.createdBy]}
+                    workspaceName={task.workspaceId ? workspaceNameMap[task.workspaceId] : undefined}
                   />
                 ))}
               </div>
@@ -270,9 +276,12 @@ const DUE_OPTIONS: { value: DueFilter; label: string }[] = [
 ];
 
 export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: QuadrantsViewProps) {
-  const { currentWorkspace } = useWorkspace();
+  const { currentWorkspace, workspaces } = useWorkspace();
   const singleId = workspaceIds ? null : currentWorkspace?.id ?? null;
-  const { tasks, isLoading, updateTask: updateLocalTask, removeTask, refresh: refreshTasks } = useTasks(singleId);
+  const { tasks, isLoading, updateTask: updateLocalTask, removeTask, refresh: refreshTasks } = useTasks(
+    singleId,
+    { workspaceType: currentWorkspace?.type },
+  );
 
   const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [allLoading, setAllLoading] = useState(false);
@@ -286,6 +295,27 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
 
   const [profileNameMap, setProfileNameMap] = useState<Record<string, string>>({});
   const profileCacheRef = useRef<Record<string, string>>({});
+
+  const workspaceNameMap = useMemo(() => {
+    if (!workspaceIds) return {};
+    const map: Record<string, string> = {};
+    workspaces.forEach((w) => {
+      map[w.id] =
+        w.type === "personal"
+          ? "Personal"
+          : w.type === "family"
+            ? w.name
+            : `Equipo: ${w.name}`;
+    });
+    if (currentWorkspace)
+      map[currentWorkspace.id] =
+        currentWorkspace.type === "personal"
+          ? "Personal"
+          : currentWorkspace.type === "family"
+            ? currentWorkspace.name
+            : `Equipo: ${currentWorkspace.name}`;
+    return map;
+  }, [workspaces, currentWorkspace, workspaceIds]);
 
   const [assignees, setAssignees] = useState<{ id: string; name: string }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string }[]>([]);
@@ -795,6 +825,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
                   onDelete={setDeleteTarget}
                   onAddTask={handleAddTask}
                   profileNameMap={profileNameMap}
+                  workspaceNameMap={workspaceNameMap}
                   variant="kanban"
                 />
               );
@@ -824,6 +855,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
                       onDelete={setDeleteTarget}
                       onAddTask={handleAddTask}
                       profileNameMap={profileNameMap}
+                      workspaceNameMap={workspaceNameMap}
                     />
                   );
                 })}
@@ -847,6 +879,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
                 onDelete={setDeleteTarget}
                 onAddTask={handleAddTask}
                 profileNameMap={profileNameMap}
+                workspaceNameMap={workspaceNameMap}
               />
             </QuadrantsDnd>
           </div>
@@ -864,6 +897,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
                 onDelete={setDeleteTarget}
                 onArchive={handleArchive}
                 profileNameMap={profileNameMap}
+                workspaceNameMap={workspaceNameMap}
               />
               <CompletedSection
                 className="lg:hidden"
@@ -873,6 +907,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
                 onDelete={setDeleteTarget}
                 onArchive={handleArchive}
                 profileNameMap={profileNameMap}
+                workspaceNameMap={workspaceNameMap}
               />
             </>
           )}

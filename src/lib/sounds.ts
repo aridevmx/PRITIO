@@ -1,4 +1,9 @@
-export type SoundName = "taskCompleted" | "notification" | "meetingReminder";
+export type SoundName =
+  | "taskCompleted"
+  | "notification"
+  | "meetingReminder"
+  | "pomodoroTick"
+  | "pomodoroEnd";
 
 const STORAGE_KEY = "pritio:soundsEnabled";
 
@@ -50,6 +55,14 @@ const SOUNDS: Record<SoundName, Note[]> = {
   meetingReminder: [
     { freq: 523.25, start: 0, duration: 0.1, type: "sine", gain: 0.2 },
     { freq: 523.25, start: 0.14, duration: 0.1, type: "sine", gain: 0.2 },
+  ],
+  pomodoroTick: [
+    { freq: 900, start: 0, duration: 0.02, type: "square", gain: 0.05 },
+  ],
+  pomodoroEnd: [
+    { freq: 659.25, start: 0, duration: 0.12, type: "sine", gain: 0.2 },
+    { freq: 783.99, start: 0.16, duration: 0.12, type: "sine", gain: 0.2 },
+    { freq: 987.77, start: 0.32, duration: 0.22, type: "sine", gain: 0.22 },
   ],
 };
 

@@ -4,9 +4,11 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/AuthProvider";
 import { IdentityTab } from "@/features/account/IdentityTab";
 import { SecurityTab } from "@/features/account/SecurityTab";
+import { PreferencesTab } from "@/features/account/PreferencesTab";
 import { BlockedDaysTab } from "@/features/account/BlockedDaysTab";
 import { NotificationsTab } from "@/features/account/NotificationsTab";
 import { AboutTab } from "@/features/account/AboutTab";
+import { IntegrationsTab } from "@/features/account/IntegrationsTab";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { PLAN_LABELS, PLAN_BADGE_CLASSES } from "@/features/billing/plans";
 
@@ -18,15 +20,19 @@ interface AccountModalProps {
 export type TabId =
   | "identity"
   | "security"
+  | "preferences"
   | "blockedDays"
   | "notifications"
+  | "integrations"
   | "about";
 
 const TABS: { id: TabId; label: string }[] = [
   { id: "identity", label: "Identidad" },
   { id: "security", label: "Seguridad" },
+  { id: "preferences", label: "Preferencias" },
   { id: "blockedDays", label: "Mis días" },
   { id: "notifications", label: "Notificaciones" },
+  { id: "integrations", label: "Integraciones" },
   { id: "about", label: "Acerca de" },
 ];
 
@@ -38,8 +44,10 @@ export function AccountModal({ onClose, initialTab }: AccountModalProps) {
   const tabRefs = useRef<Record<TabId, HTMLButtonElement | null>>({
     identity: null,
     security: null,
+    preferences: null,
     blockedDays: null,
     notifications: null,
+    integrations: null,
     about: null,
   });
 
@@ -155,6 +163,15 @@ export function AccountModal({ onClose, initialTab }: AccountModalProps) {
           </section>
           <section
             role="tabpanel"
+            id="account-panel-preferences"
+            aria-labelledby="account-tab-preferences"
+            hidden={activeTab !== "preferences"}
+            className="space-y-7"
+          >
+            {activeTab === "preferences" && <PreferencesTab />}
+          </section>
+          <section
+            role="tabpanel"
             id="account-panel-blockedDays"
             aria-labelledby="account-tab-blockedDays"
             hidden={activeTab !== "blockedDays"}
@@ -170,6 +187,15 @@ export function AccountModal({ onClose, initialTab }: AccountModalProps) {
             className="space-y-7"
           >
             {activeTab === "notifications" && <NotificationsTab />}
+          </section>
+          <section
+            role="tabpanel"
+            id="account-panel-integrations"
+            aria-labelledby="account-tab-integrations"
+            hidden={activeTab !== "integrations"}
+            className="space-y-7"
+          >
+            {activeTab === "integrations" && <IntegrationsTab />}
           </section>
           <section
             role="tabpanel"

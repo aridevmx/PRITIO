@@ -27,6 +27,8 @@ export const MEMBER_TYPE_LABELS: Record<string, string> = {
   otro: "Otro",
 };
 
+export const SHOW_DONATIONS = import.meta.env.VITE_DONATIONS_ENABLED === "true";
+
 export const DONATION_LINKS = {
   github: import.meta.env.VITE_DONATION_GITHUB ?? "",
   paypal: import.meta.env.VITE_DONATION_PAYPAL ?? "",

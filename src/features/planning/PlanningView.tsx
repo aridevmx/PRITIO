@@ -32,8 +32,11 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 export function PlanningView({ workspaceId, space }: PlanningViewProps) {
-  const { profile, members } = useWorkspace();
-  const { tasks, isLoading, updateTask: updateLocalTask, removeTask } = useTasks(workspaceId);
+  const { currentWorkspace, profile, members } = useWorkspace();
+  const { tasks, isLoading, updateTask: updateLocalTask, removeTask } = useTasks(
+    workspaceId,
+    { workspaceType: currentWorkspace?.type },
+  );
   const timeFormat = useTimeFormat();
 
   const [viewDate, setViewDate] = useState<Date>(new Date());

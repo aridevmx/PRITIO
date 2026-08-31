@@ -14,6 +14,7 @@ interface TaskCardProps {
   isDragging?: boolean;
   responsableName?: string;
   creatorName?: string;
+  workspaceName?: string;
 }
 
 function nameHue(name: string): number {
@@ -107,6 +108,7 @@ export function TaskCard({
   onArchive,
   isDragging,
   responsableName,
+  workspaceName,
 }: TaskCardProps) {
   const overdue = isOverdue(task);
   const dueToday = isDueToday(task);
@@ -344,6 +346,12 @@ export function TaskCard({
           >
             <RepeatGlyph className="h-3.5 w-3.5" />
             {recurrenceLabel}
+          </span>
+        )}
+
+        {workspaceName && (
+          <span className="inline-flex items-center rounded bg-surface-muted px-1.5 py-0.5 text-[10px] font-semibold text-ink-muted">
+            {workspaceName}
           </span>
         )}
 

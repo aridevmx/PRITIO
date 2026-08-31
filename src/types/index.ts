@@ -129,7 +129,8 @@ export type PlanFeature =
   | "board_view"
   | "meetings"
   | "due_date"
-  | "events";
+  | "events"
+  | "premium_themes";
 
 export interface PlanLimits {
   plan: WorkspacePlan;
@@ -145,6 +146,7 @@ export interface PlanLimits {
   allowPlanView: boolean;
   allowBoardView: boolean;
   allowDueDate: boolean;
+  allowPremiumThemes: boolean;
   supportTier: string;
 }
 
@@ -408,6 +410,7 @@ export interface PlanLimitsRow {
   allow_plan_view: boolean;
   allow_board_view: boolean;
   allow_due_date: boolean;
+  allow_premium_themes: boolean;
   support_tier: string;
 }
 

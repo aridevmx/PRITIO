@@ -2,6 +2,7 @@ import { useMemo, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { listProjects } from "@/features/projects/api";
 import { useTasks } from "@/features/tasks/useTasks";
+import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { parseDateOnly } from "@/features/tasks/dates";
 import { localDateStr, todayStr } from "@/lib/utils";
 import { StatCard } from "@/components/stats/StatCard";
@@ -136,7 +137,11 @@ interface StatsViewProps {
 }
 
 export function StatsView({ workspaceId }: StatsViewProps) {
-  const { tasks } = useTasks(workspaceId);
+  const { currentWorkspace } = useWorkspace();
+  const { tasks } = useTasks(
+    workspaceId,
+    { workspaceType: currentWorkspace?.type },
+  );
   const [searchQuery, setSearchQuery] = useState("");
   const [myTasksOnly, setMyTasksOnly] = useState(false);
   const [responsableId, setResponsableId] = useState("");

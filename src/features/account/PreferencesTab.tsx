@@ -1,9 +1,10 @@
 import { useState } from "react";
 import { SegmentedControl } from "@/components/SegmentedControl";
-import { useTheme } from "@/lib/useTheme";
+import { useTheme, type Theme } from "@/lib/useTheme";
 import { useTimeFormat, setTimeFormat } from "@/lib/timeFormat";
 import { areSoundsEnabled, setSoundsEnabled } from "@/lib/sounds";
 import { useViewPrefs } from "@/lib/viewPrefs";
+import { useWidgetPrefs } from "@/lib/widgetPrefs";
 import { ToggleRow } from "@/features/account/AccountToggle";
 import { useToast } from "@/components/Toast";
 import { exportMyData, downloadJson } from "@/features/account/exportData";
@@ -12,6 +13,7 @@ export function PreferencesTab() {
   const { theme, setTheme } = useTheme();
   const timeFormat = useTimeFormat();
   const { hiddenViews, toggleView } = useViewPrefs();
+  const { clockVisible, pomodoroVisible, clockShowSeconds, toggleClockVisible, togglePomodoroVisible, setClockShowSeconds } = useWidgetPrefs();
   const { toast } = useToast();
 
   const [sounds, setSounds] = useState(areSoundsEnabled());
@@ -39,10 +41,11 @@ export function PreferencesTab() {
           <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">Se aplica en toda la app.</p>
           <SegmentedControl
             value={theme}
-            onChange={(t) => setTheme(t as "light" | "dark")}
+            onChange={(t) => setTheme(t as Theme)}
             options={[
               { value: "light", label: "Claro" },
               { value: "dark", label: "Oscuro" },
+              { value: "system", label: "Sistema" },
             ]}
             className="mt-3"
           />
@@ -101,6 +104,39 @@ export function PreferencesTab() {
               Cuadrantes, Calendario e Indicadores siempre están disponibles y no se pueden ocultar.
             </p>
           </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Widgets</p>
+        <div className="overflow-hidden rounded-xl border border-line divide-y divide-line bg-surface-muted">
+          <ToggleRow
+            label="Reloj"
+            description="Muestra el reloj con timer en la barra lateral."
+            checked={clockVisible}
+            onChange={toggleClockVisible}
+          />
+          <div className="px-3.5 py-3">
+            <p className="text-sm font-medium text-ink">Segundos en el reloj</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+              Añade los segundos al reloj digital.
+            </p>
+            <SegmentedControl
+              value={clockShowSeconds ? "on" : "off"}
+              onChange={(v) => setClockShowSeconds(v === "on")}
+              options={[
+                { value: "off", label: "Ocultar" },
+                { value: "on", label: "Mostrar" },
+              ]}
+              className="mt-3"
+            />
+          </div>
+          <ToggleRow
+            label="Pomodoro"
+            description="Muestra el pomodoro en los workspaces de trabajo y personal."
+            checked={pomodoroVisible}
+            onChange={togglePomodoroVisible}
+          />
         </div>
       </div>
 

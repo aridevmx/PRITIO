@@ -34,7 +34,10 @@ export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceView
   const { currentWorkspace, workspaces, members } = useWorkspace();
   const { hasFeature } = useBilling();
   const { hiddenViews } = useViewPrefs();
-  const { tasks, refresh, isLoading } = useTasks(currentWorkspace?.id ?? null);
+  const { tasks, refresh, isLoading } = useTasks(
+    currentWorkspace?.id ?? null,
+    { workspaceType: currentWorkspace?.type },
+  );
   const [refreshKey, setRefreshKey] = useState(0);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);

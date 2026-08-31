@@ -1,5 +1,5 @@
 import { createPortal } from "react-dom";
-import { DONATION_LINKS, IS_SELF_HOSTED } from "@/lib/constants";
+import { DONATION_LINKS, IS_SELF_HOSTED, SHOW_DONATIONS } from "@/lib/constants";
 import { APP_NAME } from "@/lib/branding";
 
 interface DonationModalProps {
@@ -51,7 +51,7 @@ const PLATFORMS = [
 ];
 
 export function DonationModal({ open, onClose }: DonationModalProps) {
-  if (!open || IS_SELF_HOSTED) return null;
+  if (!open || IS_SELF_HOSTED || !SHOW_DONATIONS) return null;
 
   return createPortal(
     <div

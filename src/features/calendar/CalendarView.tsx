@@ -121,8 +121,11 @@ function taskDateKeys(t: Task): string[] {
 }
 
 export function CalendarView({ workspaceId, space, defaultDate }: CalendarViewProps) {
-  const { profile, members } = useWorkspace();
-  const { tasks, isLoading } = useTasks(workspaceId);
+  const { currentWorkspace, profile, members } = useWorkspace();
+  const { tasks, isLoading } = useTasks(
+    workspaceId,
+    { workspaceType: currentWorkspace?.type },
+  );
   const [viewMode, setViewMode] = useState<ViewMode>("month");
   const [viewDate, setViewDate] = useState(() => {
     if (defaultDate) return new Date(defaultDate + "T12:00:00");

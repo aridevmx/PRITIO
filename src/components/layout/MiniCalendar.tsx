@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { cn, localDateStr, todayStr } from "@/lib/utils";
 
-const DAYS = ["L", "M", "J", "V", "S", "D"];
+const DAYS = ["L", "M", "X", "J", "V", "S", "D"];
 
 interface MiniCalendarProps {
   taskDates: string[];

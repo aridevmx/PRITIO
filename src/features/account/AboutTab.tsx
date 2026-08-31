@@ -175,6 +175,10 @@ export function AboutTab() {
           </p>
         </div>
       </div>
+
+      <p className="text-center text-xs text-ink-muted">
+        &copy; {new Date().getFullYear()} {APP_NAME}. Todos los derechos reservados.
+      </p>
     </div>
   );
 }

@@ -48,12 +48,17 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
-        // PRITIO brand palette — preserved from v1
+        // PRITIO brand palette — preserved from v1.
+        // Wired a CSS variables (rgb triplets) para que el tema seleccionado
+        // pueda cambiar los acentos globalmente y las clases /N (/10, /30,
+        // from-.../30) sigan funcionando via `<alpha-value>`. El formato
+        // `rgb(var(--pritio-blue-rgb) / <alpha-value>)` es el mismo que usan
+        // surface/ink/line.
         pritio: {
-          green: "#4FC38A",
-          coral: "#F27D72",
-          blue: "#5BA7D1",
-          purple: "#9B7EDC",
+          green: "rgb(var(--pritio-green-rgb) / <alpha-value>)",
+          coral: "rgb(var(--pritio-coral-rgb) / <alpha-value>)",
+          blue: "rgb(var(--pritio-blue-rgb) / <alpha-value>)",
+          purple: "rgb(var(--pritio-purple-rgb) / <alpha-value>)",
         },
         // Surface tokens — used across the app shell.
         // Wired a CSS variables para que cambien automaticamente en

@@ -8,6 +8,7 @@ import { DatePickerPopover } from "@/components/DatePickerPopover";
 import { TimePicker } from "@/components/TimePicker";
 import { useTimeFormat } from "@/lib/timeFormat";
 import { QUADRANTS, QUADRANT_ORDER, type QuadrantIconKey } from "@/features/tasks/quadrants";
+import { allowedKindsForWorkspace } from "@/features/tasks/kinds";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { useToast } from "@/components/Toast";
 import { supabase } from "@/lib/supabase";
@@ -176,14 +177,7 @@ const QUADRANT_ICONS: Record<QuadrantIconKey, ReactNode> = {
 };
 
 function allowedKindsFor(type: string | undefined, isEdit: boolean, currentKind: TaskKind): TaskKind[] {
-  const base: TaskKind[] =
-    type === "personal"
-      ? ["task", "meeting", "event"]
-      : type === "team"
-        ? ["task", "meeting"]
-        : type === "family"
-          ? ["task", "event"]
-          : ["task", "meeting", "event"];
+  const base = allowedKindsForWorkspace(type);
   if (isEdit && currentKind && !base.includes(currentKind)) return [...base, currentKind];
   return base;
 }
@@ -196,6 +190,7 @@ interface TaskFormDialogProps {
   defaultQuadrant?: Quadrant;
   defaultDueDate?: string;
   defaultStartTime?: string;
+  defaultKind?: TaskKind;
 }
 
 function addDays(days: number): string {
@@ -312,6 +307,7 @@ export function TaskFormDialog({
   defaultQuadrant = "do",
   defaultDueDate,
   defaultStartTime,
+  defaultKind = "task",
 }: TaskFormDialogProps) {
   const { currentWorkspace, currentMember, profile, members } = useWorkspace();
   const { canCreate, hasFeature, usage, currentLimits } = useBilling();
@@ -320,7 +316,7 @@ export function TaskFormDialog({
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [quadrant, setQuadrant] = useState<Quadrant>(defaultQuadrant);
-  const [kind, setKind] = useState<TaskKind>("task");
+  const [kind, setKind] = useState<TaskKind>(defaultKind);
   const [dueDate, setDueDate] = useState("");
   const [startDate, setStartDate] = useState("");
   const [startTime, setStartTime] = useState("");
@@ -545,7 +541,7 @@ export function TaskFormDialog({
         setTitle("");
         setDescription("");
         setQuadrant(defaultQuadrant);
-        setKind("task");
+        setKind(defaultKind);
         setDueDate(defaultStartTime ? "" : (defaultDueDate ?? ""));
         setStartDate(defaultDueDate ?? "");
         setEndDate("");
@@ -1481,7 +1477,7 @@ export function TaskFormDialog({
                         type="button"
                         onClick={() => removeSubtask(st.key)}
                         aria-label={`Quitar subtarea: ${st.title}`}
-                        className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-muted opacity-0 transition-all hover:bg-pritio-coral/10 hover:text-pritio-coral focus-visible:opacity-100 group-hover/sub:opacity-100 md:opacity-0"
+                        className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-muted opacity-0 transition-all hover:bg-pritio-coral/10 hover:text-pritio-coral focus-visible:opacity-100 group-hover/sub:opacity-100"
                       >
                         <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
                           <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
@@ -2054,7 +2050,7 @@ export function TaskFormDialog({
           </aside>
         </div>
 
-        <div className="sticky bottom-0 -mx-5 -mb-5 mt-6 flex gap-3 border-t border-line bg-surface px-5 pb-4 pt-4 md:-mx-6 md:-mb-6 md:px-6 md:pb-5">
+        <div className="sticky bottom-0 -mx-5 -mb-5 mt-8 flex gap-3 border-t border-line bg-surface px-5 pb-4 pt-4 md:-mx-6 md:-mb-6 md:px-6 md:pb-5">
           <button
             onClick={onClose}
             className="flex-1 rounded-xl border border-line px-4 py-2.5 text-sm font-semibold text-ink-soft transition-colors hover:bg-surface-muted sm:flex-none"

@@ -9,6 +9,15 @@
     --pritio-blue: #5ba7d1;
     --pritio-purple: #9b7edc;
 
+    /* RGB triplets de la paleta PRITIO. Usados por las clases `pritio-*`
+     * (bg-pritio-blue, text-pritio-purple, /10, from-.../30, etc.) vía
+     * tailwind.config. El tema seleccionado (data-theme) sobreescribe
+     * estos valores para cambiar los acentos. */
+    --pritio-green-rgb: 79 195 138;
+    --pritio-coral-rgb: 242 125 114;
+    --pritio-blue-rgb: 91 167 209;
+    --pritio-purple-rgb: 155 126 220;
+
     --ink: #0f172a;
     --ink-soft: #64748b;
     --ink-muted: #94a3b8;
@@ -82,6 +91,38 @@
     --ink-muted-rgb: 100 116 139;
     --line-rgb: 51 65 85;
     --line-strong-rgb: 71 85 105;
+  }
+
+  /* Temas de color (presets de acento).
+   *
+   * El `<html>` lleva `data-theme="<id>"` (aplicado por useAppTheme). Cada
+   * tema redefine la paleta PRITIO (--pritio-*-rgb) que las clases
+   * `pritio-*` consumen via tailwind.config — asi cambia toda la app sin
+   * tocar componentes. Se aplican en ambos modos (claro/oscuro).
+   */
+  html[data-theme="ocean"] {
+    --pritio-green-rgb: 34 168 191;
+    --pritio-coral-rgb: 244 96 116;
+    --pritio-blue-rgb: 35 131 222;
+    --pritio-purple-rgb: 108 109 227;
+  }
+  html[data-theme="sunset"] {
+    --pritio-green-rgb: 247 148 55;
+    --pritio-coral-rgb: 240 86 82;
+    --pritio-blue-rgb: 250 137 92;
+    --pritio-purple-rgb: 239 108 143;
+  }
+  html[data-theme="forest"] {
+    --pritio-green-rgb: 40 179 116;
+    --pritio-coral-rgb: 235 122 74;
+    --pritio-blue-rgb: 45 152 138;
+    --pritio-purple-rgb: 122 150 97;
+  }
+  html[data-theme="midnight"] {
+    --pritio-green-rgb: 96 169 232;
+    --pritio-coral-rgb: 164 120 235;
+    --pritio-blue-rgb: 130 113 246;
+    --pritio-purple-rgb: 158 106 232;
   }
 
   * {

@@ -33,6 +33,7 @@ const ROW = (
   allowPlanView: boolean,
   allowBoardView: boolean,
   allowDueDate: boolean,
+  allowPremiumThemes: boolean,
   supportTier: string,
 ): PlanLimits => ({
   plan,
@@ -48,16 +49,17 @@ const ROW = (
   allowPlanView,
   allowBoardView,
   allowDueDate,
+  allowPremiumThemes,
   supportTier,
 });
 
 export const PLAN_LIMITS: PlanLimits[] = [
-  ROW("free", "personal", 1, 50, 3, 0, 10, 1, 5, 5, false, false, false, "mail"),
-  ROW("pro", "personal", 1, 300, 100, 0, 30, 1, null, null, true, true, true, "mail+chat"),
-  ROW("free", "family", 4, 50, 5, 5, 10, 1, 0, 5, false, false, false, "mail"),
-  ROW("pro", "family", 10, 300, 100, 50, 30, 1, null, null, true, true, true, "email+chat"),
-  ROW("free", "team", 5, 100, 5, 10, 10, 1, 5, 0, false, false, false, "mail"),
-  ROW("pro", "team", 50, 5000, 500, 500, 90, 1, null, null, true, true, true, "chat+mail+phone"),
+  ROW("free", "personal", 1, 50, 3, 0, 10, 1, 5, 5, false, false, false, false, "mail"),
+  ROW("pro", "personal", 1, 300, 100, 0, 30, 1, null, null, true, true, true, true, "mail+chat"),
+  ROW("free", "family", 4, 50, 5, 5, 10, 1, 0, 5, false, false, false, false, "mail"),
+  ROW("pro", "family", 10, 300, 100, 50, 30, 1, null, null, true, true, true, true, "email+chat"),
+  ROW("free", "team", 5, 100, 5, 10, 10, 1, 5, 0, false, false, false, false, "mail"),
+  ROW("pro", "team", 50, 5000, 500, 500, 90, 1, null, null, true, true, true, true, "chat+mail+phone"),
 ];
 
 export function getLimits(plan: WorkspacePlan, workspaceType: WorkspaceType): PlanLimits {
@@ -162,6 +164,8 @@ export function hasFeature(limits: PlanLimits, feature: PlanFeature): boolean {
       return limits.eventsPerMonth !== 0;
     case "due_date":
       return limits.allowDueDate;
+    case "premium_themes":
+      return limits.allowPremiumThemes;
   }
 }
 

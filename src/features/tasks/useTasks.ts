@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
 import { TASK_COLUMNS, mapTask } from "@/lib/mappers";
@@ -6,7 +6,8 @@ import type { SubtaskCounts } from "@/lib/mappers";
 import { useDebouncedRealtimeRefresh } from "@/lib/useDebouncedRealtimeRefresh";
 import { isOnline, loadSnapshot, saveSnapshot } from "@/lib/offline";
 import { deleteTask as apiDeleteTask } from "@/features/tasks/api";
-import type { Task } from "@/types";
+import { allowedKindsForWorkspace } from "@/features/tasks/kinds";
+import type { Task, WorkspaceType } from "@/types";
 
 let channelKeyCounter = 0;
 
@@ -30,22 +31,29 @@ export async function fetchSubtaskCounts(
   return counts;
 }
 
-export function useTasks(workspaceId: string | null) {
+export function useTasks(
+  workspaceId: string | null,
+  options?: { workspaceType?: WorkspaceType | string },
+) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const kinds = useMemo(
+    () => allowedKindsForWorkspace(options?.workspaceType),
+    [options?.workspaceType],
+  );
 
   const loadFromSnapshot = useCallback(async () => {
     if (!workspaceId) return false;
     const snap = await loadSnapshot<Task[]>(`tasks:${workspaceId}`);
     if (snap) {
-      setTasks(snap.data);
+      setTasks(kinds ? snap.data.filter((t) => kinds.includes(t.kind)) : snap.data);
       setError(null);
       return true;
     }
     return false;
-  }, [workspaceId]);
+  }, [workspaceId, kinds]);
 
   const fetchTasks = useCallback(async () => {
     if (!workspaceId) {
@@ -67,12 +75,14 @@ export function useTasks(workspaceId: string | null) {
     try {
       // Timeout de seguridad: si la red está caída pero navigator.onLine miente,
       // la promesa no se queda colgada indefinidamente.
+      let query = supabase
+        .from("tasks")
+        .select(TASK_COLUMNS)
+        .eq("workspace_id", workspaceId);
+      if (kinds && kinds.length > 0) query = query.in("kind", kinds);
+
       const { data: taskRows, error: taskError } = await Promise.race([
-        supabase
-          .from("tasks")
-          .select(TASK_COLUMNS)
-          .eq("workspace_id", workspaceId)
-          .order("created_at", { ascending: false }),
+        query.order("created_at", { ascending: false }),
         new Promise<never>((_, reject) =>
           window.setTimeout(() => reject(new Error("La solicitud tardó demasiado")), 10_000),
         ),
@@ -120,7 +130,7 @@ export function useTasks(workspaceId: string | null) {
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId, loadFromSnapshot]);
+  }, [workspaceId, kinds, loadFromSnapshot]);
 
   const silentRefresh = useDebouncedRealtimeRefresh(fetchTasks);
 

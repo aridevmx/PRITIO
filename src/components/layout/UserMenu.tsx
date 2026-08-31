@@ -1,10 +1,9 @@
 import { forwardRef, useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
-import { useTheme } from "@/lib/useTheme";
-import { IS_SELF_HOSTED } from "@/lib/constants";
+import { useTheme, type Theme } from "@/lib/useTheme";
+import { IS_SELF_HOSTED, SHOW_DONATIONS } from "@/lib/constants";
 import { DonationModal } from "@/components/layout/DonationModal";
 import { AccountModal, type TabId } from "@/features/account/AccountModal";
-import { PreferencesModal } from "@/features/account/PreferencesModal";
 import { SubscriptionsModal } from "@/features/billing/SubscriptionsModal";
 import { ApprovalsDialog } from "@/features/tasks/ApprovalsDialog";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
@@ -19,21 +18,37 @@ interface UserMenuProps {
   children: ReactNode;
 }
 
+const THEME_LABELS: Record<Theme, string> = {
+  light: "Claro",
+  dark: "Oscuro",
+  system: "Sistema",
+};
+
 export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
   const [open, setOpen] = useState(false);
   const [accountTab, setAccountTab] = useState<TabId | null>(null);
-  const [showPreferences, setShowPreferences] = useState(false);
   const [showSubscriptions, setShowSubscriptions] = useState(false);
   const [showApprovals, setShowApprovals] = useState(false);
   const [showDonate, setShowDonate] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([]);
-  const { theme, toggleTheme } = useTheme();
+  const { theme, setTheme } = useTheme();
   const { isLeader, currentWorkspace } = useWorkspace();
   const { effectivePlan } = useBilling();
 
   const initial = (profile?.fullName || profile?.email || "?").charAt(0).toUpperCase();
+
+  // Índices fijos de navegación por teclado (dependen de roles/flags).
+  const accountIndex = 0;
+  const billingIndex = 1;
+  const availabilityIndex = 2;
+  const approvalsIndex = isLeader ? 3 : -1;
+  const notificationsIndex = isLeader ? 4 : 3;
+  const themeIndex = isLeader ? 5 : 4;
+  const tourIndex = isLeader ? 6 : 5;
+  const supportIndex = SHOW_DONATIONS && !IS_SELF_HOSTED ? (isLeader ? 7 : 6) : -1;
+  const signOutIndex = SHOW_DONATIONS && !IS_SELF_HOSTED ? (isLeader ? 8 : 7) : (isLeader ? 7 : 6);
 
   const openAccount = (tab: TabId) => {
     setOpen(false);
@@ -41,6 +56,12 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
   };
 
   const close = useCallback(() => setOpen(false), []);
+
+  const cycleTheme = useCallback(() => {
+    const order: Theme[] = ["light", "dark", "system"];
+    const next = order[(order.indexOf(theme) + 1) % order.length];
+    setTheme(next);
+  }, [theme, setTheme]);
 
   // ── Focus trap + keyboard navigation ────────────────────────
   const handleKeyDown = useCallback(
@@ -79,7 +100,6 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
   // ── Open/close lifecycle ────────────────────────────────────
   useEffect(() => {
     if (!open) return;
-    // Auto-focus first item
     requestAnimationFrame(() => {
       itemsRef.current[0]?.focus();
     });
@@ -108,8 +128,11 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
 
   // ── Helpers ─────────────────────────────────────────────────
   const registerItem = (idx: number) => (el: HTMLButtonElement | null) => {
-    itemsRef.current[idx] = el;
+    if (idx >= 0) itemsRef.current[idx] = el;
   };
+
+  const themeIcon =
+    theme === "light" ? <SunIcon /> : theme === "dark" ? <MoonIcon /> : <MonitorIcon />;
 
   return (
     <div className="relative">
@@ -143,9 +166,12 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
           aria-label="Menú de usuario"
           className="pritio-menu-enter absolute right-0 top-full z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-line/80 bg-surface shadow-elevated"
         >
-          {/* ── Identidad ────────────────────────────────────── */}
+          {/* ── Encabezado de perfil ─────────────────────────── */}
           <div className="relative overflow-hidden px-3.5 pt-3.5 pb-2.5">
-            <div className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-br from-pritio-purple/10 via-transparent to-transparent" aria-hidden />
+            <div
+              className="pointer-events-none absolute inset-x-0 top-0 h-16 bg-gradient-to-br from-pritio-purple/10 via-transparent to-transparent"
+              aria-hidden
+            />
             <div className="relative flex items-center gap-2.5">
               {profile?.avatarUrl ? (
                 <img
@@ -174,13 +200,14 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
                   close();
                   setShowSubscriptions(true);
                 }}
+                aria-label="Gestionar plan y facturación"
                 className={cn(
-                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-opacity hover:opacity-80",
+                  "inline-flex min-h-[28px] items-center gap-1 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider transition-opacity hover:opacity-80",
                   PLAN_BADGE_CLASSES[effectivePlan],
                 )}
               >
-                {PLAN_LABELS[effectivePlan]}
-                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none">
+                Plan {PLAN_LABELS[effectivePlan]}
+                <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none" aria-hidden>
                   <path d="M6 11L10 8L6 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
@@ -189,18 +216,18 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
 
           <div className="h-px bg-line/60" />
 
-          {/* ── Cuenta ──────────────────────────────────────── */}
+          {/* ── Cuenta ───────────────────────────────────────── */}
           <div className="p-1" role="group" aria-label="Cuenta">
             <MenuItem
-              ref={registerItem(0)}
+              ref={registerItem(accountIndex)}
               icon={<UserIcon />}
               label="Mi cuenta"
               onClick={() => openAccount("identity")}
             />
             <MenuItem
-              ref={registerItem(1)}
+              ref={registerItem(billingIndex)}
               icon={<WalletIcon />}
-              label="Suscripciones"
+              label="Suscripción y facturación"
               onClick={() => {
                 close();
                 setShowSubscriptions(true);
@@ -210,23 +237,17 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
 
           <div className="h-px bg-line/40" />
 
-          {/* ── Workspace ────────────────────────────────────── */}
-          <div className="p-1" role="group" aria-label="Workspace">
+          {/* ── Gestión ──────────────────────────────────────── */}
+          <div className="p-1" role="group" aria-label="Gestión">
             <MenuItem
-              ref={registerItem(2)}
-              icon={<CalendarOffIcon />}
-              label="Mis días bloqueados"
+              ref={registerItem(availabilityIndex)}
+              icon={<AvailabilityIcon />}
+              label="Disponibilidad"
               onClick={() => openAccount("blockedDays")}
-            />
-            <MenuItem
-              ref={registerItem(3)}
-              icon={<BellIcon />}
-              label="Notificaciones"
-              onClick={() => openAccount("notifications")}
             />
             {isLeader && (
               <MenuItem
-                ref={registerItem(4)}
+                ref={registerItem(approvalsIndex)}
                 icon={<ShieldIcon />}
                 label="Aprobaciones"
                 onClick={() => {
@@ -242,40 +263,37 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
           {/* ── Preferencias ─────────────────────────────────── */}
           <div className="p-1" role="group" aria-label="Preferencias">
             <MenuItem
-              ref={registerItem(isLeader ? 5 : 4)}
-              icon={<SlidersIcon />}
-              label="Preferencias"
-              onClick={() => {
-                close();
-                setShowPreferences(true);
-              }}
+              ref={registerItem(notificationsIndex)}
+              icon={<BellIcon />}
+              label="Notificaciones"
+              onClick={() => openAccount("notifications")}
             />
             <MenuItem
-              ref={registerItem(isLeader ? 6 : 5)}
-              icon={theme === "dark" ? <SunIcon /> : <MoonIcon />}
-              label={theme === "dark" ? "Modo claro" : "Modo oscuro"}
-              onClick={toggleTheme}
+              ref={registerItem(themeIndex)}
+              icon={themeIcon}
+              label={`Tema: ${THEME_LABELS[theme]}`}
+              onClick={cycleTheme}
             />
           </div>
 
           <div className="h-px bg-line/40" />
 
-          {/* ── Ayuda ────────────────────────────────────────── */}
-          <div className="p-1" role="group" aria-label="Ayuda">
+          {/* ── Ayuda y apoyo ────────────────────────────────── */}
+          <div className="p-1" role="group" aria-label="Ayuda y apoyo">
             <MenuItem
-              ref={registerItem(isLeader ? 7 : 6)}
+              ref={registerItem(tourIndex)}
               icon={<StarIcon />}
-              label="Tour de la app"
+              label="Ver recorrido de la app"
               onClick={() => {
                 close();
                 emitAppEvent("pritio:startTour");
               }}
             />
-            {!IS_SELF_HOSTED && (
+            {SHOW_DONATIONS && !IS_SELF_HOSTED && (
               <MenuItem
-                ref={registerItem(isLeader ? 8 : 7)}
+                ref={registerItem(supportIndex)}
                 icon={<HeartIcon />}
-                label="Donar / Apoyar"
+                label="Apoyar el proyecto"
                 onClick={() => {
                   close();
                   setShowDonate(true);
@@ -284,10 +302,10 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
             )}
           </div>
 
-          {/* ── Cerrar sesión (separado visualmente) ─────────── */}
+          {/* ── Cerrar sesión ────────────────────────────────── */}
           <div className="border-t border-line/60 p-1">
             <MenuItem
-              ref={registerItem(isLeader ? 9 : 8)}
+              ref={registerItem(signOutIndex)}
               danger
               icon={<SignOutIcon />}
               label="Cerrar sesión"
@@ -302,7 +320,6 @@ export function UserMenu({ profile, onSignOut, children }: UserMenuProps) {
 
       {/* ── Modales ──────────────────────────────────────────── */}
       <DonationModal open={showDonate} onClose={() => setShowDonate(false)} />
-      {showPreferences && <PreferencesModal onClose={() => setShowPreferences(false)} />}
       {showSubscriptions && <SubscriptionsModal onClose={() => setShowSubscriptions(false)} />}
       {accountTab && (
         <AccountModal initialTab={accountTab} onClose={() => setAccountTab(null)} />
@@ -338,11 +355,13 @@ function WalletIcon() {
   );
 }
 
-function CalendarOffIcon() {
+function AvailabilityIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <rect x="2.5" y="4.5" width="9" height="7" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5.5 4.5V3.5C5.5 2.7 6.2 2 7 2H8C8.8 2 9.5 2.7 9.5 3.5V4.5M2.5 8H13.5" stroke="currentColor" strokeWidth="1.3" />
+      <rect x="2.5" y="3.5" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M2.5 6.5H13.5" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M5.5 2.5V4.5M10.5 2.5V4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M6 9.5L7.5 11L10 8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -365,11 +384,12 @@ function ShieldIcon() {
   );
 }
 
-function SlidersIcon() {
+function MonitorIcon() {
   return (
     <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="1.8" fill="currentColor" />
-      <path d="M8 2.5V4M8 12V13.5M2.5 8H4M12 8H13.5M4.2 4.2L5.3 5.3M10.7 10.7L11.8 11.8M11.8 4.2L10.7 5.3M5.3 10.7L4.2 11.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <rect x="2" y="2.5" width="12" height="9" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
+      <path d="M6.5 14.5H9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+      <path d="M8 11.5V14.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -438,7 +458,7 @@ const MenuItem = forwardRef<HTMLButtonElement, MenuItemProps>(function MenuItem(
       tabIndex={0}
       onClick={onClick}
       className={cn(
-        "flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-semibold transition-colors",
+        "flex w-full min-h-[44px] items-center gap-2.5 rounded-lg px-2.5 py-2 text-sm font-semibold transition-colors",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-pritio-purple/50",
         "active:scale-[0.98]",
         danger

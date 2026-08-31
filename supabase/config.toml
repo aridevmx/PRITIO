@@ -397,6 +397,12 @@ verify_jwt = false
 [functions.sync-seats]
 verify_jwt = false
 
+[functions.asana-oauth]
+verify_jwt = true
+
+[functions.asana-import]
+verify_jwt = true
+
 [analytics]
 enabled = true
 port = 54327

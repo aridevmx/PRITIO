@@ -12,6 +12,7 @@ import { LogoLoader } from "@/components/LogoLoader";
 import { OfflineBanner } from "@/components/OfflineBanner";
 import { JoinScreen } from "@/features/invitations/JoinScreen";
 import { DownloadScreen } from "@/features/download/DownloadScreen";
+import { AsanaOAuthCallback } from "@/features/integrations/AsanaOAuthCallback";
 
 function PendingInvitationRedirect() {
   const { user } = useAuth();
@@ -73,6 +74,7 @@ export default function App() {
               <Route path="/download" element={<DownloadScreen />} />
               <Route element={<Root />}>
                 <Route index element={<Navigate to="/pendiente" replace />} />
+                <Route path="oauth/asana/callback" element={<AsanaOAuthCallback />} />
                 <Route path=":space/:view?" element={<AppShell />} />
                 <Route path="*" element={<Navigate to="/pendiente" replace />} />
               </Route>
