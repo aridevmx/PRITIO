@@ -80,12 +80,14 @@ function DownloadButton({
   primary,
   disabled,
   hrefFallback,
+  downloadName,
 }: {
   asset: ReleaseAsset | undefined;
   platform: Platform;
   primary: boolean;
   disabled?: boolean;
   hrefFallback?: string;
+  downloadName?: string;
 }) {
   const label =
     platform === "windows" ? "Descargar para Windows" :
@@ -96,7 +98,7 @@ function DownloadButton({
   return (
     <a
       href={asset?.browser_download_url ?? hrefFallback ?? RELEASES_URL}
-      download={asset ? undefined : undefined}
+      download={!asset ? downloadName : undefined}
       aria-disabled={disabled}
       className={`flex items-center justify-center gap-2.5 rounded-xl px-4 py-3 text-sm font-bold transition-colors ${
         primary
@@ -217,6 +219,7 @@ export function DownloadScreen() {
             platform="android"
             primary={platform === "android"}
             hrefFallback={ANDROID_APK_URL}
+            downloadName="pritio.apk"
           />
           <p className="text-center text-xs leading-relaxed text-ink-muted">
             Android: instala el APK y permite la instalación desde

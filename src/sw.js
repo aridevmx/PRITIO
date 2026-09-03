@@ -8,7 +8,15 @@ precacheAndRoute(self.__WB_MANIFEST);
 cleanupOutdatedCaches();
 
 registerRoute(
-  new NavigationRoute(createHandlerBoundToURL("/index.html")),
+  new NavigationRoute(createHandlerBoundToURL("/index.html"), {
+    // No tratar descargas/archivos (p. ej. el APK) como rutas de la SPA:
+    // dejar que la red las responda directamente para que el navegador
+    // descargue el archivo en lugar de devolver index.html.
+    denylist: [
+      /\/apk\//,
+      /\.(apk|aab|exe|msi|dmg|appimage|zip|pdf)$/i,
+    ],
+  }),
 );
 
 registerRoute(
