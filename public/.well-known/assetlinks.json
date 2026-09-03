@@ -5,7 +5,7 @@
       "namespace": "android_app",
       "package_name": "com.pritio.app",
       "sha256_cert_fingerprints": [
-        "REEMPLAZAR: Genera el proyecto TWA con `npm run twa:build` y copia este archivo con `npm run twa:update-assetlinks`"
+        "F1:78:E9:77:23:27:DF:F7:7A:EF:14:A5:F2:42:5B:C7:37:9A:DA:07:FF:FB:38:D4:1C:AD:11:19:DF:0B:AA:B9"
       ]
     }
   }

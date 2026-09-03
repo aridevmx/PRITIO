@@ -1,5 +1,10 @@
 # Generado por bubblewrap — no versionar el proyecto Android ni el keystore.
 android.keystore
+local.properties
+.gradle/
+.idea/
+*.iml
+store_icon.png
 *.aab
 *.apk
 assetlinks.json

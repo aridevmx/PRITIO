@@ -1,11 +1,13 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { APP_NAME, APP_TAGLINE } from "@/lib/branding";
+import { APP_NAME, APP_TAGLINE, APP_URL } from "@/lib/branding";
 import { PritioLogo } from "@/components/PritioLogo";
 
 const REPO_OWNER = "aridevmx";
 const REPO_NAME = "PRITIO";
 const RELEASES_URL = `https://github.com/${REPO_OWNER}/${REPO_NAME}/releases/latest`;
+// APK servido en el dominio (fallback / distribución directa).
+const ANDROID_APK_URL = `${APP_URL}/apk/pritio.apk`;
 
 interface ReleaseAsset {
   name: string;
@@ -20,10 +22,11 @@ interface GitHubRelease {
   assets: ReleaseAsset[];
 }
 
-type Platform = "windows" | "linux" | "mac" | "other";
+type Platform = "windows" | "linux" | "mac" | "android" | "other";
 
 function detectPlatform(): Platform {
   const ua = navigator.userAgent;
+  if (/android/i.test(ua)) return "android";
   if (/windows/i.test(ua)) return "windows";
   if (/linux/i.test(ua)) return "linux";
   if (/mac/i.test(ua)) return "mac";
@@ -56,6 +59,13 @@ function PlatformIcon({ platform }: { platform: Platform }) {
       </svg>
     );
   }
+  if (platform === "android") {
+    return (
+      <svg className={common} viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+        <path d="M7.6 14.6a1.4 1.4 0 0 0 2.8 0v-1.6a1.4 1.4 0 0 0-2.8 0v1.6Zm6 0a1.4 1.4 0 0 0 2.8 0v-1.6a1.4 1.4 0 0 0-2.8 0v1.6Zm-8.5.5a.6.6 0 0 0 .6.6h12.6a.6.6 0 0 0 .6-.6v-3.9c0-3.1-2.7-5.6-6.9-5.6S4.9 8.1 4.9 11.2v3.9Zm2.6-8C8.4 5.7 10.2 5 12 5s3.6.7 5.3 2.1l1.1-1.6A11.7 11.7 0 0 0 12 3.5c-2.3 0-4.6.8-6.4 2l1.1 1.6Z" transform="translate(0 1)" />
+      </svg>
+    );
+  }
   return (
     <svg className={common} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden>
       <rect x="4" y="3" width="16" height="18" rx="3" />
@@ -69,20 +79,23 @@ function DownloadButton({
   platform,
   primary,
   disabled,
+  hrefFallback,
 }: {
   asset: ReleaseAsset | undefined;
   platform: Platform;
   primary: boolean;
   disabled?: boolean;
+  hrefFallback?: string;
 }) {
   const label =
     platform === "windows" ? "Descargar para Windows" :
     platform === "linux" ? "Descargar para Linux" :
-    platform === "mac" ? "Descargar para macOS" : "Descargar";
+    platform === "mac" ? "Descargar para macOS" :
+    platform === "android" ? "Descargar para Android" : "Descargar";
 
   return (
     <a
-      href={asset?.browser_download_url ?? RELEASES_URL}
+      href={asset?.browser_download_url ?? hrefFallback ?? RELEASES_URL}
       download={asset ? undefined : undefined}
       aria-disabled={disabled}
       className={`flex items-center justify-center gap-2.5 rounded-xl px-4 py-3 text-sm font-bold transition-colors ${
@@ -133,6 +146,7 @@ export function DownloadScreen() {
 
   const windowsAsset = release ? findAsset(release, ".exe") : undefined;
   const linuxAsset = release ? findAsset(release, ".appimage") : undefined;
+  const androidAsset = release ? findAsset(release, ".apk") : undefined;
   const version = release?.tag_name.replace(/^v/, "") ?? null;
 
   return (
@@ -195,6 +209,19 @@ export function DownloadScreen() {
               />
             </>
           )}
+        </div>
+
+        <div className="mt-2.5 w-full space-y-2.5">
+          <DownloadButton
+            asset={androidAsset}
+            platform="android"
+            primary={platform === "android"}
+            hrefFallback={ANDROID_APK_URL}
+          />
+          <p className="text-center text-xs leading-relaxed text-ink-muted">
+            Android: instala el APK y permite la instalación desde
+            "orígenes desconocidos".
+          </p>
         </div>
 
         <div className="mt-7 flex flex-wrap items-center justify-center gap-x-4 gap-y-1 text-xs text-ink-muted">
