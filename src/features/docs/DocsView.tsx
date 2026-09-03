@@ -33,7 +33,7 @@ import {
 import { DocsTree } from "@/features/docs/DocsTree";
 import { ShareDialog } from "@/features/docs/ShareDialog";
 import { useDocPresence } from "@/features/docs/useDocPresence";
-import { isOnline, loadSnapshot, queueOfflineOp, saveSnapshot } from "@/lib/offline";
+import { isNetworkError, isOnline, loadSnapshot, queueOfflineOp, saveSnapshot } from "@/lib/offline";
 import {
   buildStandaloneHtml,
   downloadFile,
@@ -226,6 +226,22 @@ export function DocsView({ workspaceId }: DocsViewProps) {
     };
   }, [workspaceId, toast]);
 
+  // Tras sincronizar el outbox al volver online, recargar docs y carpetas.
+  useEffect(() => {
+    if (!workspaceId || !isOnline()) return;
+    const onSynced = () => {
+      void Promise.all([listDocs(workspaceId), listFolders(workspaceId)])
+        .then(([rows, folderRows]) => {
+          setDocs(rows);
+          setFolders(folderRows);
+          void saveSnapshot(`docs:${workspaceId}`, { docs: rows, folders: folderRows });
+        })
+        .catch(() => {});
+    };
+    window.addEventListener("pritio:synced", onSynced);
+    return () => window.removeEventListener("pritio:synced", onSynced);
+  }, [workspaceId]);
+
   // ─── Autosave ─────────────────────────────────────────────
 
   const flushSave = useCallback(async () => {
@@ -244,9 +260,9 @@ export function DocsView({ workspaceId }: DocsViewProps) {
           d.id === id ? { ...d, ...patch, updatedAt: new Date().toISOString() } : d,
         ),
       );
-    } catch {
-      // Sin conexión: encolar para sincronizar al reconectar.
-      if (!isOnline()) {
+    } catch (err) {
+      // Erorres de red (o sin conexión): encolar para sincronizar al volver.
+      if (!isOnline() || isNetworkError(err)) {
         const doc = docsRef.current.find((d) => d.id === id);
         const workspaceIdSnap = doc?.workspaceId ?? workspaceId ?? "";
         void queueOfflineOp("doc_upsert", workspaceIdSnap, id, {

@@ -138,6 +138,14 @@ export function useTasks(
     void fetchTasks();
   }, [fetchTasks]);
 
+  // Al terminar de sincronizar el outbox, refrescar desde el servidor para que
+  // la vista local refleje los cambios aplicados (y los de otros dispositivos).
+  useEffect(() => {
+    const onSynced = () => void fetchTasks();
+    window.addEventListener("pritio:synced", onSynced);
+    return () => window.removeEventListener("pritio:synced", onSynced);
+  }, [fetchTasks]);
+
   useEffect(() => {
     if (!workspaceId) return;
 

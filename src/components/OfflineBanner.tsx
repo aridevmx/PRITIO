@@ -1,9 +1,14 @@
 import { useEffect, useState } from "react";
-import { flushOutbox, getOutbox, isOnline } from "@/lib/offline";
+import {
+  getOutbox,
+  startAutoSync,
+  startConnectivityMonitor,
+  useOnlineStatus,
+} from "@/lib/offline";
 
 /** Banner fijo que avisa pérdida de conexión y sincroniza al volver. */
 export function OfflineBanner() {
-  const [online, setOnline] = useState(isOnline());
+  const online = useOnlineStatus();
   const [pendingCount, setPendingCount] = useState(0);
   const [justSynced, setJustSynced] = useState(false);
 
@@ -13,34 +18,33 @@ export function OfflineBanner() {
     };
     void refreshPending();
 
-    // Al montar, si hay conexión intentar vaciar la cola (p. ej. después de un reload).
-    if (isOnline()) {
-      void flushOutbox().then(refreshPending);
-    }
+    // Arranca el monitor de conectividad real y el drenaje automático del
+    // outbox (ambos idempotentes, una sola vez por sesión).
+    const stopMonitor = startConnectivityMonitor();
+    const stopAutoSync = startAutoSync();
 
-    const up = () => {
-      setOnline(true);
-      void flushOutbox().then((applied) => {
-        refreshPending();
-        if (applied > 0) {
-          setJustSynced(true);
-          window.setTimeout(() => setJustSynced(false), 2500);
-        }
-      });
+    const onSynced = () => {
+      setJustSynced(true);
+      window.setTimeout(() => setJustSynced(false), 2500);
     };
-    const down = () => setOnline(false);
+    const refresh = () => void refreshPending();
 
-    window.addEventListener("online", up);
-    window.addEventListener("offline", down);
-    window.addEventListener("pritio:outbox-changed", refreshPending);
+    window.addEventListener("online", refresh);
+    window.addEventListener("offline", refresh);
+    window.addEventListener("pritio:outbox-changed", refresh);
+    window.addEventListener("pritio:synced", onSynced);
+
     return () => {
-      window.removeEventListener("online", up);
-      window.removeEventListener("offline", down);
-      window.removeEventListener("pritio:outbox-changed", refreshPending);
+      window.removeEventListener("online", refresh);
+      window.removeEventListener("offline", refresh);
+      window.removeEventListener("pritio:outbox-changed", refresh);
+      window.removeEventListener("pritio:synced", onSynced);
+      stopMonitor();
+      stopAutoSync();
     };
   }, []);
 
-  if (online && !justSynced && pendingCount === 0) return null;
+  if (online && !justSynced && (pendingCount === 0)) return null;
 
   return (
     <div

@@ -16,7 +16,7 @@ import { ManageDialog } from "@/components/layout/ManageDialog";
 import { SegmentedControl } from "@/components/SegmentedControl";
 import { updateTask as apiUpdateTask, archiveTask as apiArchiveTask } from "@/features/tasks/api";
 import { notifyTaskChange } from "@/features/tasks/notifications";
-import { isOnline, queueOfflineOp } from "@/lib/offline";
+import { isNetworkError, isOnline, queueOfflineOp } from "@/lib/offline";
 import { groupTasksByDay, formatDateShort } from "@/features/tasks/dates";
 import type { Task, Quadrant } from "@/types";
 
@@ -478,36 +478,44 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
 
   const handleToggleComplete = useCallback(
     async (task: Task) => {
+      const workspaceId = currentWorkspace?.id ?? task.workspaceId;
+      const nextCompleted = !task.completed;
+      const completedAt = nextCompleted ? new Date().toISOString() : null;
+      const optimistic: Task = { ...task, completed: nextCompleted, completedAt };
+
+      const applyLocal = (t: Task) => {
+        if (isMultiWs) {
+          setAllTasks((prev) => prev.map((x) => (x.id === t.id ? t : x)));
+        } else {
+          updateLocalTask(t);
+        }
+      };
+
       // Sin conexión: encola el toggle y aplica el estado localmente;
       // el outbox lo sincroniza al reconectar.
-      if (!isOnline() && currentWorkspace) {
-        const nextCompleted = !task.completed;
-        const completedAt = nextCompleted ? new Date().toISOString() : null;
-        void queueOfflineOp(
-          "task_update",
-          currentWorkspace.id,
-          task.id,
-          { completed: nextCompleted, completed_at: completedAt },
-        );
-        const optimistic: Task = { ...task, completed: nextCompleted, completedAt };
-        if (isMultiWs) {
-          setAllTasks((prev) => prev.map((t) => (t.id === task.id ? optimistic : t)));
-        } else {
-          updateLocalTask(optimistic);
-        }
+      if (!isOnline() && workspaceId) {
+        void queueOfflineOp("task_update", workspaceId, task.id, {
+          completed: nextCompleted,
+          completed_at: completedAt,
+        });
+        applyLocal(optimistic);
         return;
       }
       try {
-        const updated = await apiUpdateTask(task.id, { completed: !task.completed });
-        if (isMultiWs) {
-          setAllTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
-        } else {
-          updateLocalTask(updated);
+        const updated = await apiUpdateTask(task.id, { completed: nextCompleted });
+        applyLocal(updated);
+        if (!task.completed && task.assigneeIds.length > 0 && workspaceId) {
+          void notifyTaskChange("completed", task.id, workspaceId, task.assigneeIds);
         }
-        if (!task.completed && task.assigneeIds.length > 0 && currentWorkspace) {
-          void notifyTaskChange("completed", task.id, currentWorkspace.id, task.assigneeIds);
+      } catch (err) {
+        if (isNetworkError(err) && workspaceId) {
+          // Red cayó a mitad: encolar y aplicar local para no perder el cambio.
+          void queueOfflineOp("task_update", workspaceId, task.id, {
+            completed: nextCompleted,
+            completed_at: completedAt,
+          });
+          applyLocal(optimistic);
         }
-      } catch {
         // realtime will sync
       }
     },
@@ -516,49 +524,92 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
 
   const handleArchive = useCallback(
     async (task: Task) => {
-      try {
-        await apiArchiveTask(task.id);
+      const workspaceId = currentWorkspace?.id ?? task.workspaceId;
+      const applyLocal = () => {
         if (isMultiWs) {
           setAllTasks((prev) => prev.filter((t) => t.id !== task.id));
         } else {
           removeTask(task.id);
         }
-      } catch {
+      };
+      if (!isOnline() && workspaceId) {
+        void queueOfflineOp("task_update", workspaceId, task.id, { is_active: false });
+        applyLocal();
+        return;
+      }
+      try {
+        await apiArchiveTask(task.id);
+        applyLocal();
+      } catch (err) {
+        if (isNetworkError(err) && workspaceId) {
+          void queueOfflineOp("task_update", workspaceId, task.id, { is_active: false });
+          applyLocal();
+        }
         // realtime will sync
       }
     },
-    [removeTask, isMultiWs],
+    [removeTask, isMultiWs, currentWorkspace],
   );
 
   const handleDelete = useCallback(
     async (task: Task) => {
-      try {
-        await removeTask(task.id);
+      const workspaceId = currentWorkspace?.id ?? task.workspaceId;
+      const applyLocal = () => {
         if (isMultiWs) {
           setAllTasks((prev) => prev.filter((t) => t.id !== task.id));
+        } else {
+          removeTask(task.id);
         }
-      } catch {
+      };
+      if (!isOnline() && workspaceId) {
+        void queueOfflineOp("task_delete", workspaceId, task.id, {});
+        applyLocal();
+        setDeleteTarget(null);
+        return;
+      }
+      try {
+        await removeTask(task.id);
+        applyLocal();
+      } catch (err) {
+        if (isNetworkError(err) && workspaceId) {
+          void queueOfflineOp("task_delete", workspaceId, task.id, {});
+          applyLocal();
+        }
         // realtime will sync
       }
       setDeleteTarget(null);
     },
-    [removeTask, isMultiWs],
+    [removeTask, isMultiWs, currentWorkspace],
   );
 
   const handleMoveTask = useCallback(
     async (taskId: string, newQuadrant: Quadrant) => {
-      try {
-        const updated = await apiUpdateTask(taskId, { quadrant: newQuadrant });
+      const task = tasksSource.find((t) => t.id === taskId);
+      const workspaceId = currentWorkspace?.id ?? task?.workspaceId;
+      const applyLocal = (updated: Task) => {
         if (isMultiWs) {
           setAllTasks((prev) => prev.map((t) => (t.id === taskId ? updated : t)));
         } else {
           updateLocalTask(updated);
         }
-      } catch {
+      };
+      if (task && !isOnline() && workspaceId) {
+        void queueOfflineOp("task_update", workspaceId, taskId, { quadrant: newQuadrant });
+        applyLocal({ ...task, quadrant: newQuadrant });
+        return;
+      }
+      try {
+        const updated = await apiUpdateTask(taskId, { quadrant: newQuadrant });
+        applyLocal(updated);
+      } catch (err) {
+        if (task && isNetworkError(err) && workspaceId) {
+          void queueOfflineOp("task_update", workspaceId, taskId, { quadrant: newQuadrant });
+          applyLocal({ ...task, quadrant: newQuadrant });
+        }
         // realtime will sync
       }
     },
-    [updateLocalTask, isMultiWs],
+    [updateLocalTask, isMultiWs, currentWorkspace, tasksSource],
   );
 
   const handleSaved = useCallback(
