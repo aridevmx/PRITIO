@@ -19,7 +19,7 @@ import type { SpaceKey } from "@/features/spaces/spaces";
 import type { ViewKey } from "@/components/layout/ViewTabs";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 import { cn } from "@/lib/utils";
-import { onAppEvent } from "@/lib/appEvents";
+import { onAppEvent, emitAppEvent } from "@/lib/appEvents";
 
 function baseViewsFor(_workspaceType: string, _space: SpaceKey): ViewKey[] {
   // Todas las vistas están disponibles en cualquier workspace/espacio.
@@ -158,6 +158,20 @@ export function AppShell() {
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              onClick={() => emitAppEvent("pritio:app-refresh")}
+              aria-label="Refrescar datos"
+              title="Refrescar datos"
+              className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40"
+            >
+              <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4m0 6a8.1 8.1 0 0 0 15.5-2m.5 4v-4h-4"
+                />
+              </svg>
+            </button>
             <PendingInvitationsPopover />
             <NotificationBell />
             <MemberPresenceStack

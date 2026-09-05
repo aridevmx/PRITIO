@@ -6,6 +6,17 @@ este proyecto cumple con [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [0.1.6] - 2026-09-05
+
+### Corregido
+- Las tareas nuevas/editadas aparecían solo al refrescar: ahora la vista local
+  reacciona al instante al guardar desde el formulario (sin depender del
+  Realtime, que puede fallar o tardar) y sincroniza desde el servidor.
+- Bordes sólidos de la UI suavizados con opacidad (menos duros).
+
+### Añadido
+- Botón de refrescar datos en la cabecera (recarga las tareas del servidor).
+
 ## [0.1.5] - 2026-08-26
 
 ## [0.1.4] - 2026-08-24

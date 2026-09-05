@@ -642,6 +642,29 @@
   }
 }
 
+/* ─── Bordes por defecto ligeramente translúcidos ───────────────
+   Las clases base border-line / divide-line / ring-line se aplican
+   con alpha moderado para que la UI no se sienta de líneas duras.
+   Los usos explícitos (border-line/60, /70, ...) conservan su valor. */
+.border-line {
+  border-color: rgb(var(--line-rgb) / 0.75);
+}
+.border-line-strong {
+  border-color: rgb(var(--line-strong-rgb) / 0.78);
+}
+.divide-line > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgb(var(--line-rgb) / 0.75);
+}
+.divide-line-strong > :not([hidden]) ~ :not([hidden]) {
+  border-color: rgb(var(--line-strong-rgb) / 0.78);
+}
+.ring-line {
+  --tw-ring-color: rgb(var(--line-rgb) / 0.75);
+}
+.ring-line-strong {
+  --tw-ring-color: rgb(var(--line-strong-rgb) / 0.78);
+}
+
 /* ─── Impresión del reporte (ReportsDialog vive en un portal de body) ── */
 @media print {
   /* Ocultar todo lo que no sea el diálogo de reporte (#root y otros portales). */

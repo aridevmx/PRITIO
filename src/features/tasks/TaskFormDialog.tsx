@@ -1052,6 +1052,14 @@ export function TaskFormDialog({
       }
 
       onSaved(saved);
+      // Avisa a cualquier vista con useTasks que hay datos nuevos para que
+      // actualice al instante (sin esperar al Realtime, que puede fallar o
+      // tardar en ciertos entornos) y luego sincroniza desde el servidor.
+      window.dispatchEvent(
+        new CustomEvent("pritio:tasks-changed", {
+          detail: { task: saved, workspaceId: saved.workspaceId },
+        }),
+      );
       toast.success(
         isEdit
           ? kind === "meeting" ? "Junta actualizada" : kind === "event" ? "Evento actualizado" : "Tarea actualizada"

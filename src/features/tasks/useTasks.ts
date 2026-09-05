@@ -4,6 +4,7 @@ import { supabase } from "@/lib/supabase";
 import { TASK_COLUMNS, mapTask } from "@/lib/mappers";
 import type { SubtaskCounts } from "@/lib/mappers";
 import { useDebouncedRealtimeRefresh } from "@/lib/useDebouncedRealtimeRefresh";
+import { onAppEvent } from "@/lib/appEvents";
 import { isOnline, loadSnapshot, saveSnapshot } from "@/lib/offline";
 import { deleteTask as apiDeleteTask } from "@/features/tasks/api";
 import { allowedKindsForWorkspace } from "@/features/tasks/kinds";
@@ -29,6 +30,17 @@ export async function fetchSubtaskCounts(
     counts.set(taskId, cur);
   });
   return counts;
+}
+
+/**
+ * Evento que emiten las vistas/el formulario al crear o actualizar una tarea
+ * para que la lista local reaccione al instante (sin esperar al Realtime).
+ */
+export const TASKS_CHANGED_EVENT = "pritio:tasks-changed";
+
+export interface TasksChangedDetail {
+  task: Task;
+  workspaceId: string;
 }
 
 export function useTasks(
@@ -138,12 +150,45 @@ export function useTasks(
     void fetchTasks();
   }, [fetchTasks]);
 
+  // Las vistas emiten este evento al guardar desde el formulario (crear o
+  // editar). Actualiza el estado local al instante y luego refresca desde el
+  // servidor para traer también subtareas/asignaciones enlazadas.
+  useEffect(() => {
+    const onTasksChanged = (event: Event) => {
+      const detail = (event as CustomEvent<TasksChangedDetail>).detail;
+      if (!detail) return;
+      if (detail.workspaceId && workspaceId && detail.workspaceId !== workspaceId) {
+        return;
+      }
+      const task = detail.task;
+      if (!task) return;
+
+      setTasks((prev) => {
+        const idx = prev.findIndex((t) => t.id === task.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = task;
+          return next;
+        }
+        return [task, ...prev];
+      });
+      silentRefresh();
+    };
+    window.addEventListener(TASKS_CHANGED_EVENT, onTasksChanged);
+    return () => window.removeEventListener(TASKS_CHANGED_EVENT, onTasksChanged);
+  }, [workspaceId, silentRefresh]);
+
   // Al terminar de sincronizar el outbox, refrescar desde el servidor para que
   // la vista local refleje los cambios aplicados (y los de otros dispositivos).
   useEffect(() => {
     const onSynced = () => void fetchTasks();
     window.addEventListener("pritio:synced", onSynced);
     return () => window.removeEventListener("pritio:synced", onSynced);
+  }, [fetchTasks]);
+
+  // Refresh manual desde la UI (botón en el header).
+  useEffect(() => {
+    return onAppEvent("pritio:app-refresh", () => void fetchTasks());
   }, [fetchTasks]);
 
   useEffect(() => {
@@ -193,7 +238,15 @@ export function useTasks(
   }, []);
 
   const updateTask = useCallback((task: Task) => {
-    setTasks((prev) => prev.map((t) => (t.id === task.id ? task : t)));
+    setTasks((prev) => {
+      const idx = prev.findIndex((t) => t.id === task.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = task;
+        return next;
+      }
+      return [task, ...prev];
+    });
   }, []);
 
   const removeTask = useCallback(async (taskId: string) => {
