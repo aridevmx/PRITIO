@@ -7,6 +7,7 @@ import {
   isDesktop,
   type UpdateStatus,
 } from "@/lib/desktop";
+import { isNative } from "@/lib/native";
 
 const REPO_URL = "https://github.com/aridevmx/PRITIO";
 
@@ -123,7 +124,7 @@ export function AboutTab() {
           </div>
         )}
 
-        {!isDesktop() && canInstall && (
+        {!isDesktop() && !isNative() && canInstall && (
           <div className="px-3.5 py-3">
             <button
               type="button"

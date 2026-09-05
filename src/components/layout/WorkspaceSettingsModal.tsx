@@ -17,6 +17,7 @@ import { InvitationModal } from "@/features/invitations/InvitationModal";
 import { ProjectsManager } from "@/features/projects/ProjectsManager";
 import { useToast } from "@/components/Toast";
 import { getAppUrl } from "@/lib/appUrl";
+import { copyToClipboard } from "@/lib/native";
 import { useTimeFormat, setTimeFormat } from "@/lib/timeFormat";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
@@ -272,9 +273,9 @@ function MembersManager({
   };
 
   const copyLink = (id: string) => {
-    navigator.clipboard.writeText(`${getAppUrl()}/invitacion/${id}`).then(
-      () => toast.success("Enlace copiado al portapapeles"),
-      () => toast.error("No se pudo copiar el enlace"),
+    void copyToClipboard(`${getAppUrl()}/invitacion/${id}`).then(
+      (ok) =>
+        ok ? toast.success("Enlace copiado al portapapeles") : toast.error("No se pudo copiar el enlace"),
     );
   };
 

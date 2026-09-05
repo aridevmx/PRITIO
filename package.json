@@ -20,7 +20,15 @@
     "desktop:dir": "npm run build && electron-builder --dir",
     "twa:init": "bubblewrap init",
     "twa:build": "bubblewrap build",
-    "twa:update-assetlinks": "node scripts/update-assetlinks.mjs"
+    "twa:update-assetlinks": "node scripts/update-assetlinks.mjs",
+    "cap:add": "cap add android",
+    "cap:sync": "npm run build && cap sync android",
+    "cap:open": "cap open android",
+    "cap:sync:copy": "cap copy android",
+    "cap:apk": "npm run build && cap sync android && cd android && gradlew assembleDebug",
+    "cap:apk:release": "npm run build && cap sync android && cd android && gradlew assembleRelease",
+    "cap:apk:aab": "npm run build && cap sync android && cd android && gradlew bundleRelease",
+    "release:android": "node scripts/release-android.mjs"
   },
   "build": {
     "appId": "app.pritio.desktop",
@@ -79,6 +87,9 @@
     }
   },
   "dependencies": {
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/clipboard": "^8.0.1",
+    "@capacitor/core": "^8.5.1",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/sortable": "^10.0.0",
     "@sentry/react": "^9.32.0",
@@ -116,6 +127,8 @@
   },
   "devDependencies": {
     "@bubblewrap/cli": "^1.25.0",
+    "@capacitor/android": "^8.5.1",
+    "@capacitor/cli": "^8.5.1",
     "@eslint/js": "^10.0.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^24.13.2",

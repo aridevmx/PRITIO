@@ -12,6 +12,7 @@ import type { User } from "@supabase/supabase-js";
 import { fetchProfile, upsertProfile } from "@/features/auth/api";
 import { getAuthRedirectUrl, getResetRedirectUrl } from "@/lib/appUrl";
 import { isDesktop, getDesktopApi } from "@/lib/desktop";
+import { isNative, onNativeDeepLink } from "@/lib/native";
 import type { Profile } from "@/types";
 
 interface AuthContextValue {
@@ -175,10 +176,11 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Desktop: completa el flujo de auth cuando el wrapper recibe un deep link
   // `pritio://auth...` (magic link o recuperación de contraseña).
+  // Nativo (Capacitor): igual pero vía el custom scheme `pritio://` de la app.
   useEffect(() => {
-    if (!isDesktop()) return;
+    if (!isDesktop() && !isNative()) return;
 
-    return getDesktopApi().onAuthCallback(async (url) => {
+    const handleAuthUrl = async (url: string) => {
       try {
         const parsed = new URL(url);
         const code = parsed.searchParams.get("code");
@@ -199,7 +201,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
       } catch (err) {
         console.error("[AuthProvider] Error al procesar deep link de auth:", err);
       }
-    });
+    };
+
+    if (isNative()) {
+      return onNativeDeepLink(handleAuthUrl);
+    }
+    return getDesktopApi().onAuthCallback(handleAuthUrl);
   }, [navigate]);
 
   const value: AuthContextValue = {
