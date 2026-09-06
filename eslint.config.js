@@ -11,6 +11,9 @@ export default defineConfig([
       "public",
       "scripts",
       "supabase/.temp",
+      "android",
+      "ios",
+      "supabase/functions/**/.deno",
     ],
   },
   {

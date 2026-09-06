@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { handleCors } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
 import { APP_URL } from "../_shared/app-info.ts";
 
@@ -12,8 +12,6 @@ const TOKEN_URL = "https://app.asana.com/-/oauth_token";
 
 /** Minimal scopes: read tasks, projects, and workspaces. */
 const SCOPES = "tasks:read projects:read workspaces:read";
-
-type Action = "authorize" | "exchange" | "disconnect";
 
 interface AuthorizePayload {
   action: "authorize";

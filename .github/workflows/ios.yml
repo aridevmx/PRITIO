@@ -62,7 +62,7 @@ jobs:
       - name: Validar que la app compila (simulador)
         run: |
           xcodebuild \
-            -workspace ios/App/App.xcworkspace \
+            -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Release \
             -sdk iphonesimulator \
@@ -119,7 +119,7 @@ jobs:
         if: ${{ env.DEPLOY_CREDS == 'true' }}
         run: |
           xcodebuild \
-            -workspace ios/App/App.xcworkspace \
+            -project ios/App/App.xcodeproj \
             -scheme App \
             -configuration Release \
             -destination 'generic/platform=iOS' \
