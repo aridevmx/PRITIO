@@ -73,14 +73,17 @@ jobs:
           path: build/ios-derived/Build/Products/Release-iphonesimulator/*.app
           if-no-files-found: warn
 
-  # Solo corre cuando existan los secrets de Apple Developer.
+  # Solo corre cuando existan los secrets de Apple Developer. El contexto
+  # `secrets` no puede usarse en `if` de jobs, así que se calcula en `env`
+  # (que sí lo soporta) y cada paso se gatea con esa variable.
   testflight:
     needs: build-ios
-    if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPSTORE_API_KEY_ID != '' && secrets.APPSTORE_API_ISSUER_ID != '' && secrets.APPSTORE_API_KEY_FILE != '' }}
     runs-on: macos-15
     timeout-minutes: 40
     environment:
       name: testflight
+    env:
+      DEPLOY_CREDS: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPSTORE_API_KEY_ID != '' && secrets.APPSTORE_API_ISSUER_ID != '' && secrets.APPSTORE_API_KEY_FILE != '' }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -92,12 +95,14 @@ jobs:
           cache: npm
 
       - name: Dependencias + build web + sync
+        if: ${{ env.DEPLOY_CREDS == 'true' }}
         run: |
           npm ci
           npm run build
           npx cap sync ios
 
       - name: Instalar firma de distribución
+        if: ${{ env.DEPLOY_CREDS == 'true' }}
         run: |
           echo "$APPSTORE_API_KEY_FILE" > /tmp/AuthKey.p8
           chmod 600 /tmp/AuthKey.p8
@@ -108,6 +113,7 @@ jobs:
           APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
 
       - name: Archivar para dispositivo
+        if: ${{ env.DEPLOY_CREDS == 'true' }}
         run: |
           xcodebuild \
             -workspace ios/App/App.xcworkspace \
@@ -125,6 +131,7 @@ jobs:
           APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
 
       - name: Exportar IPA para App Store
+        if: ${{ env.DEPLOY_CREDS == 'true' }}
         run: |
           sed -i '' "s/__APPLE_TEAM_ID__/$APPLE_TEAM_ID/g" ios/ExportOptions.plist
           xcodebuild \
@@ -137,6 +144,7 @@ jobs:
           APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
 
       - name: Subir a TestFlight
+        if: ${{ env.DEPLOY_CREDS == 'true' }}
         run: |
           xcrun altool \
             --upload-app \
@@ -150,7 +158,7 @@ jobs:
           APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
 
       - name: Subir IPA como artefacto
-        if: always()
+        if: ${{ always() && env.DEPLOY_CREDS == 'true' }}
         uses: actions/upload-artifact@v4
         with:
           name: pritio-ios-ipa
