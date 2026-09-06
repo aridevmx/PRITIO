@@ -33,6 +33,9 @@ concurrency:
   group: ios-${{ github.ref }}
   cancel-in-progress: true
 
+# `npm install` en vez de `npm ci`: la lockfile se genera en Windows y en
+# macOS/Linux npm debe resolver peers/optativas por plataforma (p.ej.
+# @emnapi/* para resvg/@napi-rs), que no figuran en la lock de Windows.
 jobs:
   build-ios:
     runs-on: macos-15
@@ -48,7 +51,7 @@ jobs:
           cache: npm
 
       - name: Dependencias
-        run: npm ci
+        run: npm install
 
       - name: Build web (PWA)
         run: npm run build
@@ -97,7 +100,7 @@ jobs:
       - name: Dependencias + build web + sync
         if: ${{ env.DEPLOY_CREDS == 'true' }}
         run: |
-          npm ci
+          npm install
           npm run build
           npx cap sync ios
 

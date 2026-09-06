@@ -21,7 +21,10 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      # npm install en vez de npm ci: la lockfile se genera en Windows y en
+      # otras plataformas npm resuelve peers/optativas distintas (p.ej. la
+      # binaria de resvg), que no figuran en la lock de Windows.
+      - run: npm install
 
       - name: Lint
         run: npm run lint
@@ -51,7 +54,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - run: npm install
 
       - name: Configure git
         run: |
@@ -79,7 +82,7 @@ jobs:
           node-version: 22
           cache: npm
 
-      - run: npm ci
+      - run: npm install
 
       - name: Build web
         run: npm run build
@@ -109,7 +112,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libfuse2 || sudo apt-get install -y libfuse2t64 || true
 
-      - run: npm ci
+      - run: npm install
 
       - name: Build web
         run: npm run build
