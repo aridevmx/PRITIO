@@ -146,7 +146,7 @@ jobs:
       # macOS solo mostrará el aviso de Gatekeeper la primera vez (clic derecho -> Abrir).
       # Cuando exista certificado, electron-builder firma y notariza por sí mismo.
       - name: Package & publish DMG to GitHub Releases
-        run: npx electron-builder --mac dmg --publish always
+        run: npx electron-builder --mac dmg --x64 --arm64 --publish always
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
