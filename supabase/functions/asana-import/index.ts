@@ -1,5 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { corsHeaders, handleCors } from "../_shared/cors.ts";
+import { handleCors } from "../_shared/cors.ts";
 import { supabaseAdmin } from "../_shared/supabase-client.ts";
 
 const ASANA_API = "https://app.asana.com/api/1.0";
