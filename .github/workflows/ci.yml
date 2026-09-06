@@ -122,6 +122,35 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  desktop-macos:
+    name: Build & publish desktop (macOS)
+    needs: version
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm install
+
+      - name: Build web
+        run: npm run build
+
+      # Sin cuenta de Apple Developer: firmamos ad-hoc (CSC_IDENTITY_AUTO_DISCOVERY=false).
+      # macOS solo mostrará el aviso de Gatekeeper la primera vez (clic derecho -> Abrir).
+      # Cuando exista certificado, electron-builder firma y notariza por sí mismo.
+      - name: Package & publish DMG to GitHub Releases
+        run: npx electron-builder --mac dmg --publish always
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+
   deploy:
     name: Deploy a Vercel (producción)
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
