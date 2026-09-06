@@ -1,0 +1,166 @@
+# Build de la app iOS (Capacitor) en un runner macOS.
+# Sin credenciales de Apple: compila la app para simulador (valida que el
+# bundle web + proyecto nativo compilan) y sube el .app como artefacto.
+# Con secrets configurados (Apple Developer), además archiva, firma y sube
+# el IPA a TestFlight.
+#
+# Secrets necesarios para el job de TestFlight (Acceso del Apple ID):
+#   APPLE_ID               -> email del Apple Developer Program
+#   APPLE_APP_PASSWORD     -> contraseña de aplicación (app-specific password)
+#   APPLE_TEAM_ID          -> Team ID de la cuenta
+#   APPSTORE_API_KEY_ID    -> Key ID de la App Store Connect API key
+#   APPSTORE_API_ISSUER_ID -> Issuer ID de la App Store Connect API key
+#   APPSTORE_API_KEY_FILE  -> contenido de la llave privada .p8 de la API key
+name: iOS
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "capacitor.config.ts"
+      - "package.json"
+      - "package-lock.json"
+      - "ios/**"
+      - "public/brand/**"
+      - ".github/workflows/ios.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ios-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-ios:
+    runs-on: macos-15
+    timeout-minutes: 40
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Dependencias
+        run: npm ci
+
+      - name: Build web (PWA)
+        run: npm run build
+
+      - name: Sync Capacitor iOS
+        run: npx cap sync ios
+
+      - name: Validar que la app compila (simulador)
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -sdk iphonesimulator \
+            -derivedDataPath build/ios-derived \
+            build
+
+      - name: Subir .app de simulación
+        uses: actions/upload-artifact@v4
+        with:
+          name: pritio-ios-simulator-${{ github.sha }}
+          path: build/ios-derived/Build/Products/Release-iphonesimulator/*.app
+          if-no-files-found: warn
+
+  # Solo corre cuando existan los secrets de Apple Developer.
+  testflight:
+    needs: build-ios
+    if: >-
+      ${{ secrets.APPLE_ID != '' &&
+          secrets.APPLE_APP_PASSWORD != '' &&
+          secrets.APPLE_TEAM_ID != '' &&
+          secrets.APPSTORE_API_KEY_ID != '' &&
+          secrets.APPSTORE_API_ISSUER_ID != '' &&
+          secrets.APPSTORE_API_KEY_FILE != '' }}
+    runs-on: macos-15
+    timeout-minutes: 40
+    environment:
+      name: testflight
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Dependencias + build web + sync
+        run: |
+          npm ci
+          npm run build
+          npx cap sync ios
+
+      - name: Instalar firma de distribución
+        run: |
+          echo "$APPSTORE_API_KEY_FILE" > /tmp/AuthKey.p8
+          chmod 600 /tmp/AuthKey.p8
+          mkdir -p ~/.appstoreconnect/private_keys
+          cp /tmp/AuthKey.p8 ~/.appstoreconnect/private_keys/AuthKey_$APPSTORE_API_KEY_ID.p8
+        env:
+          APPSTORE_API_KEY_FILE: ${{ secrets.APPSTORE_API_KEY_FILE }}
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+
+      - name: Archivar para dispositivo
+        run: |
+          xcodebuild \
+            -workspace ios/App/App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -archivePath build/ios/Pritio.xcarchive \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath ~/.appstoreconnect/private_keys/AuthKey_$APPSTORE_API_KEY_ID.p8 \
+            -authenticationKeyID "$APPSTORE_API_KEY_ID" \
+            -authenticationKeyIssuerID "$APPSTORE_API_ISSUER_ID" \
+            archive
+        env:
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+
+      - name: Exportar IPA para App Store
+        run: |
+          sed -i '' "s/__APPLE_TEAM_ID__/$APPLE_TEAM_ID/g" ios/ExportOptions.plist
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/ios/Pritio.xcarchive \
+            -exportOptionsPlist ios/ExportOptions.plist \
+            -exportPath build/ios/export \
+            -allowProvisioningUpdates
+        env:
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Subir a TestFlight
+        run: |
+          xcrun altool \
+            --upload-app \
+            --file "build/ios/export/Pritio.ipa" \
+            --type ios \
+            --apiKey "$APPSTORE_API_KEY_ID" \
+            --apiIssuer "$APPSTORE_API_ISSUER_ID" \
+            --verbose
+        env:
+          APPSTORE_API_KEY_ID: ${{ secrets.APPSTORE_API_KEY_ID }}
+          APPSTORE_API_ISSUER_ID: ${{ secrets.APPSTORE_API_ISSUER_ID }}
+
+      - name: Subir IPA como artefacto
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pritio-ios-ipa
+          path: |
+            build/ios/export/*.ipa
+            build/ios/export/*.plist
+          if-no-files-found: warn

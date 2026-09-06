@@ -28,6 +28,8 @@
     "cap:apk": "npm run build && cap sync android && cd android && gradlew assembleDebug",
     "cap:apk:release": "npm run build && cap sync android && cd android && gradlew assembleRelease",
     "cap:apk:aab": "npm run build && cap sync android && cd android && gradlew bundleRelease",
+    "cap:ios:open": "npm run build && cap sync ios && cap open ios",
+    "cap:ios:sync": "npm run build && cap sync ios",
     "release:android": "node scripts/release-android.mjs"
   },
   "build": {
@@ -129,6 +131,7 @@
     "@bubblewrap/cli": "^1.25.0",
     "@capacitor/android": "^8.5.1",
     "@capacitor/cli": "^8.5.1",
+    "@capacitor/ios": "^8.5.1",
     "@eslint/js": "^10.0.1",
     "@resvg/resvg-js": "^2.6.2",
     "@types/node": "^24.13.2",
