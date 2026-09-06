@@ -76,13 +76,7 @@ jobs:
   # Solo corre cuando existan los secrets de Apple Developer.
   testflight:
     needs: build-ios
-    if: >-
-      ${{ secrets.APPLE_ID != '' &&
-          secrets.APPLE_APP_PASSWORD != '' &&
-          secrets.APPLE_TEAM_ID != '' &&
-          secrets.APPSTORE_API_KEY_ID != '' &&
-          secrets.APPSTORE_API_ISSUER_ID != '' &&
-          secrets.APPSTORE_API_KEY_FILE != '' }}
+    if: ${{ secrets.APPLE_ID != '' && secrets.APPLE_APP_PASSWORD != '' && secrets.APPLE_TEAM_ID != '' && secrets.APPSTORE_API_KEY_ID != '' && secrets.APPSTORE_API_ISSUER_ID != '' && secrets.APPSTORE_API_KEY_FILE != '' }}
     runs-on: macos-15
     timeout-minutes: 40
     environment:
