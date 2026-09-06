@@ -6,6 +6,8 @@ este proyecto cumple con [Versionado Semántico](https://semver.org/lang/es/).
 
 ## [Unreleased]
 
+## [0.1.7] - 2026-09-06
+
 ## [0.1.6] - 2026-09-05
 
 ### Corregido
