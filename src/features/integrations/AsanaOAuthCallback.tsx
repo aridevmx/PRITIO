@@ -1,13 +1,20 @@
 import { useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
+import { useToast } from "@/components/Toast";
 import { exchangeAsanaCode } from "@/features/integrations/api";
 
+const STATE_KEY = "pritio-asana-oauth-state";
+const REDIRECT_KEY = "pritio-asana-redirect";
+
 /**
- * OAuth callback de Asana: recibe `code`, lo canjea por tokens vía Edge
- * Function y devuelve al usuario al pendiente.
+ * OAuth callback de Asana: recibe `code` y `state`, valida el nonce contra
+ * sessionStorage (protección CSRF), canjea el código por tokens vía Edge
+ * Function y devuelve al usuario al pendiente. Reporta errores por toast y
+ * postMessage para que la pestaña que lanzó el popup lo refleje.
  */
 export function AsanaOAuthCallback() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const done = useRef(false);
 
   useEffect(() => {
@@ -17,20 +24,44 @@ export function AsanaOAuthCallback() {
     (async () => {
       const params = new URLSearchParams(window.location.search);
       const code = params.get("code");
+      const state = params.get("state");
+      const storedState = sessionStorage.getItem(STATE_KEY);
+      sessionStorage.removeItem(STATE_KEY);
 
-      if (code) {
-        await exchangeAsanaCode(code);
+      const post = (type: string, detail?: unknown) =>
+        window.opener?.postMessage(
+          { type, detail: detail ?? undefined },
+          window.location.origin,
+        );
+
+      if (code && storedState && state && state === storedState) {
+        try {
+          const result = await exchangeAsanaCode(code, state);
+          if (result.ok) {
+            toast.success("Conectado con Asana");
+            post("pritio:asana-connected");
+          } else {
+            toast.error(result.error ?? "Error al conectar con Asana");
+            post("pritio:asana-error", result.error ?? "Exchange failed");
+          }
+        } catch {
+          toast.error("Error al conectar con Asana");
+          post("pritio:asana-error", "unexpected");
+        }
+      } else if (code && storedState) {
+        toast.error("La sesión de Asana no coincide — vuelve a intentarlo");
+        post("pritio:asana-error", "state-mismatch");
+      } else {
+        toast.error("La sesión de Asana caducó — vuelve a conectarte");
+        post("pritio:asana-error", "session-expired");
       }
 
-      // Dispatcher un evento que cierra la ventana/popup si abrió Asana en popup.
-      window.opener?.postMessage({ type: "pritio:asana-connected" }, window.location.origin);
-
       // Redirigir al usuario de vuelta a la app.
-      const redirect = sessionStorage.getItem("pritio-asana-redirect") ?? "/pendiente";
-      sessionStorage.removeItem("pritio-asana-redirect");
+      const redirect = sessionStorage.getItem(REDIRECT_KEY) ?? "/pendiente";
+      sessionStorage.removeItem(REDIRECT_KEY);
       navigate(redirect, { replace: true });
     })();
-  }, [navigate]);
+  }, [navigate, toast]);
 
   return (
     <div className="flex h-full min-h-screen items-center justify-center bg-surface">

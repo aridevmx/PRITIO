@@ -45,7 +45,14 @@ export interface TasksChangedDetail {
 
 export function useTasks(
   workspaceId: string | null,
-  options?: { workspaceType?: WorkspaceType | string },
+  options?: {
+    workspaceType?: WorkspaceType | string;
+    /** Filtra por estado de Inbox (captura pendiente de triaje). */
+    inboxed?: boolean;
+    /** Modo multi-workspace: se usa cuando `workspaceId` es null y se
+        agregan tareas de varios workspaces del mismo tipo. */
+    workspaceIds?: string[];
+  },
 ) {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -55,29 +62,36 @@ export function useTasks(
     () => allowedKindsForWorkspace(options?.workspaceType),
     [options?.workspaceType],
   );
+  const { inboxed } = options ?? {};
+  const multiIds = useMemo(() => options?.workspaceIds ?? [], [options?.workspaceIds]);
 
   const loadFromSnapshot = useCallback(async () => {
     if (!workspaceId) return false;
     const snap = await loadSnapshot<Task[]>(`tasks:${workspaceId}`);
     if (snap) {
-      setTasks(kinds ? snap.data.filter((t) => kinds.includes(t.kind)) : snap.data);
+      const filtered = (kinds ? snap.data.filter((t) => kinds.includes(t.kind)) : snap.data).filter((t) =>
+        inboxed === undefined ? true : t.inboxed === inboxed,
+      );
+      setTasks(filtered);
       setError(null);
       return true;
     }
     return false;
-  }, [workspaceId, kinds]);
+  }, [workspaceId, kinds, inboxed]);
 
   const fetchTasks = useCallback(async () => {
     if (!workspaceId) {
-      setTasks([]);
-      setIsLoading(false);
-      return;
+      if (multiIds.length === 0) {
+        setTasks([]);
+        setIsLoading(false);
+        return;
+      }
     }
 
     setIsLoading(true);
 
-    // Si ya estamos offline, servir snapshot inmediatamente sin colgar la UI.
-    if (!isOnline()) {
+    // Si ya estamos offline y es un solo workspace, servir snapshot inmediatamente sin colgar la UI.
+    if (workspaceId && !isOnline()) {
       const ok = await loadFromSnapshot();
       setIsLoading(false);
       if (!ok) setError(new Error("Sin conexión"));
@@ -87,11 +101,11 @@ export function useTasks(
     try {
       // Timeout de seguridad: si la red está caída pero navigator.onLine miente,
       // la promesa no se queda colgada indefinidamente.
-      let query = supabase
-        .from("tasks")
-        .select(TASK_COLUMNS)
-        .eq("workspace_id", workspaceId);
+      let query = workspaceId
+        ? supabase.from("tasks").select(TASK_COLUMNS).eq("workspace_id", workspaceId)
+        : supabase.from("tasks").select(TASK_COLUMNS).in("workspace_id", multiIds);
       if (kinds && kinds.length > 0) query = query.in("kind", kinds);
+      if (inboxed !== undefined) query = query.eq("inboxed", inboxed);
 
       const { data: taskRows, error: taskError } = await Promise.race([
         query.order("created_at", { ascending: false }),
@@ -120,7 +134,7 @@ export function useTasks(
 
       let subtaskCounts: Map<string, SubtaskCounts> | undefined;
       try {
-        subtaskCounts = await fetchSubtaskCounts([workspaceId]);
+        subtaskCounts = await fetchSubtaskCounts(workspaceId ? [workspaceId] : multiIds);
       } catch {
         // Los conteos son cosméticos; no deben romper la carga de tareas.
       }
@@ -134,15 +148,19 @@ export function useTasks(
       );
       setTasks(mapped);
       setError(null);
-      void saveSnapshot(`tasks:${workspaceId}`, mapped);
+      if (workspaceId) void saveSnapshot(`tasks:${workspaceId}`, mapped);
     } catch (err) {
-      // Sin conexión: servir el último snapshot en lugar de quedarse vacío.
-      const ok = await loadFromSnapshot();
-      if (!ok) setError(err instanceof Error ? err : new Error(String(err)));
+      // Sin conexión: servir el último snapshot en lugar de quedarse vacío (solo un workspace).
+      if (workspaceId) {
+        const ok = await loadFromSnapshot();
+        if (!ok) setError(err instanceof Error ? err : new Error(String(err)));
+      } else {
+        setError(err instanceof Error ? err : new Error(String(err)));
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [workspaceId, kinds, loadFromSnapshot]);
+  }, [workspaceId, multiIds, kinds, loadFromSnapshot, inboxed]);
 
   const silentRefresh = useDebouncedRealtimeRefresh(fetchTasks);
 
@@ -192,20 +210,25 @@ export function useTasks(
   }, [fetchTasks]);
 
   useEffect(() => {
-    if (!workspaceId) return;
+    const channelScope = workspaceId ?? (multiIds.length > 0 ? [...multiIds].sort().join(",") : "");
+    if (!channelScope) return;
+
+    const taskFilter = workspaceId
+      ? `workspace_id=eq.${workspaceId}`
+      : `workspace_id=in.(${multiIds.join(",")})`;
 
     channelRef.current?.unsubscribe();
 
     channelKeyCounter++;
     const channel = supabase
-      .channel(`tasks-${workspaceId}-${channelKeyCounter}`)
+      .channel(`tasks-${channelScope}-${channelKeyCounter}`)
       .on(
         "postgres_changes",
         {
           event: "*",
           schema: "public",
           table: "tasks",
-          filter: `workspace_id=eq.${workspaceId}`,
+          filter: taskFilter,
         },
         () => silentRefresh(),
       )
@@ -220,7 +243,7 @@ export function useTasks(
           event: "*",
           schema: "public",
           table: "task_subtasks",
-          filter: `workspace_id=eq.${workspaceId}`,
+          filter: taskFilter,
         },
         () => silentRefresh(),
       )
@@ -231,7 +254,7 @@ export function useTasks(
     return () => {
       channel.unsubscribe();
     };
-  }, [workspaceId, silentRefresh]);
+  }, [workspaceId, multiIds, silentRefresh]);
 
   const addTask = useCallback((task: Task) => {
     setTasks((prev) => [task, ...prev]);

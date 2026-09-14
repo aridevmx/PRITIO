@@ -22,6 +22,15 @@ import {
 } from "@/features/spaces/WorkspaceGuide";
 import { WorkspaceSettingsModal } from "@/components/layout/WorkspaceSettingsModal";
 
+const VIEW_LABELS: Record<ViewKey, string> = {
+  cuadrantes: "Cuadrantes",
+  plan: "Plan",
+  kanban: "Tablero",
+  calendario: "Calendario",
+  docs: "Documentos",
+  indicadores: "Indicadores",
+};
+
 interface SpaceViewProps {
   space: SpaceKey;
   view: ViewKey;
@@ -125,6 +134,24 @@ export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceView
               <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
             </svg>
           </button>
+        </div>
+
+        <div className="mt-1 flex gap-1.5 overflow-x-auto pb-1 lg:hidden" data-tour="vistas">
+          {availableTabs.map((t) => (
+            <button
+              key={t}
+              type="button"
+              onClick={() => onViewChange(t)}
+              className={cn(
+                "shrink-0 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors",
+                view === t
+                  ? "border-ink bg-ink text-white"
+                  : "border-line bg-surface text-ink-soft hover:text-ink",
+              )}
+            >
+              {VIEW_LABELS[t] ?? t}
+            </button>
+          ))}
         </div>
       </div>
       {view === "cuadrantes" && showGuide && currentWorkspace && (

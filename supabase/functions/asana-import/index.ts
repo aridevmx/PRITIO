@@ -1,6 +1,60 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { handleCors } from "../_shared/cors.ts";
-import { supabaseAdmin } from "../_shared/supabase-client.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+// ── Helpers inline (la función es autónoma para desplegarse sin ../_shared) ──
+
+const APP_URL = Deno.env.get("PUBLIC_APP_URL") ?? "https://app.pritio.com.mx";
+
+const supabaseAdmin = createClient(
+  Deno.env.get("SUPABASE_URL") ?? "",
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+);
+
+const BASE_CORS_HEADERS: Record<string, string> = {
+  "Vary": "Origin",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+  "Access-Control-Allow-Headers":
+    "Content-Type, Authorization, apikey, x-client-info, x-supabase-api-version, x-sb-transport-rpc",
+};
+
+const APP_ORIGIN = (() => {
+  try {
+    return new URL(APP_URL).origin;
+  } catch {
+    return "";
+  }
+})();
+
+function isAllowedOrigin(origin: string | null | undefined): boolean {
+  if (!origin) return false;
+  try {
+    const u = new URL(origin);
+    if (u.hostname === "localhost" || u.hostname === "127.0.0.1") {
+      return u.protocol === "http:" || u.protocol === "https:";
+    }
+    return u.protocol === "https:" && u.origin === APP_ORIGIN;
+  } catch {
+    return false;
+  }
+}
+
+function corsHeaders(req?: Request): Record<string, string> {
+  const origin = req?.headers.get("Origin") ?? null;
+  if (!isAllowedOrigin(origin)) return { ...BASE_CORS_HEADERS };
+  return { ...BASE_CORS_HEADERS, "Access-Control-Allow-Origin": origin as string };
+}
+
+function handleCors(req: Request): Response | null {
+  if (req.method === "OPTIONS") {
+    return new Response("ok", { headers: corsHeaders(req) });
+  }
+  return null;
+}
+
+/** JSON response con CORS en todas las respuestas (no solo el preflight). */
+function jsonHeaders(req: Request): Record<string, string> {
+  return { ...corsHeaders(req), "Content-Type": "application/json" };
+}
 
 const ASANA_API = "https://app.asana.com/api/1.0";
 const TOKEN_URL = "https://app.asana.com/-/oauth_token";
@@ -97,7 +151,7 @@ Deno.serve(async (req) => {
     if (req.method !== "POST") {
       return new Response(JSON.stringify({ error: "Method not allowed" }), {
         status: 405,
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders(req),
       });
     }
 
@@ -107,14 +161,14 @@ Deno.serve(async (req) => {
     if (!token) {
       return new Response(JSON.stringify({ error: "Missing authorization" }), {
         status: 401,
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders(req),
       });
     }
     const { data: userData, error: userErr } = await supabaseAdmin.auth.getUser(token);
     if (userErr || !userData.user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders(req),
       });
     }
 
@@ -123,7 +177,7 @@ Deno.serve(async (req) => {
     if (!workspaceId) {
       return new Response(JSON.stringify({ error: "Missing workspaceId" }), {
         status: 400,
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders(req),
       });
     }
 
@@ -137,7 +191,7 @@ Deno.serve(async (req) => {
     if (wsErr || !ws) {
       return new Response(JSON.stringify({ error: "Workspace not found" }), {
         status: 404,
-        headers: { "Content-Type": "application/json" },
+        headers: jsonHeaders(req),
       });
     }
 
@@ -151,7 +205,7 @@ Deno.serve(async (req) => {
     if (connErr || !conn) {
       return new Response(
         JSON.stringify({ error: "No Asana connection found. Connect first." }),
-        { status: 400, headers: { "Content-Type": "application/json" } },
+        { status: 400, headers: jsonHeaders(req) },
       );
     }
 
@@ -162,7 +216,7 @@ Deno.serve(async (req) => {
       if (!refreshed) {
         return new Response(
           JSON.stringify({ error: "Asana token refresh failed. Please reconnect." }),
-          { status: 401, headers: { "Content-Type": "application/json" } },
+          { status: 401, headers: jsonHeaders(req) },
         );
       }
       accessToken = refreshed;
@@ -176,7 +230,7 @@ Deno.serve(async (req) => {
       console.error("Failed to fetch Asana projects:", err);
       return new Response(
         JSON.stringify({ error: "Failed to fetch Asana projects" }),
-        { status: 502, headers: { "Content-Type": "application/json" } },
+        { status: 502, headers: jsonHeaders(req) },
       );
     }
 
@@ -246,13 +300,13 @@ Deno.serve(async (req) => {
         errors,
         projectsCount: projects.length,
       }),
-      { headers: { "Content-Type": "application/json" } },
+      { headers: jsonHeaders(req) },
     );
   } catch (err) {
     console.error("asana-import error:", err);
     return new Response(
       JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { "Content-Type": "application/json" } },
+      { status: 500, headers: jsonHeaders(req) },
     );
   }
 });

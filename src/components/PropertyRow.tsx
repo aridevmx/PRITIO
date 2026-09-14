@@ -66,7 +66,15 @@ export function PropertyRow({
     if (!expanded) return;
     function handlePointerDown(e: MouseEvent) {
       const target = e.target as Node;
-      if (btnRef.current?.contains(target) || panelRef.current?.contains(target)) return;
+      // Ignora los popovers anidados (calendarios vía portal): si cayeran
+      // fuera de btn/panel cerrarían el panel justo al intentar usarlos.
+      if (
+        (target as Element).closest?.("[data-pritio-popover]") ||
+        btnRef.current?.contains(target) ||
+        panelRef.current?.contains(target)
+      ) {
+        return;
+      }
       onToggle();
     }
     // Capture: cierra el popover antes de que el Esc del dialog cierre todo.

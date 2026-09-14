@@ -17,6 +17,8 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { updateTask as apiUpdateTask, archiveTask as apiArchiveTask } from "@/features/tasks/api";
 import { notifyTaskChange } from "@/features/tasks/notifications";
 import { isNetworkError, isOnline, queueOfflineOp } from "@/lib/offline";
+import { onAppEvent } from "@/lib/appEvents";
+import { takeSearchPendingTarget, FOCUS_MEMBER_EVENT } from "@/features/search/api";
 import { groupTasksByDay, formatDateShort } from "@/features/tasks/dates";
 import type { Task, Quadrant } from "@/types";
 
@@ -328,6 +330,14 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
   const [selectedQuadrant, setSelectedQuadrant] = useState<Quadrant>("do");
   const [filterSheetOpen, setFilterSheetOpen] = useState(false);
   const [manageSheetOpen, setManageSheetOpen] = useState(false);
+
+  useEffect(() => {
+    const pending = takeSearchPendingTarget();
+    if (pending?.type === "member") setAssigneeFilter(pending.assigneeId);
+    return onAppEvent<{ assigneeId: string }>(FOCUS_MEMBER_EVENT, (payload) => {
+      if (payload && typeof payload.assigneeId === "string") setAssigneeFilter(payload.assigneeId);
+    });
+  }, []);
 
   useEffect(() => {
     const wsIds =

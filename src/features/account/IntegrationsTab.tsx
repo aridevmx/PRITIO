@@ -36,7 +36,9 @@ export function IntegrationsTab() {
   }, [workspaces, selectedWs]);
 
   async function handleConnect() {
-    const res = await getAsanaAuthorizeUrl();
+    const state = crypto.randomUUID();
+    sessionStorage.setItem("pritio-asana-oauth-state", state);
+    const res = await getAsanaAuthorizeUrl(state);
     if ("error" in res) {
       toast.error(res.error);
       return;
@@ -47,26 +49,41 @@ export function IntegrationsTab() {
       toast.error("Permite ventanas emergentes para conectar");
       return;
     }
+    let settled = false;
+    const finish = (ok: boolean, message: string) => {
+      if (settled) return;
+      settled = true;
+      window.removeEventListener("message", onMessage);
+      clearInterval(poll);
+      if (ok) {
+        setConnected(true);
+        toast.success(message);
+      } else {
+        toast.error(message);
+      }
+    };
     // Listen for the callback posting a message back to this window.
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== window.location.origin) return;
       if (e.data?.type === "pritio:asana-connected") {
-        window.removeEventListener("message", onMessage);
-        setConnected(true);
-        toast.success("Conectado con Asana");
+        finish(true, "Conectado con Asana");
+      } else if (e.data?.type === "pritio:asana-error") {
+        finish(false, e.data?.detail === "state-mismatch"
+          ? "La sesión de Asana no coincide — vuelve a intentarlo"
+          : "Error al conectar con Asana");
       }
     };
     window.addEventListener("message", onMessage);
     // Fallback: poll as long as the popup is open.
     const poll = setInterval(async () => {
-      if (popup.closed) clearInterval(poll);
-      const conn = await getAsanaConnection();
-      if (conn) {
+      if (settled) clearInterval(poll);
+      if (popup.closed && !settled) {
         clearInterval(poll);
         window.removeEventListener("message", onMessage);
-        setConnected(true);
-        toast.success("Conectado con Asana");
+        return;
       }
+      const conn = await getAsanaConnection();
+      if (conn) finish(true, "Conectado con Asana");
     }, 2000);
     setTimeout(() => clearInterval(poll), 60_000);
   }

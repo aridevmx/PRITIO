@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    color-scheme: light;
     --pritio-green: #4fc38a;
     --pritio-coral: #f27d72;
     --pritio-blue: #5ba7d1;
@@ -83,6 +84,7 @@
    *   - line = bordes. De gris pastel a slate transparente.
    */
   html.dark {
+    color-scheme: dark;
     --surface-rgb: 30 41 59;
     --surface-muted-rgb: 15 23 42;
     --surface-subtle-rgb: 30 41 59;

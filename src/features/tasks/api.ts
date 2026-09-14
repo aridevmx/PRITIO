@@ -1,6 +1,6 @@
 import { supabase } from "@/lib/supabase";
 import { TASK_COLUMNS, SUBTASK_COLUMNS, mapTask, mapSubtask } from "@/lib/mappers";
-import type { Task, TaskSubtask, CreateTaskPayload, UpdateTaskPayload, TaskReminder } from "@/types";
+import type { Task, TaskSubtask, CreateTaskPayload, UpdateTaskPayload, TaskReminder, Quadrant } from "@/types";
 
 export async function getTask(taskId: string): Promise<Task> {
   const { data: taskRow, error } = await supabase
@@ -61,6 +61,7 @@ export async function createTask(payload: CreateTaskPayload): Promise<Task> {
       description: payload.description ?? null,
       quadrant: payload.quadrant,
       kind: payload.kind ?? "task",
+      inboxed: payload.inboxed ?? false,
       start_date: payload.startDate ?? null,
       end_date: payload.endDate ?? null,
       visibility: payload.visibility ?? "all",
@@ -110,6 +111,7 @@ export async function updateTask(
   if (payload.description !== undefined) updateData.description = payload.description;
   if (payload.quadrant !== undefined) updateData.quadrant = payload.quadrant;
   if (payload.kind !== undefined) updateData.kind = payload.kind;
+  if (payload.inboxed !== undefined) updateData.inboxed = payload.inboxed;
   if (payload.startDate !== undefined) updateData.start_date = payload.startDate;
   if (payload.endDate !== undefined) updateData.end_date = payload.endDate;
   if (payload.visibility !== undefined) updateData.visibility = payload.visibility;
@@ -279,7 +281,14 @@ export async function createSubtasks(
   taskId: string,
   workspaceId: string,
   createdBy: string,
-  items: { title: string; completed?: boolean; position: number }[],
+  items: {
+    title: string;
+    completed?: boolean;
+    position: number;
+    startDate?: string | null;
+    dueDate?: string | null;
+    quadrant?: Quadrant | null;
+  }[],
 ): Promise<void> {
   if (items.length === 0) return;
   const { error } = await supabase.from("task_subtasks").insert(
@@ -290,6 +299,9 @@ export async function createSubtasks(
       title: item.title,
       completed: item.completed ?? false,
       position: item.position,
+      start_date: item.startDate ?? null,
+      due_date: item.dueDate ?? null,
+      quadrant: item.quadrant ?? null,
     })),
   );
   if (error) throw error;
@@ -297,12 +309,22 @@ export async function createSubtasks(
 
 export async function updateSubtask(
   subtaskId: string,
-  payload: { title?: string; completed?: boolean; position?: number },
+  payload: {
+    title?: string;
+    completed?: boolean;
+    position?: number;
+    startDate?: string | null;
+    dueDate?: string | null;
+    quadrant?: Quadrant | null;
+  },
 ): Promise<void> {
   const updateData: Record<string, unknown> = {};
   if (payload.title !== undefined) updateData.title = payload.title;
   if (payload.completed !== undefined) updateData.completed = payload.completed;
   if (payload.position !== undefined) updateData.position = payload.position;
+  if (payload.startDate !== undefined) updateData.start_date = payload.startDate || null;
+  if (payload.dueDate !== undefined) updateData.due_date = payload.dueDate || null;
+  if (payload.quadrant !== undefined) updateData.quadrant = payload.quadrant || null;
   if (Object.keys(updateData).length === 0) return;
 
   const { error } = await supabase
@@ -437,3 +459,4 @@ export async function saveTaskReminders(
     // table may not exist yet — don't block task save
   }
 }
+

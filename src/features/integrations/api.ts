@@ -8,11 +8,15 @@ import { supabase } from "@/lib/supabase";
 
 // ── OAuth ────────────────────────────────────────────────────
 
-export async function getAsanaAuthorizeUrl(): Promise<
-  { url: string; state: string } | { error: string }
-> {
+/**
+ * Pide la URL de autorización. `state` es un nonce que el cliente genera
+ * y guarda (sessionStorage) para verificar el callback (protección CSRF).
+ */
+export async function getAsanaAuthorizeUrl(
+  state: string,
+): Promise<{ url: string; state: string } | { error: string }> {
   const { data, error } = await supabase.functions.invoke("asana-oauth", {
-    body: { action: "authorize" },
+    body: { action: "authorize", state },
   });
   if (error) return { error: error.message ?? "Failed to get authorize URL" };
   return data as { url: string; state: string };
@@ -20,9 +24,10 @@ export async function getAsanaAuthorizeUrl(): Promise<
 
 export async function exchangeAsanaCode(
   code: string,
+  state: string,
 ): Promise<{ ok: boolean; user?: { name: string; email: string }; error?: string }> {
   const { data, error } = await supabase.functions.invoke("asana-oauth", {
-    body: { action: "exchange", code },
+    body: { action: "exchange", code, state },
   });
   if (error) return { ok: false, error: error.message ?? "Exchange failed" };
   return data as { ok: boolean; user?: { name: string; email: string } };

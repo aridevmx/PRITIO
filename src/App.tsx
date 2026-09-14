@@ -73,10 +73,17 @@ export default function App() {
               <Route path="/reset-password" element={<ResetPasswordScreen />} />
               <Route path="/download" element={<DownloadScreen />} />
               <Route element={<Root />}>
-                <Route index element={<Navigate to="/pendiente" replace />} />
+                <Route index element={<AppShell />} />
+                <Route path="inbox" element={<AppShell />} />
+                <Route path="mi-dia" element={<AppShell />} />
+                <Route path="cuadrantes" element={<AppShell />} />
+                <Route path="calendario" element={<AppShell />} />
+                <Route path="proyectos" element={<AppShell />} />
+                <Route path="notas" element={<AppShell />} />
+                <Route path="indicadores" element={<AppShell />} />
                 <Route path="oauth/asana/callback" element={<AsanaOAuthCallback />} />
                 <Route path=":space/:view?" element={<AppShell />} />
-                <Route path="*" element={<Navigate to="/pendiente" replace />} />
+                <Route path="*" element={<Navigate to="/" replace />} />
               </Route>
             </Routes>
           </AuthProvider>

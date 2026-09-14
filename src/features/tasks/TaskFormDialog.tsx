@@ -1,13 +1,14 @@
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { cn, todayStr, localDateStr, isNotesEmpty, formatDayLabel, stripHtml } from "@/lib/utils";
+import { cn, localDateStr, isNotesEmpty, stripHtml } from "@/lib/utils";
 import { Field } from "@/components/Field";
 import { SegmentedControl, type SegmentedOption } from "@/components/SegmentedControl";
 import { PropertyRow } from "@/components/PropertyRow";
-import { DatePickerPopover } from "@/components/DatePickerPopover";
-import { TimePicker } from "@/components/TimePicker";
-import { useTimeFormat } from "@/lib/timeFormat";
+import { QuickDatePicker } from "@/components/QuickDatePicker";
+import { DatePickerField } from "@/components/DatePickerField";
+import { usePopover } from "@/hooks/usePopover";
 import { QUADRANTS, QUADRANT_ORDER, type QuadrantIconKey } from "@/features/tasks/quadrants";
+import { SubtaskContextMenu } from "@/features/tasks/SubtaskContextMenu";
 import { allowedKindsForWorkspace } from "@/features/tasks/kinds";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { useToast } from "@/components/Toast";
@@ -15,6 +16,10 @@ import { supabase } from "@/lib/supabase";
 import { createTask as apiCreateTask, updateTask as apiUpdateTask, listSubtasks, createSubtasks, updateSubtask, deleteSubtasks, listComments, createComment, deleteComment, listTaskReminders, saveTaskReminders, type TaskComment } from "@/features/tasks/api";
 import { listDocsForTask, listDocs, linkDocToTask, unlinkDocFromTask, createDoc } from "@/features/docs/api";
 import { TemplatePicker } from "@/features/docs/TemplatePicker";
+import { ProjectPicker } from "@/features/projects/ProjectPicker";
+import { AssigneePicker } from "@/features/tasks/AssigneePicker";
+import { createProject } from "@/features/projects/api";
+import { PRESET_COLORS } from "@/features/projects/ProjectsManager";
 import type { DocTemplate } from "@/features/docs/api";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
@@ -47,6 +52,9 @@ interface SubtaskDraft {
   id: string | null; // null = aún no existe en DB
   title: string;
   completed: boolean;
+  startDate: string;
+  dueDate: string;
+  quadrant: Quadrant | null;
 }
 
 function AddRowButton({ label, onClick }: { label: string; onClick: () => void }) {
@@ -81,7 +89,10 @@ async function persistSubtasks(
   workspaceId: string,
   createdBy: string,
   drafts: SubtaskDraft[],
-  originals: Map<string, { title: string; completed: boolean }>,
+  originals: Map<
+    string,
+    { title: string; completed: boolean; startDate: string; dueDate: string; quadrant: Quadrant | null }
+  >,
 ): Promise<void> {
   const currentIds = new Set(drafts.filter((d) => d.id).map((d) => d.id as string));
   const toDelete = [
@@ -90,18 +101,51 @@ async function persistSubtasks(
   ];
   await deleteSubtasks(toDelete);
 
-  const toCreate: { title: string; completed: boolean; position: number }[] = [];
+  const toCreate: {
+    title: string;
+    completed: boolean;
+    position: number;
+    startDate: string;
+    dueDate: string;
+    quadrant: Quadrant | null;
+  }[] = [];
   const updates: Promise<void>[] = [];
   drafts.forEach((draft, index) => {
     const cleanTitle = draft.title.trim();
     if (!draft.id) {
-      if (cleanTitle) toCreate.push({ title: cleanTitle, completed: draft.completed, position: index });
+      if (cleanTitle)
+        toCreate.push({
+          title: cleanTitle,
+          completed: draft.completed,
+          position: index,
+          startDate: draft.startDate,
+          dueDate: draft.dueDate,
+          quadrant: draft.quadrant,
+        });
       return;
     }
     if (!cleanTitle) return; // ya va en toDelete
     const original = originals.get(draft.id);
-    if (original && original.title === cleanTitle && original.completed === draft.completed) return;
-    updates.push(updateSubtask(draft.id, { title: cleanTitle, completed: draft.completed, position: index }));
+    if (
+      original &&
+      original.title === cleanTitle &&
+      original.completed === draft.completed &&
+      original.startDate === draft.startDate &&
+      original.dueDate === draft.dueDate &&
+      original.quadrant === draft.quadrant
+    ) {
+      return;
+    }
+    updates.push(
+      updateSubtask(draft.id, {
+        title: cleanTitle,
+        completed: draft.completed,
+        position: index,
+        startDate: draft.startDate,
+        dueDate: draft.dueDate,
+        quadrant: draft.quadrant,
+      }),
+    );
   });
 
   await Promise.all(updates);
@@ -193,12 +237,6 @@ interface TaskFormDialogProps {
   defaultKind?: TaskKind;
 }
 
-function addDays(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() + days);
-  return localDateStr(d);
-}
-
 function reminderWithOffset(anchor: string, minutes: number): string {
   const d = new Date(anchor);
   if (isNaN(d.getTime())) return "";
@@ -228,14 +266,6 @@ function timeToMinutes(time: string): number {
   const [h, m] = time.split(":").map(Number);
   if (isNaN(h) || isNaN(m)) return 0;
   return h * 60 + m;
-}
-
-function formatTimeLabel(t: string, is12: boolean): string {
-  if (!t) return "";
-  const [h, m] = t.split(":");
-  if (!is12) return `${h}:${m}`;
-  const hh = Number(h) % 12 || 12;
-  return `${hh}:${m} ${Number(h) < 12 ? "AM" : "PM"}`;
 }
 
 function initialsOf(name: string): string {
@@ -348,17 +378,27 @@ export function TaskFormDialog({
   const [showNotes, setShowNotes] = useState(false);
   const [newSubtaskTitle, setNewSubtaskTitle] = useState("");
   const [subtasksExpanded, setSubtasksExpanded] = useState(true);
+  const [editingSubtaskKey, setEditingSubtaskKey] = useState<string | null>(null);
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState("");
   const [commentSaving, setCommentSaving] = useState(false);
   const [linkedDocs, setLinkedDocs] = useState<{ id: string; title: string }[]>([]);
   const [workspaceDocs, setWorkspaceDocs] = useState<{ id: string; title: string }[]>([]);
   const [pendingDocIds, setPendingDocIds] = useState<string[]>([]);
-  const [docsPickerOpen, setDocsPickerOpen] = useState(false);
   const [templatePickerOpen, setTemplatePickerOpen] = useState(false);
-  const docsPickerRef = useRef<HTMLDivElement>(null);
+  const [commentsExpanded, setCommentsExpanded] = useState(true);
+  const {
+    anchorRef: docsAnchorRef,
+    panelRef: docsPanelRef,
+    open: docsPickerOpen,
+    toggle: toggleDocsPicker,
+    setOpen: setDocsPickerOpen,
+    pos: docsPickerPos,
+  } = usePopover<HTMLButtonElement>({ align: "left", offset: 4 });
   const subtaskKeyCounter = useRef(0);
-  const originalSubtasksRef = useRef<Map<string, { title: string; completed: boolean }>>(new Map());
+  const originalSubtasksRef = useRef<
+    Map<string, { title: string; completed: boolean; startDate: string; dueDate: string; quadrant: Quadrant | null }>
+  >(new Map());
 
   const [assignees, setAssignees] = useState<{ id: string; name: string; linkedUserId: string | null }[]>([]);
   const [projects, setProjects] = useState<{ id: string; name: string; color: string }[]>([]);
@@ -392,6 +432,34 @@ export function TaskFormDialog({
   const titleRef = useRef<HTMLInputElement>(null);
 
   const isEdit = !!task;
+
+  const spaceLabel = useMemo(() => {
+    const t = currentWorkspace?.type;
+    if (t === "personal") return "Personal";
+    if (!currentWorkspace?.name) return "Mis proyectos";
+    return t === "family" ? currentWorkspace.name : `Equipo: ${currentWorkspace.name}`;
+  }, [currentWorkspace]);
+
+  const handleCreateProject = useCallback(
+    async (name: string) => {
+      if (!currentWorkspace?.id || !canCreate("projects")) return;
+      const color = PRESET_COLORS[name.length % PRESET_COLORS.length];
+      try {
+        const created = await createProject(currentWorkspace.id, name, color);
+        setProjects((prev) => (prev.some((p) => p.id === created.id) ? prev : [...prev, created]));
+        setProjectId(created.id);
+        toast.success("Proyecto creado");
+      } catch (err) {
+        const resource = parsePlanLimitError(err);
+        if (resource) {
+          openUpgrade(resource);
+          return;
+        }
+        toast.error("Error al crear proyecto");
+      }
+    },
+    [currentWorkspace?.id, canCreate, toast],
+  );
 
   const applyKind = (k: TaskKind) => {
     setKind(k);
@@ -446,40 +514,13 @@ export function TaskFormDialog({
 
   const reminderAnchor = startTime && startDate ? `${startDate}T${startTime}` : dueDate ? `${dueDate}T09:00` : "";
 
-  const timeIs12 = useTimeFormat() === "12h";
   const timeAccent: "blue" | "purple" | "coral" =
     kind === "meeting" ? "purple" : kind === "event" ? "coral" : "blue";
   const toggleProperty = useCallback((key: string) => {
     setOpenProperty((cur) => (cur === key ? null : key));
   }, []);
 
-  const fechasSummary = (() => {
-    let base = "";
-    if (startDate) base = formatDayLabel(startDate);
-    else if (endDate) base = formatDayLabel(endDate);
-    if (base && !allDay && startTime) {
-      const endLabel = endTime ? `–${formatTimeLabel(endTime, timeIs12)}` : "";
-      base += `, ${formatTimeLabel(startTime, timeIs12)}${endLabel}`;
-    }
-    if (base && allDay && endDate && endDate !== startDate) base += ` – ${formatDayLabel(endDate)}`;
-    if (!base) return "";
-    if (kind === "task" && showDueDate && dueDate) base += ` · vence ${formatDayLabel(dueDate)}`;
-    return base;
-  })();
-
   const repetirSummary = recurrenceFreq ? (RECURRENCE_LABELS[recurrenceFreq] ?? "") : "";
-
-  const recordatoriosSummary =
-    reminders.length > 0
-      ? reminders.length === 1
-        ? "1 recordatorio"
-        : `${reminders.length} recordatorios`
-      : "";
-
-  const asignadosSummary = selectedAssigneeIds
-    .map((id) => assignees.find((a) => a.id === id)?.name ?? "")
-    .filter(Boolean)
-    .join(", ");
 
   useEffect(() => {
     if (open) {
@@ -647,11 +688,30 @@ export function TaskFormDialog({
       void listSubtasks(task.id)
         .then((rows) => {
           if (cancelled) return;
-          const originals = new Map<string, { title: string; completed: boolean }>();
-          rows.forEach((r) => originals.set(r.id, { title: r.title, completed: r.completed }));
+          const originals = new Map<
+            string,
+            { title: string; completed: boolean; startDate: string; dueDate: string; quadrant: Quadrant | null }
+          >();
+          rows.forEach((r) =>
+            originals.set(r.id, {
+              title: r.title,
+              completed: r.completed,
+              startDate: r.startDate ?? "",
+              dueDate: r.dueDate ?? "",
+              quadrant: r.quadrant ?? null,
+            }),
+          );
           originalSubtasksRef.current = originals;
           setSubtasks(
-            rows.map((r) => ({ key: r.id, id: r.id, title: r.title, completed: r.completed })),
+            rows.map((r) => ({
+              key: r.id,
+              id: r.id,
+              title: r.title,
+              completed: r.completed,
+              startDate: r.startDate ?? "",
+              dueDate: r.dueDate ?? "",
+              quadrant: r.quadrant ?? null,
+            })),
           );
         })
         .catch(() => {});
@@ -670,7 +730,7 @@ export function TaskFormDialog({
     return () => {
       cancelled = true;
     };
-  }, [open, task, currentWorkspace?.id]);
+  }, [open, task, currentWorkspace?.id, setDocsPickerOpen]);
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent) => {
@@ -707,7 +767,15 @@ export function TaskFormDialog({
     subtaskKeyCounter.current += 1;
     setSubtasks((prev) => [
       ...prev,
-      { key: `tmp-${subtaskKeyCounter.current}-${Date.now()}`, id: null, title: t, completed: false },
+      {
+        key: `tmp-${subtaskKeyCounter.current}-${Date.now()}`,
+        id: null,
+        title: t,
+        completed: false,
+        startDate: "",
+        dueDate: "",
+        quadrant: null,
+      },
     ]);
     setNewSubtaskTitle("");
   };
@@ -722,6 +790,39 @@ export function TaskFormDialog({
 
   const renameSubtask = (key: string, title: string) =>
     setSubtasks((prev) => prev.map((s) => (s.key === key ? { ...s, title } : s)));
+
+  const setSubtaskStartDate = (key: string, date: string | null) =>
+    setSubtasks((prev) => prev.map((s) => (s.key === key ? { ...s, startDate: date ?? "" } : s)));
+
+  const setSubtaskDueDate = (key: string, date: string | null) =>
+    setSubtasks((prev) => prev.map((s) => (s.key === key ? { ...s, dueDate: date ?? "" } : s)));
+
+  const setSubtaskQuadrant = (key: string, q: Quadrant | null) =>
+    setSubtasks((prev) => prev.map((s) => (s.key === key ? { ...s, quadrant: q } : s)));
+
+  const duplicateSubtask = (key: string) => {
+    if (subtasks.length >= MAX_SUBTASKS_PER_TASK) {
+      toast.error(`Una tarea puede tener máximo ${MAX_SUBTASKS_PER_TASK} subtareas`);
+      return;
+    }
+    const index = subtasks.findIndex((s) => s.key === key);
+    if (index < 0) return;
+    const src = subtasks[index];
+    subtaskKeyCounter.current += 1;
+    setSubtasks((prev) => {
+      const copy = [...prev];
+      copy.splice(index + 1, 0, {
+        key: `tmp-${subtaskKeyCounter.current}-${Date.now()}`,
+        id: null,
+        title: src.title,
+        completed: src.completed,
+        startDate: src.startDate,
+        dueDate: src.dueDate,
+        quadrant: src.quadrant,
+      });
+      return copy;
+    });
+  };
 
   const submitComment = useCallback(async () => {
     const body = newComment.trim();
@@ -752,18 +853,6 @@ export function TaskFormDialog({
       /* silencioso: la lista queda como está */
     }
   }, []);
-
-  // Cerrar picker de documentos con clic afuera
-  useEffect(() => {
-    if (!docsPickerOpen) return;
-    function handlePointerDown(e: MouseEvent) {
-      if (docsPickerRef.current && !docsPickerRef.current.contains(e.target as Node)) {
-        setDocsPickerOpen(false);
-      }
-    }
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
-  }, [docsPickerOpen]);
 
   const toggleDocLink = useCallback(
     async (docId: string) => {
@@ -942,6 +1031,7 @@ export function TaskFormDialog({
           description: isNotesEmpty(description) ? null : description.trim(),
           quadrant,
           kind,
+          inboxed: false,
           startDate: effectiveStartDate,
           endDate: effectiveEndDate,
           visibility: effectiveVisibility,
@@ -1207,8 +1297,61 @@ export function TaskFormDialog({
             >
               {title.length}/{MAX_TASK_TITLE_LENGTH}
             </span>
-            {error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
+{error && <p className="mt-1.5 text-xs text-red-500">{error}</p>}
           </div>
+
+          {/* Notas: se revelan al pedirlas; las notas legacy editables aparecen solas */}
+          {(showNotes || (isEdit && !!task?.description)) ? (
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-ink">Notas</label>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDescription("");
+                    setShowNotes(false);
+                  }}
+                  className="text-xs font-medium text-ink-muted transition-colors hover:text-ink"
+                >
+                  Quitar
+                </button>
+              </div>
+              <Suspense
+                fallback={
+                  <div className="min-h-[7.25rem] animate-pulse rounded-xl border border-line bg-surface-subtle" />
+                }
+              >
+                <RichTextEditor
+                  content={description || null}
+                  onChange={setDescription}
+                  placeholder="Detalles adicionales..."
+                  contentClassName="min-h-[4.75rem]"
+                />
+              </Suspense>
+              {(() => {
+                const visibleCount = stripHtml(description).length;
+                return (
+                  <p
+                    className={cn(
+                      "text-right text-[11px] font-medium tabular-nums",
+                      visibleCount >= MAX_NOTES_VISIBLE_CHARS
+                        ? "text-red-500"
+                        : visibleCount > MAX_NOTES_VISIBLE_CHARS - 400
+                          ? "text-pritio-coral"
+                          : "text-ink-muted/70",
+                    )}
+                  >
+                    {visibleCount.toLocaleString("es-MX")}/
+                    {MAX_NOTES_VISIBLE_CHARS.toLocaleString("es-MX")}
+                  </p>
+                );
+              })()}
+            </div>
+          ) : (
+            <div>
+              <AddRowButton label="Agregar notas" onClick={() => setShowNotes(true)} />
+            </div>
+          )}
 
           <Field label="Cuadrante">
             <div className="grid grid-cols-4 gap-1.5">
@@ -1283,142 +1426,6 @@ export function TaskFormDialog({
             </Field>
           )}
 
-          {/* Notas: se revelan al pedirlas; las notas legacy editables aparecen solas */}
-          {(showNotes || (isEdit && !!task?.description)) ? (
-            <div className="space-y-1.5">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-ink">Notas</label>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDescription("");
-                    setShowNotes(false);
-                  }}
-                  className="text-xs font-medium text-ink-muted transition-colors hover:text-ink"
-                >
-                  Quitar
-                </button>
-              </div>
-              <Suspense
-                fallback={
-                  <div className="min-h-[7.25rem] animate-pulse rounded-xl border border-line bg-surface-subtle" />
-                }
-              >
-                <RichTextEditor
-                  content={description || null}
-                  onChange={setDescription}
-                  placeholder="Detalles adicionales..."
-                  contentClassName="min-h-[4.75rem]"
-                />
-              </Suspense>
-              {(() => {
-                const visibleCount = stripHtml(description).length;
-                return (
-                  <p
-                    className={cn(
-                      "text-right text-[11px] font-medium tabular-nums",
-                      visibleCount >= MAX_NOTES_VISIBLE_CHARS
-                        ? "text-red-500"
-                        : visibleCount > MAX_NOTES_VISIBLE_CHARS - 400
-                          ? "text-pritio-coral"
-                          : "text-ink-muted/70",
-                    )}
-                  >
-                    {visibleCount.toLocaleString("es-MX")}/
-                    {MAX_NOTES_VISIBLE_CHARS.toLocaleString("es-MX")}
-                  </p>
-                );
-              })()}
-            </div>
-          ) : (
-            <div>
-              <AddRowButton label="Agregar notas" onClick={() => setShowNotes(true)} />
-            </div>
-          )}
-
-          {/* Documentos vinculados */}
-          <div className="space-y-2">
-            <label className="text-sm font-medium text-ink">Documentos</label>
-            <div className="flex flex-wrap items-center gap-1.5" ref={docsPickerRef}>
-              {linkedDocs.map((d) => (
-                <span
-                  key={d.id}
-                  className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-subtle py-1 pl-2 pr-1.5 text-xs font-medium text-ink"
-                >
-                  <svg className="h-3 w-3 shrink-0 text-ink-muted" viewBox="0 0 16 16" fill="none">
-                    <path d="M4.5 2h4.75L12.5 5.25V13a1 1 0 01-1 1h-7a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                    <path d="M9 2v3.5h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                  </svg>
-                  <span className="max-w-[10rem] truncate">{d.title || "Sin título"}</span>
-                  <button
-                    type="button"
-                    onClick={() => void toggleDocLink(d.id)}
-                    aria-label={`Desvincular documento: ${d.title || "Sin título"}`}
-                    className="text-ink-muted transition-colors hover:text-pritio-coral"
-                  >
-                    <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                      <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
-                  </button>
-                </span>
-              ))}
-              <button
-                type="button"
-                onClick={() => setDocsPickerOpen((v) => !v)}
-                aria-expanded={docsPickerOpen}
-                className="rounded-full border border-dashed border-line-strong/70 px-2.5 py-1 text-xs font-medium text-ink-soft transition-colors hover:border-pritio-blue/50 hover:text-pritio-blue"
-              >
-                + Vincular documento
-              </button>
-            </div>
-
-            {docsPickerOpen && (
-              <div className="pritio-menu-enter ml-6 w-[19rem] rounded-xl border border-line bg-surface p-2 shadow-elevated">
-                {workspaceDocs.length === 0 ? (
-                  <p className="px-2 py-2 text-xs leading-relaxed text-ink-muted">
-                    Todavía no hay documentos en este workspace.
-                  </p>
-                ) : (
-                  <div className="max-h-[14rem] space-y-0.5 overflow-y-auto">
-                    {workspaceDocs.map((d) => {
-                      const linked = linkedDocs.some((x) => x.id === d.id);
-                      return (
-                        <button
-                          key={d.id}
-                          type="button"
-                          onClick={() => void toggleDocLink(d.id)}
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-muted",
-                            linked && "bg-pritio-blue/5",
-                          )}
-                        >
-                          <span className="min-w-0 flex-1 truncate text-sm text-ink">
-                            {d.title || "Sin título"}
-                          </span>
-                          {linked && (
-                            <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
-                              <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setTemplatePickerOpen(true)}
-                  className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 pb-1 text-left text-sm font-medium text-pritio-blue transition-colors hover:bg-pritio-blue/5"
-                >
-                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                  </svg>
-                  Crear nota y vincular
-                </button>
-              </div>
-            )}
-          </div>
-
           {/* Subtareas (contraíbles) */}
           {subtasks.length > 0 || showSubtasks ? (
             <div className="space-y-2">
@@ -1474,6 +1481,8 @@ export function TaskFormDialog({
                       <input
                         type="text"
                         value={st.title}
+                        autoFocus={editingSubtaskKey === st.key}
+                        onBlur={() => setEditingSubtaskKey((cur) => (cur === st.key ? null : cur))}
                         onChange={(e) => renameSubtask(st.key, e.target.value)}
                         placeholder="Título de la subtarea"
                         className={cn(
@@ -1481,16 +1490,23 @@ export function TaskFormDialog({
                           st.completed && "text-ink-muted line-through",
                         )}
                       />
-                      <button
-                        type="button"
-                        onClick={() => removeSubtask(st.key)}
-                        aria-label={`Quitar subtarea: ${st.title}`}
-                        className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-muted opacity-0 transition-all hover:bg-pritio-coral/10 hover:text-pritio-coral focus-visible:opacity-100 group-hover/sub:opacity-100"
-                      >
-                        <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                          <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                        </svg>
-                      </button>
+                      <SubtaskContextMenu
+                        subtask={{
+                          key: st.key,
+                          id: st.id,
+                          title: st.title,
+                          completed: st.completed,
+                          startDate: st.startDate || null,
+                          dueDate: st.dueDate || null,
+                          quadrant: st.quadrant,
+                        }}
+                        onEdit={() => setEditingSubtaskKey(st.key)}
+                        onSetStartDate={(d) => setSubtaskStartDate(st.key, d)}
+                        onSetDueDate={(d) => setSubtaskDueDate(st.key, d)}
+                        onSetQuadrant={(q) => setSubtaskQuadrant(st.key, q)}
+                        onDuplicate={() => duplicateSubtask(st.key)}
+                        onDelete={() => removeSubtask(st.key)}
+                      />
                     </div>
                   ))}
                   {subtasks.length >= MAX_SUBTASKS_PER_TASK ? (
@@ -1530,107 +1546,199 @@ export function TaskFormDialog({
             <AddRowButton label="Añadir subtareas" onClick={() => setShowSubtasks(true)} />
           )}
 
+          {/* Comentarios — en la columna principal */}
+          {isEdit && (
+            <div className="space-y-2">
+              <button
+                type="button"
+                onClick={() => setCommentsExpanded((c) => !c)}
+                className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-muted transition-colors hover:text-ink"
+              >
+                Comentarios
+                <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ink-soft">
+                  {comments.length}
+                </span>
+                <svg
+                  className={cn("h-3.5 w-3.5 transition-transform", commentsExpanded && "rotate-180")}
+                  viewBox="0 0 16 16"
+                  fill="none"
+                >
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </button>
+
+              {/* Input directo, siempre visible */}
+              <textarea
+                value={newComment}
+                onChange={(e) => setNewComment(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    void submitComment();
+                  }
+                }}
+                rows={2}
+                placeholder="Escribe un comentario…"
+                aria-label="Nuevo comentario"
+                className="w-full resize-none rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
+              />
+              {commentSaving && <p className="text-[11px] text-ink-muted">Enviando…</p>}
+
+              {commentsExpanded && comments.length > 0 && (
+                <div className="max-h-[12rem] space-y-2.5 overflow-y-auto pr-0.5">
+                  {comments.map((c) => (
+                    <div key={c.id} className="group/c flex items-start gap-2">
+                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface-muted text-[10px] font-bold text-ink-soft">
+                        {initialsOf(c.authorName)}
+                      </span>
+                      <div className="min-w-0 flex-1">
+                        <p className="flex flex-wrap items-baseline gap-x-1.5">
+                          <span className="text-xs font-bold text-ink">{c.authorName}</span>
+                          <time className="text-[11px] text-ink-muted">{formatRelativeTime(c.createdAt)}</time>
+                        </p>
+                        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-soft">
+                          {c.body}
+                        </p>
+                      </div>
+                      {c.userId === profile?.id && (
+                        <button
+                          type="button"
+                          onClick={() => void removeComment(c.id)}
+                          aria-label="Eliminar comentario"
+                          className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-muted opacity-0 transition-all hover:bg-pritio-coral/10 hover:text-pritio-coral focus-visible:opacity-100 group-hover/c:opacity-100"
+                        >
+                          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
+                            <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                          </svg>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              {commentsExpanded && comments.length === 0 && (
+                <p className="text-xs text-ink-muted">Aún no hay comentarios.</p>
+              )}
+            </div>
+          )}
           </div>
 
           {/* Rail de datos adicionales */}
-          <aside className="min-w-0 self-start rounded-xl border border-line/70 bg-surface-subtle/40 p-1 md:block">
-            <p className="mb-1 px-2 pt-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
+          <aside className="min-w-0 self-start space-y-5 rounded-xl border border-line/70 bg-surface-subtle/40 p-3 md:block">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
               Detalles
             </p>
-            <PropertyRow
-              icon={ROW_ICONS.fechas}
-              label="Fechas"
-              value={fechasSummary}
-              emptyText="Sin fecha"
-              expanded={openProperty === "fechas"}
-              onToggle={() => toggleProperty("fechas")}
-            >
-              <div className="space-y-2.5 pt-0.5">
-                {kind !== "meeting" && (
-                  <label className="flex cursor-pointer items-center justify-end gap-1.5 text-xs font-medium text-ink-soft">
-                    <input
-                      type="checkbox"
-                      checked={allDay}
-                      onChange={(e) => {
-                        const next = e.target.checked;
-                        setAllDay(next);
-                        if (next) {
-                          setStartTime("");
-                          setEndTime("");
-                        }
-                      }}
-                      className="h-3.5 w-3.5 rounded border-line text-pritio-blue focus:ring-pritio-blue/20"
-                    />
-                    Todo el día
-                  </label>
-                )}
-                {allDay ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <DatePickerPopover
+
+            {/* Fechas — campos directos, sin collapsible */}
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Fechas</p>
+
+              {kind !== "meeting" && (
+                <label className="flex cursor-pointer items-center justify-end gap-1.5 text-xs font-medium text-ink-soft">
+                  <input
+                    type="checkbox"
+                    checked={allDay}
+                    onChange={(e) => {
+                      const next = e.target.checked;
+                      setAllDay(next);
+                      if (next) {
+                        setStartTime("");
+                        setEndTime("");
+                      }
+                    }}
+                    className="h-3.5 w-3.5 rounded border-line text-pritio-blue focus:ring-pritio-blue/20"
+                  />
+                  Todo el día
+                </label>
+              )}
+
+              {allDay ? (
+                <div className="grid grid-cols-2 gap-2">
+                  <DatePickerField
+                    field="fecha-inicio"
+                    value={startDate}
+                    onChange={(d) => setStartDate(d ?? "")}
+                    showTime={false}
+                    accent={timeAccent}
+                    placeholder={kind === "meeting" ? "Día de la junta" : kind === "event" ? "Día de inicio" : "Día"}
+                  />
+                  <DatePickerField
+                    field="fecha-fin"
+                    value={endDate}
+                    onChange={(d) => setEndDate(d ?? "")}
+                    showTime={false}
+                    accent={timeAccent}
+                    placeholder="Día fin"
+                    minDate={startDate || undefined}
+                    error={
+                      startDate && endDate && endDate < startDate
+                        ? "El fin no puede ser anterior al inicio"
+                        : undefined
+                    }
+                  />
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 shrink-0 text-[11px] font-medium text-ink-muted">Inicio</span>
+                    <DatePickerField
+                      field="fecha-inicio"
                       value={startDate}
-                      onChange={setStartDate}
+                      time={startTime}
+                      onChange={(d, t) => {
+                        setStartDate(d ?? "");
+                        if (t !== undefined) setStartTime(t);
+                      }}
+                      showTime
+                      accent={timeAccent}
                       placeholder={kind === "meeting" ? "Día de la junta" : kind === "event" ? "Día de inicio" : "Día"}
-                      align="right"
+                      className="min-w-0 flex-1"
                     />
-                    <DatePickerPopover value={endDate} onChange={setEndDate} placeholder="Día fin" clearable align="right" />
                   </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <span className="w-8 shrink-0 text-[11px] font-medium text-ink-muted">Inicio</span>
-                      <DatePickerPopover value={startDate} onChange={setStartDate} placeholder="Día" className="min-w-0 flex-1" align="right" />
-                      <div className="w-[6.75rem] shrink-0">
-                        <TimePicker compact value={startTime} onChange={setStartTime} accent={timeAccent} />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="w-8 shrink-0 text-[11px] font-medium text-ink-muted">Fin</span>
-                      <DatePickerPopover value={endDate} onChange={setEndDate} placeholder="Día" clearable className="min-w-0 flex-1" align="right" />
-                      <div className="w-[6.75rem] shrink-0">
-                        <TimePicker compact value={endTime} onChange={setEndTime} accent={timeAccent} />
-                      </div>
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 shrink-0 text-[11px] font-medium text-ink-muted">Fin</span>
+                    <DatePickerField
+                      field="fecha-fin"
+                      value={endDate}
+                      time={endTime}
+                      onChange={(d, t) => {
+                        setEndDate(d ?? "");
+                        if (t !== undefined) setEndTime(t);
+                      }}
+                      showTime
+                      accent={timeAccent}
+                      placeholder="Día fin"
+                      minDate={startDate || undefined}
+                      className="min-w-0 flex-1"
+                      error={
+                        startDate && endDate && endDate < startDate
+                          ? "El fin no puede ser anterior al inicio"
+                          : undefined
+                      }
+                    />
                   </div>
-                )}
-                {kind === "task" && showDueDate && (
-                  <div className="space-y-1.5 border-t border-line/60 pt-2.5">
-                    <p className="text-[11px] font-medium text-ink-muted">Fecha límite</p>
-                    <div className="flex flex-wrap items-center gap-1.5">
-                      <DatePickerPopover
-                        value={dueDate}
-                        onChange={setDueDate}
-                        placeholder="Fecha límite"
-                        presets
-                        clearable
-                        className="min-w-[9rem] flex-1"
-                        align="right"
-                      />
-                      <div className="flex gap-1">
-                        {[
-                          { label: "Hoy", value: todayStr() },
-                          { label: "Mañana", value: addDays(1) },
-                          { label: "1 sem", value: addDays(7) },
-                        ].map((s) => (
-                          <button
-                            key={s.label}
-                            type="button"
-                            onClick={() => setDueDate(s.value)}
-                            className={cn(
-                              "rounded-md border px-2 py-0.5 text-[11px] font-medium transition-all",
-                              dueDate === s.value
-                                ? "border-pritio-blue bg-pritio-blue/5 text-pritio-blue"
-                                : "border-line text-ink-soft hover:bg-surface-muted",
-                            )}
-                          >
-                            {s.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </PropertyRow>
+                </div>
+              )}
+
+              {kind === "task" && showDueDate && (
+                <div className="space-y-1.5 border-t border-line/60 pt-2">
+                  <p className="text-[11px] font-medium text-ink-muted">Fecha límite</p>
+                  <DatePickerField
+                    field="fecha-limite"
+                    value={dueDate}
+                    onChange={(d) => setDueDate(d ?? "")}
+                    showTime={false}
+                    minDate={endDate || startDate || undefined}
+                    placeholder="Sin fecha límite"
+                    error={
+                      endDate && dueDate && dueDate < endDate
+                        ? "La fecha límite no puede ser anterior al fin"
+                        : undefined
+                    }
+                  />
+                </div>
+              )}
+            </div>
 
             <PropertyRow
               icon={ROW_ICONS.repetir}
@@ -1716,205 +1824,120 @@ export function TaskFormDialog({
               </div>
             </PropertyRow>
 
-            <PropertyRow
-              icon={ROW_ICONS.recordatorios}
-              label="Recordatorios"
-              value={recordatoriosSummary}
-              emptyText="Sin recordatorios"
-              expanded={openProperty === "recordatorios"}
-              onToggle={() => toggleProperty("recordatorios")}
-            >
-              <div className="space-y-2 pt-0.5">
+            {/* Recordatorios — input con select, directo */}
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Recordatorios</p>
                 {reminders.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {reminders.map((r, i) => (
-                      <span
-                        key={`${r}-${i}`}
-                        className="inline-flex items-center gap-1 rounded-full bg-pritio-purple/10 px-2.5 py-1 text-xs font-medium text-pritio-purple"
-                      >
-                        {new Date(r).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
-                        <button
-                          type="button"
-                          onClick={() => setReminders((prev) => prev.filter((_, j) => j !== i))}
-                          className="text-pritio-purple/60 hover:text-pritio-purple"
-                          aria-label="Quitar recordatorio"
-                        >
-                          <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                            <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                          </svg>
-                        </button>
-                      </span>
-                    ))}
-                  </div>
+                  <span className="text-[11px] font-semibold tabular-nums text-pritio-purple">
+                    {reminders.length}
+                  </span>
                 )}
-                <div className="space-y-2">
-                  <DatePickerPopover
-                    value={newReminder.slice(0, 10)}
-                    onChange={(d) => setNewReminder(`${d}T${newReminder.slice(11, 16) || "09:00"}`)}
-                    placeholder="Día"
-                    className="w-full"
-                    align="right"
-                  />
-                  <div className="flex items-center gap-2">
-                    <div className="min-w-0 flex-1">
-                      <TimePicker
-                        compact
-                        value={newReminder.slice(11, 16)}
-                        onChange={(t) => setNewReminder(`${newReminder.slice(0, 10) || todayStr()}T${t}`)}
-                        accent="purple"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (newReminder && !reminders.includes(newReminder)) {
-                          setReminders((prev) => [...prev, newReminder]);
-                        }
-                        setNewReminder("");
-                      }}
-                      className="shrink-0 rounded-xl bg-pritio-purple px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-pritio-purple/90"
-                    >
-                      Agregar
-                    </button>
-                  </div>
-                </div>
-                {reminderAnchor && (
-                  <div className="flex flex-wrap gap-1">
-                    {[
-                      { label: "En el momento", minutes: 0 },
-                      { label: "15 min antes", minutes: 15 },
-                      { label: "1 h antes", minutes: 60 },
-                      { label: "1 día antes", minutes: 1440 },
-                    ].map((p) => {
-                      const v = reminderWithOffset(reminderAnchor, p.minutes);
-                      return (
-                        <button
-                          key={p.label}
-                          type="button"
-                          onClick={() => {
-                            if (v && !reminders.includes(v)) setReminders((prev) => [...prev, v]);
-                          }}
-                          className="rounded-full border border-line px-2 py-0.5 text-[11px] font-medium text-ink-soft transition-all hover:bg-surface-muted"
-                        >
-                          {p.label}
-                        </button>
-                      );
-                    })}
-                  </div>
-                )}
-                <p className="text-[11px] leading-relaxed text-ink-muted">
-                  Recibirás una notificación in-app, por correo y push en la fecha elegida.
-                </p>
               </div>
-            </PropertyRow>
 
-            {projects.length > 0 && (
-              <PropertyRow
-                icon={ROW_ICONS.proyecto}
-                label="Proyecto"
-                value={projects.find((p) => p.id === projectId)?.name ?? ""}
-                emptyText="Sin proyecto"
-                expanded={openProperty === "proyecto"}
-                onToggle={() => toggleProperty("proyecto")}
-              >
-                <div className="space-y-0.5">
-                  {projects.map((p) => {
-                    const selected = projectId === p.id;
-                    return (
+              {reminders.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {reminders.map((r, i) => (
+                    <span
+                      key={`${r}-${i}`}
+                      className="inline-flex items-center gap-1 rounded-full bg-pritio-purple/10 px-2.5 py-1 text-xs font-medium text-pritio-purple"
+                    >
+                      {new Date(r).toLocaleString("es-MX", { dateStyle: "short", timeStyle: "short" })}
                       <button
-                        key={p.id}
                         type="button"
-                        onClick={() => setProjectId(selected ? "" : p.id)}
-                        className={cn(
-                          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-muted",
-                          selected && "bg-pritio-blue/5",
-                        )}
+                        onClick={() => setReminders((prev) => prev.filter((_, j) => j !== i))}
+                        className="text-pritio-purple/60 hover:text-pritio-purple"
+                        aria-label="Quitar recordatorio"
                       >
-                        <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: p.color }} />
-                        <span className="min-w-0 flex-1 truncate text-sm text-ink">{p.name}</span>
-                        {selected && (
-                          <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
-                            <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
+                        <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                          <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
                       </button>
-                    );
-                  })}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-1.5">
+                  <QuickDatePicker
+                    date={newReminder.slice(0, 10)}
+                    time={newReminder.slice(11, 16)}
+                    onChange={(d, t) => setNewReminder(`${d}T${t || "09:00"}`)}
+                    accent="purple"
+                    placeholder="Día del recordatorio"
+                    className="min-w-0 flex-1"
+                  />
+                </div>
+                <div className="flex gap-1.5">
                   <button
                     type="button"
-                    onClick={() => setProjectId("")}
-                    className={cn(
-                      "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-muted",
-                      !projectId && "bg-pritio-blue/5",
-                    )}
+                    onClick={() => {
+                      if (newReminder && !reminders.includes(newReminder)) {
+                        setReminders((prev) => [...prev, newReminder]);
+                      }
+                      setNewReminder("");
+                    }}
+                    className="min-w-0 flex-1 truncate rounded-lg bg-pritio-purple px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-pritio-purple/90"
                   >
-                    <span className="h-2.5 w-2.5 shrink-0 rounded-full border border-dashed border-line-strong" />
-                    <span className="min-w-0 flex-1 truncate text-sm text-ink-muted">Sin proyecto</span>
-                    {!projectId && (
-                      <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
-                        <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
-                    )}
+                    Agregar
                   </button>
-                </div>
-              </PropertyRow>
-            )}
-
-            {assignees.length > 0 && (
-              <PropertyRow
-                icon={ROW_ICONS.asignados}
-                label="Asignados"
-                value={asignadosSummary}
-                emptyText="Sin asignar"
-                expanded={openProperty === "asignados"}
-                onToggle={() => toggleProperty("asignados")}
-              >
-                <div className="space-y-0.5">
-                  {assignees
-                    .filter((a) => !allowedAssigneeIds || allowedAssigneeIds.has(a.id))
-                    .map((a) => {
-                      const selected = selectedAssigneeIds.includes(a.id);
-                      const isSelfLocked = isRestrictedMember && selfAssignee?.id === a.id;
-                      return (
-                        <button
-                          key={a.id}
-                          type="button"
-                          disabled={selected && isSelfLocked}
-                          onClick={() => toggleAssignee(a.id)}
-                          title={
-                            selected && isSelfLocked
-                              ? "Los miembros solo pueden asignarse tareas a sí mismos."
-                              : undefined
-                          }
-                          className={cn(
-                            "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-muted disabled:cursor-not-allowed disabled:hover:bg-transparent",
-                            selected && "bg-pritio-blue/5",
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              "grid h-6 w-6 shrink-0 place-items-center rounded-full text-[10px] font-bold",
-                              selected ? "bg-pritio-blue text-white" : "bg-surface-muted text-ink-soft",
-                            )}
+                  {reminderAnchor && (
+                    <div className="flex min-w-0 flex-1 gap-1">
+                      {[
+                        { label: "15 min", minutes: 15 },
+                        { label: "1 h", minutes: 60 },
+                        { label: "1 día", minutes: 1440 },
+                      ].map((p) => {
+                        const v = reminderWithOffset(reminderAnchor, p.minutes);
+                        return (
+                          <button
+                            key={p.label}
+                            type="button"
+                            onClick={() => {
+                              if (v && !reminders.includes(v)) setReminders((prev) => [...prev, v]);
+                            }}
+                            className="rounded-md border border-line px-1.5 py-0.5 text-[10px] font-medium text-ink-soft transition-all hover:bg-surface-muted"
                           >
-                            {initialsOf(a.name)}
-                          </span>
-                          <span className="min-w-0 flex-1 truncate text-sm text-ink">{a.name}</span>
-                          {selected && (
-                            <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
-                              <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
-                          )}
-                        </button>
-                      );
-                    })}
-                  {isRestrictedMember && (
-                    <p className="mt-1 text-[11px] leading-relaxed text-ink-muted">
-                      Los miembros solo pueden asignarse tareas a sí mismos.
-                    </p>
+                            {p.label}
+                          </button>
+                        );
+                      })}
+                    </div>
                   )}
                 </div>
-              </PropertyRow>
+                <p className="text-[10px] leading-relaxed text-ink-muted">
+                  Notificación in-app, por correo y push en la fecha elegida.
+                </p>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Proyecto</p>
+              <ProjectPicker
+                value={projectId}
+                onChange={(id) => setProjectId(id)}
+                projects={projects}
+                spaceLabel={spaceLabel}
+                canCreate={canCreate("projects")}
+                onCreate={(name) => void handleCreateProject(name)}
+              />
+            </div>
+
+            {assignees.length > 0 && (
+            <div className="space-y-2">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Asignados</p>
+              <AssigneePicker
+                value={selectedAssigneeIds}
+                onChange={(ids) => setSelectedAssigneeIds(ids)}
+                onToggle={toggleAssignee}
+                assignees={assignees}
+                allowedIds={allowedAssigneeIds}
+                lockedIds={
+                  isRestrictedMember && selfAssignee ? new Set([selfAssignee.id]) : undefined
+                }
+              />
+            </div>
             )}
 
             {/* Visibility row (family workspaces) */}
@@ -1962,71 +1985,6 @@ export function TaskFormDialog({
               </PropertyRow>
             )}
 
-            {/* Comentarios */}
-            {isEdit && (
-              <PropertyRow
-                icon={ROW_ICONS.comentarios}
-                label="Comentarios"
-                value={
-                  comments.length > 0
-                    ? `${comments.length} comentario${comments.length > 1 ? "s" : ""}`
-                    : ""
-                }
-                emptyText="Sin comentarios"
-                expanded={openProperty === "comentarios"}
-                onToggle={() => toggleProperty("comentarios")}
-              >
-                <div className="max-h-[16rem] space-y-2.5 overflow-y-auto pt-0.5">
-                  {comments.length === 0 && (
-                    <p className="text-xs text-ink-muted">Aún no hay comentarios.</p>
-                  )}
-                  {comments.map((c) => (
-                    <div key={c.id} className="group/c flex items-start gap-2">
-                      <span className="grid h-6 w-6 shrink-0 place-items-center rounded-full bg-surface-muted text-[10px] font-bold text-ink-soft">
-                        {initialsOf(c.authorName)}
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="flex flex-wrap items-baseline gap-x-1.5">
-                          <span className="text-xs font-bold text-ink">{c.authorName}</span>
-                          <time className="text-[11px] text-ink-muted">{formatRelativeTime(c.createdAt)}</time>
-                        </p>
-                        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed text-ink-soft">
-                          {c.body}
-                        </p>
-                      </div>
-                      {c.userId === profile?.id && (
-                        <button
-                          type="button"
-                          onClick={() => void removeComment(c.id)}
-                          aria-label="Eliminar comentario"
-                          className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-muted opacity-0 transition-all hover:bg-pritio-coral/10 hover:text-pritio-coral focus-visible:opacity-100 group-hover/c:opacity-100"
-                        >
-                          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                            <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                  <textarea
-                    value={newComment}
-                    onChange={(e) => setNewComment(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) {
-                        e.preventDefault();
-                        void submitComment();
-                      }
-                    }}
-                    rows={2}
-                    placeholder="Escribe un comentario…"
-                    aria-label="Nuevo comentario"
-                    className="w-full resize-none rounded-xl border border-line bg-surface-subtle px-3 py-2 text-sm text-ink placeholder:text-ink-muted focus:border-pritio-blue focus:outline-none focus:ring-2 focus:ring-pritio-blue/20"
-                  />
-                  {commentSaving && <p className="text-[11px] text-ink-muted">Enviando…</p>}
-                </div>
-              </PropertyRow>
-            )}
-
             {/* Approval switch (only when workspace has members) */}
             {assignees.length > 0 && (
               <div className="mt-1.5 flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-2.5 py-2">
@@ -2055,8 +2013,107 @@ export function TaskFormDialog({
                 </button>
               </div>
             )}
+
+            {/* Documentos vinculados — a la derecha */}
+            <div className="space-y-2 border-t border-line/60 pt-3">
+              <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Documentos</p>
+              {linkedDocs.length > 0 && (
+                <div className="flex flex-wrap gap-1.5">
+                  {linkedDocs.map((d) => (
+                    <span
+                      key={d.id}
+                      className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-subtle py-1 pl-2 pr-1.5 text-xs font-medium text-ink"
+                    >
+                      <svg className="h-3 w-3 shrink-0 text-ink-muted" viewBox="0 0 16 16" fill="none">
+                        <path d="M4.5 2h4.75L12.5 5.25V13a1 1 0 01-1 1h-7a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                        <path d="M9 2v3.5h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+                      </svg>
+                      <span className="max-w-[7rem] truncate">{d.title || "Sin título"}</span>
+                      <button
+                        type="button"
+                        onClick={() => void toggleDocLink(d.id)}
+                        aria-label={`Desvincular documento: ${d.title || "Sin título"}`}
+                        className="text-ink-muted transition-colors hover:text-pritio-coral"
+                      >
+                        <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
+                          <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                        </svg>
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+              <button
+                ref={docsAnchorRef}
+                type="button"
+                onClick={toggleDocsPicker}
+                aria-expanded={docsPickerOpen}
+                className="w-full rounded-full border border-dashed border-line-strong/70 px-2.5 py-1 text-left text-xs font-medium text-ink-soft transition-colors hover:border-pritio-blue/50 hover:text-pritio-blue"
+              >
+                + Vincular documento
+              </button>
+            </div>
           </aside>
         </div>
+
+        {docsPickerOpen &&
+          createPortal(
+            <div
+              ref={docsPanelRef}
+              data-pritio-popover="true"
+              role="dialog"
+              aria-label="Vincular documento"
+              style={{
+                top: docsPickerPos?.top ?? -9999,
+                left: docsPickerPos?.left ?? -9999,
+                visibility: docsPickerPos ? "visible" : "hidden",
+              }}
+              className="pritio-menu-enter fixed z-[10002] w-[19rem] max-w-[calc(100vw-1rem)] rounded-xl border border-line bg-surface p-2 shadow-elevated"
+            >
+              {workspaceDocs.length === 0 ? (
+                <p className="px-2 py-2 text-xs leading-relaxed text-ink-muted">
+                  Todavía no hay documentos en este workspace.
+                </p>
+              ) : (
+                <div className="max-h-[14rem] space-y-0.5 overflow-y-auto">
+                  {workspaceDocs.map((d) => {
+                    const linked = linkedDocs.some((x) => x.id === d.id);
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => void toggleDocLink(d.id)}
+                        className={cn(
+                          "flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-surface-muted",
+                          linked && "bg-pritio-blue/5",
+                        )}
+                      >
+                        <span className="min-w-0 flex-1 truncate text-sm text-ink">
+                          {d.title || "Sin título"}
+                        </span>
+                        {linked && (
+                          <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
+                            <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+              <button
+                type="button"
+                onClick={() => setTemplatePickerOpen(true)}
+                className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 pb-1 text-left text-sm font-medium text-pritio-blue transition-colors hover:bg-pritio-blue/5"
+              >
+                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+                  <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                </svg>
+                Crear nota y vincular
+              </button>
+            </div>,
+            document.body,
+          )}
 
         <div className="sticky bottom-0 -mx-5 -mb-5 mt-8 flex gap-3 border-t border-line bg-surface px-5 pb-4 pt-4 md:-mx-6 md:-mb-6 md:px-6 md:pb-5">
           <button

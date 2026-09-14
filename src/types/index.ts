@@ -231,6 +231,8 @@ export interface Task {
   description: string | null;
   quadrant: Quadrant;
   kind: TaskKind;
+  /** Captura rápida pendiente de triaje (Inbox). */
+  inboxed: boolean;
   startDate: string | null;
   endDate: string | null;
   visibility: TaskVisibility;
@@ -288,6 +290,9 @@ export interface TaskSubtask {
   title: string;
   completed: boolean;
   position: number;
+  startDate: string | null;
+  dueDate: string | null;
+  quadrant: Quadrant | null;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -454,6 +459,7 @@ export interface TaskRow {
   description: string | null;
   quadrant: Quadrant;
   kind: TaskKind;
+  inboxed: boolean;
   start_date: string | null;
   end_date: string | null;
   visibility: TaskVisibility;
@@ -491,6 +497,9 @@ export interface TaskSubtaskRow {
   title: string;
   completed: boolean;
   position: number;
+  start_date: string | null;
+  due_date: string | null;
+  quadrant: Quadrant | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -530,6 +539,7 @@ export interface CreateTaskPayload {
   description?: string | null;
   quadrant: Quadrant;
   kind?: TaskKind;
+  inboxed?: boolean;
   startDate?: string | null;
   endDate?: string | null;
   visibility?: TaskVisibility;
@@ -553,6 +563,7 @@ export interface UpdateTaskPayload {
   description?: string | null;
   quadrant?: Quadrant;
   kind?: TaskKind;
+  inboxed?: boolean;
   startDate?: string | null;
   endDate?: string | null;
   visibility?: TaskVisibility;

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate, useParams, Navigate } from "react-router-dom";
+import { useNavigate, useParams, Navigate, useLocation } from "react-router-dom";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { useViewPrefs } from "@/lib/viewPrefs";
 import { Sidebar } from "@/components/layout/Sidebar";
@@ -18,11 +18,23 @@ import { spacesForWorkspaceType, spacePath, SLUG_TO_SPACE, SPACES } from "@/feat
 import type { SpaceKey } from "@/features/spaces/spaces";
 import type { ViewKey } from "@/components/layout/ViewTabs";
 import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
+import { GlobalFAB } from "@/components/layout/GlobalFAB";
+import { globalViewFromPath, globalViewPath, type GlobalViewKey } from "@/components/layout/globalNav";
+import { InboxView } from "@/features/inbox/InboxView";
+import { MiDiaView } from "@/features/home/MiDiaView";
+import { GlobalSearch } from "@/components/layout/GlobalSearch";
+import { RightWidgetPanel } from "@/components/layout/RightWidgetPanel";
 import { cn } from "@/lib/utils";
 import { onAppEvent, emitAppEvent } from "@/lib/appEvents";
+import { QuadrantsView } from "@/features/tasks/QuadrantsView";
+import { AddTaskDialog } from "@/features/tasks/AddTaskDialog";
+import { ProjectsGlobalView } from "@/features/projects/ProjectsGlobalView";
+import { DocsGlobalView } from "@/features/docs/DocsGlobalView";
+import { StatsGlobalView } from "@/features/stats/StatsGlobalView";
+import { CalendarGlobalView } from "@/features/calendar/CalendarGlobalView";
+import { WorkspaceSelector } from "@/components/layout/WorkspaceSelector";
 
 function baseViewsFor(_workspaceType: string, _space: SpaceKey): ViewKey[] {
-  // Todas las vistas están disponibles en cualquier workspace/espacio.
   void _workspaceType;
   void _space;
   return ["cuadrantes", "plan", "kanban", "calendario", "docs", "indicadores"];
@@ -30,14 +42,20 @@ function baseViewsFor(_workspaceType: string, _space: SpaceKey): ViewKey[] {
 
 export function AppShell() {
   const navigate = useNavigate();
+  const location = useLocation();
   const params = useParams<{ space?: string; view?: string }>();
-  const { currentWorkspace, profile } = useWorkspace();
+  const { currentWorkspace, workspaces, profile } = useWorkspace();
   const { hasFeature } = useBilling();
   const { signOut } = useAuth();
   const { hiddenViews } = useViewPrefs();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [rightPanelOpen, setRightPanelOpen] = useState(false);
   const [calendarDate, setCalendarDate] = useState<string | null>(null);
   const [tourOpen, setTourOpen] = useState(false);
+  const [workspaceSelectorOpen, setWorkspaceSelectorOpen] = useState(false);
+
+  const globalView = globalViewFromPath(location.pathname);
+  const isGlobal = globalView !== null;
 
   const workspaceType = currentWorkspace?.type ?? "personal";
   const validSpaces: SpaceKey[] = useMemo(
@@ -47,7 +65,14 @@ export function AppShell() {
         : ["pendientes"],
     [currentWorkspace],
   );
-  const defaultSpace: SpaceKey = validSpaces[0] ?? "pendientes";
+
+  // IDs de todos los workspaces del mismo tipo que el actual (vistas agregadas).
+  const workspaceIds = useMemo(() => {
+    if (!currentWorkspace) return [];
+    return workspaces
+      .filter((w) => w.type === currentWorkspace.type)
+      .map((w) => w.id);
+  }, [currentWorkspace, workspaces]);
 
   const activeSpace = params.space ? SLUG_TO_SPACE[params.space] : undefined;
 
@@ -72,20 +97,21 @@ export function AppShell() {
     if (
       viewParam &&
       activeSpace &&
-      validSpaces.includes(activeSpace) &&
-      !(availableTabs as string[]).includes(viewParam)
+      (tabsForSpace(activeSpace) as string[]).includes(viewParam) === false &&
+      validSpaces.includes(activeSpace)
     ) {
       navigate(spacePath(activeSpace, "cuadrantes"), { replace: true });
     }
-  }, [viewParam, activeSpace, validSpaces, availableTabs, navigate]);
+  }, [viewParam, activeSpace, validSpaces, tabsForSpace, navigate]);
 
   const handleNavigateToCalendar = useCallback(
     (dateStr: string) => {
-      if (!activeSpace) return;
+      if (!activeSpace || isGlobal) return;
+      setRightPanelOpen(false);
       setCalendarDate(dateStr);
       navigate(spacePath(activeSpace, "calendario"));
     },
-    [activeSpace, navigate],
+    [activeSpace, isGlobal, navigate],
   );
 
   useEffect(() => {
@@ -99,8 +125,39 @@ export function AppShell() {
     return onAppEvent("pritio:startTour", () => setTourOpen(true));
   }, []);
 
-  if (!activeSpace || !validSpaces.includes(activeSpace)) {
-    return <Navigate to={spacePath(defaultSpace)} replace />;
+  const handleGlobalViewChange = useCallback(
+    (key: GlobalViewKey) => {
+      navigate(globalViewPath(key));
+      setSidebarOpen(false);
+    },
+    [navigate],
+  );
+
+  const handleCreateTask = useCallback(() => {
+    emitAppEvent("pritio:create-task");
+  }, []);
+
+  // Cmd+K global shortcut
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+        e.preventDefault();
+        handleCreateTask();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [handleCreateTask]);
+
+  // Handle create task event from sidebar
+  useEffect(() => {
+    return onAppEvent("pritio:create-task", handleCreateTask);
+  }, [handleCreateTask]);
+
+  if (!isGlobal) {
+    if (!activeSpace || !validSpaces.includes(activeSpace)) {
+      return <Navigate to="/" replace />;
+    }
   }
 
   const activeView: ViewKey =
@@ -113,22 +170,64 @@ export function AppShell() {
   };
 
   const handleViewChange = (key: ViewKey) => {
-    navigate(spacePath(activeSpace, key));
+    if (activeSpace) navigate(spacePath(activeSpace, key));
+  };
+
+  const headerAccent =
+    !isGlobal && activeSpace ? SPACES[activeSpace].accent.bg : SPACES.pendientes.accent.bg;
+
+  const renderMain = () => {
+    if (isGlobal && globalView) {
+      switch (globalView) {
+        case "inbox":
+          return <InboxView />;
+        case "mi-dia":
+          return <MiDiaView />;
+        case "cuadrantes":
+          return <QuadrantsView workspaceIds={workspaceIds} />;
+        case "calendario":
+          return <CalendarGlobalView workspaceIds={workspaceIds} />;
+        case "proyectos":
+          return <ProjectsGlobalView workspaceIds={workspaceIds} />;
+        case "docs":
+          return <DocsGlobalView workspaceIds={workspaceIds} />;
+        case "indicadores":
+          return <StatsGlobalView workspaceIds={workspaceIds} />;
+      }
+    }
+    return (
+      <SpaceView
+        space={activeSpace!}
+        view={activeView}
+        onViewChange={handleViewChange}
+        calendarDate={calendarDate}
+      />
+    );
   };
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface-muted">
       <Sidebar
-        activeSpace={activeSpace}
+        activeSpace={isGlobal ? null : activeSpace!}
         onSpaceChange={handleSpaceChange}
+        globalView={isGlobal ? globalView : null}
+        onGlobalViewChange={handleGlobalViewChange}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
+        onCreateTask={handleCreateTask}
+      />
+
+      <RightWidgetPanel
+        open={rightPanelOpen}
+        onClose={() => setRightPanelOpen(false)}
+        space={activeSpace ?? null}
         onNavigateToCalendar={handleNavigateToCalendar}
       />
 
       <PushNotificationInit />
       <NotificationToastHost />
       <UpgradeHost />
+      <AddTaskDialog />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line/70 bg-surface/75 px-4 backdrop-blur-xl lg:px-6">
@@ -143,19 +242,23 @@ export function AppShell() {
           </button>
 
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
-            <span
-              aria-hidden
-              className={cn("h-2.5 w-2.5 shrink-0 rounded-full", SPACES[activeSpace].accent.bg)}
-            />
-            <h1 className="truncate text-sm font-bold tracking-tight text-ink">
-              {currentWorkspace?.name ?? ""}
-            </h1>
+            <span aria-hidden className={cn("h-2.5 w-2.5 shrink-0 rounded-full", headerAccent)} />
             {currentWorkspace && (
-              <span className="shrink-0 rounded-full border border-line bg-surface-muted px-2 py-0.5 text-[11px] font-semibold capitalize text-ink-soft">
-                {currentWorkspace.type}
-              </span>
+              <WorkspaceSelector
+                currentWorkspace={currentWorkspace}
+                workspaces={workspaces}
+                isOpen={workspaceSelectorOpen}
+                onClose={() => setWorkspaceSelectorOpen(false)}
+                onOpenChange={setWorkspaceSelectorOpen}
+              />
             )}
           </div>
+
+          {isGlobal && globalView !== "inbox" && (
+            <div className="hidden w-full max-w-md flex-1 lg:block">
+              <GlobalSearch />
+            </div>
+          )}
 
           <div className="flex shrink-0 items-center gap-1.5">
             <button
@@ -171,6 +274,23 @@ export function AppShell() {
                   d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4m0 6a8.1 8.1 0 0 0 15.5-2m.5 4v-4h-4"
                 />
               </svg>
+            </button>
+            <button
+              onClick={() => setRightPanelOpen(true)}
+              aria-label="Abrir calendario y utilidades"
+              title="Calendario y utilidades"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40"
+            >
+              <span className="relative grid h-6 w-6 place-items-center">
+                <svg className="h-6 w-6" viewBox="0 0 20 20" fill="none" aria-hidden>
+                  <rect x="2.5" y="3" width="15" height="14.5" rx="2" stroke="currentColor" strokeWidth="1.4" />
+                  <path d="M2.5 7.5H17.5" stroke="currentColor" strokeWidth="1.3" />
+                  <path d="M6 1.5V4.5M14 1.5V4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+                </svg>
+                <span className="absolute right-0 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-pritio-purple px-1 text-[9px] font-bold text-white">
+                  {new Date().getDate()}
+                </span>
+              </span>
             </button>
             <PendingInvitationsPopover />
             <NotificationBell />
@@ -203,20 +323,12 @@ export function AppShell() {
           </div>
         </header>
 
-        <main className="flex-1 overflow-x-hidden overflow-y-auto pb-20 lg:pb-0" data-pritio-scroll-root>
-          <SpaceView
-            space={activeSpace}
-            view={activeView}
-            onViewChange={handleViewChange}
-            calendarDate={calendarDate}
-          />
+        <main className="flex-1 overflow-x-hidden overflow-y-auto pb-24 lg:pb-0" data-pritio-scroll-root>
+          {renderMain()}
         </main>
 
-        <MobileBottomNav
-          activeView={activeView}
-          availableTabs={availableTabs}
-          onViewChange={handleViewChange}
-        />
+        <MobileBottomNav />
+        <GlobalFAB globalView={globalView} />
       </div>
     </div>
   );

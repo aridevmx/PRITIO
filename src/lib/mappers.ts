@@ -18,6 +18,7 @@ import type {
   Invitation,
   InvitationRow,
   UserBlockedDay,
+  Quadrant,
 } from "@/types";
 
 // ─── Plan normalization ───────────────────────────────────
@@ -44,6 +45,7 @@ export const TASK_COLUMNS = [
   "description",
   "quadrant",
   "kind",
+  "inboxed",
   "start_date",
   "end_date",
   "visibility",
@@ -83,6 +85,9 @@ export const SUBTASK_COLUMNS = [
   "title",
   "completed",
   "position",
+  "start_date",
+  "due_date",
+  "quadrant",
   "created_by",
   "created_at",
   "updated_at",
@@ -144,6 +149,7 @@ export function mapTask(row: TaskRow, assigneeIds: string[], subtaskCounts?: Sub
     description: row.description,
     quadrant: row.quadrant,
     kind: row.kind,
+    inboxed: row.inboxed,
     startDate: row.start_date,
     endDate: row.end_date,
     visibility: row.visibility,
@@ -187,6 +193,9 @@ export function mapSubtask(row: Record<string, unknown>): TaskSubtask {
     title: row.title as string,
     completed: Boolean(row.completed),
     position: Number(row.position ?? 0),
+    startDate: (row.start_date as string) || null,
+    dueDate: (row.due_date as string) || null,
+    quadrant: ((row.quadrant as string) || null) as Quadrant | null,
     createdBy: row.created_by as string,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,

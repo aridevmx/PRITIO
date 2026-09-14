@@ -1,5 +1,3 @@
-import { useRef, useState } from "react";
-import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import {
@@ -13,34 +11,6 @@ import {
 import { PomodoroFinishOverlay } from "./PomodoroFinishOverlay";
 
 const ALLOWED_WORKSPACE_TYPES = new Set(["personal", "team"]);
-
-interface FloatPrefs {
-  x: number;
-  y: number;
-  minimized: boolean;
-  width: number;
-  height: number;
-}
-
-const FLOAT_KEY = "pritio:pomodoroFloat";
-
-function loadFloatPrefs(): FloatPrefs {
-  try {
-    const raw = localStorage.getItem(FLOAT_KEY);
-    if (raw) return { y: 80, minimized: false, width: 260, height: 120, ...JSON.parse(raw) };
-  } catch {
-    /* ignore */
-  }
-  return { x: Math.max(16, window.innerWidth - 280), y: 80, minimized: false, width: 260, height: 120 };
-}
-
-function persistFloatPrefs(p: FloatPrefs) {
-  try {
-    localStorage.setItem(FLOAT_KEY, JSON.stringify(p));
-  } catch {
-    /* ignore */
-  }
-}
 
 const PHASE_LABEL: Record<PomodoroPhase, string> = {
   work: "Trabajo",
@@ -104,7 +74,6 @@ export function PomodoroWidget() {
         />
       )}
       <PomodoroFinishOverlay state={state} dispatch={dispatch} />
-      <FloatingPomodoro state={state} dispatch={dispatch} />
     </>
   );
 }
@@ -129,7 +98,7 @@ function SidebarPomodoro({
   const pct = total > 0 ? state.remaining / total : 0;
 
   return (
-    <div>
+    <div className="rounded-xl border border-line bg-surface p-3">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">Pomodoro</span>
         <div className="flex items-center gap-1">
@@ -185,231 +154,110 @@ function SidebarPomodoro({
           </div>
         </div>
       </div>
-    </div>
-  );
-}
 
-function FloatingPomodoro({
-  state,
-  dispatch,
-}: {
-  state: ReturnType<typeof usePomodoro>["state"];
-  dispatch: ReturnType<typeof usePomodoro>["dispatch"];
-}) {
-  const [prefs, setPrefs] = useState<FloatPrefs>(loadFloatPrefs);
-  const [floating, setFloating] = useState<boolean>(() => {
-    try {
-      return localStorage.getItem(FLOAT_KEY) !== null;
-    } catch {
-      return false;
-    }
-  });
-  const dragState = useRef<{ startX: number; startY: number; origX: number; origY: number } | null>(null);
-  const resizeState = useRef<{ startX: number; startY: number; origW: number; origH: number } | null>(null);
-  const prefsRef = useRef(prefs);
-  prefsRef.current = prefs;
-
-  const persist = (p: FloatPrefs) => {
-    prefsRef.current = p;
-    setPrefs(p);
-    persistFloatPrefs(p);
-    try {
-      localStorage.setItem(FLOAT_KEY, "1");
-    } catch {
-      /* ignore */
-    }
-  };
-
-  const beginDrag = (e: React.PointerEvent) => {
-    const cur = prefsRef.current;
-    if (cur.minimized) return;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    dragState.current = { startX: e.clientX, startY: e.clientY, origX: cur.x, origY: cur.y };
-  };
-  const onDrag = (e: React.PointerEvent) => {
-    const d = dragState.current;
-    if (!d) return;
-    const cur = prefsRef.current;
-    persist({ ...cur, x: Math.max(8, d.origX + e.clientX - d.startX), y: Math.max(8, d.origY + e.clientY - d.startY) });
-  };
-  const endDrag = () => {
-    dragState.current = null;
-  };
-
-  const beginResize = (e: React.PointerEvent) => {
-    const cur = prefsRef.current;
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    resizeState.current = { startX: e.clientX, startY: e.clientY, origW: cur.width, origH: cur.height };
-  };
-  const onResize = (e: React.PointerEvent) => {
-    const d = resizeState.current;
-    if (!d) return;
-    const cur = prefsRef.current;
-    persist({
-      ...cur,
-      width: Math.max(180, d.origW + (e.clientX - d.startX)),
-      height: Math.max(70, d.origH + (e.clientY - d.startY)),
-    });
-  };
-  const endResize = () => {
-    resizeState.current = null;
-  };
-
-  const total =
-    state.phase === "work"
-      ? state.workMin * 60
-      : state.phase === "shortBreak"
-        ? state.shortBreakMin * 60
-        : state.longBreakMin * 60;
-  const pct = total > 0 ? state.remaining / total : 0;
-
-  const content = (
-    <div
-      className={cn(
-        "overflow-hidden rounded-2xl border border-line bg-white shadow-xl",
-        prefs.minimized ? "w-40" : "w-full",
-      )}
-      style={prefs.minimized ? undefined : { height: prefs.height }}
-    >
-      <div
-        className={cn("flex cursor-grab select-none items-center justify-between border-b border-line bg-surface-muted px-3 active:cursor-grabbing", prefs.minimized ? "py-1" : "py-2")}
-        onPointerDown={beginDrag}
-        onPointerMove={onDrag}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      >
-        <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-          <span className="h-2 w-2 rounded-full bg-pritio-red" />
-          Pomodoro
-        </span>
-        <div className="flex items-center gap-1">
+      {isExpanded && (
+        <div className="mt-2 grid grid-cols-3 gap-2">
           <button
             type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => persist({ ...prefsRef.current, minimized: !prefsRef.current.minimized })}
-            className="grid h-6 w-6 place-items-center rounded-md text-ink-muted hover:bg-line/60 hover:text-ink"
-            title={prefs.minimized ? "Expandir" : "Minimizar"}
+            onClick={() => dispatch({ type: "setConfig", config: { workMin: state.workMin + 5 } })}
+            disabled={state.running || !!state.pendingChoice}
+            className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
+            title="Aumentar trabajo +5min"
           >
-            <svg className="h-3 w-3" viewBox="0 0 10 10" fill="none" aria-hidden>
-              {prefs.minimized ? (
-                <path d="M1.5 5h7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              ) : (
-                <path d="M1.5 5h7M5 1.5v7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              )}
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
+            <span>{state.workMin} min</span>
           </button>
           <button
             type="button"
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => {
-              setFloating(false);
-              try {
-                localStorage.removeItem(FLOAT_KEY);
-              } catch {
-                /* ignore */
-              }
-            }}
-            className="grid h-6 w-6 place-items-center rounded-md text-ink-muted hover:bg-line/60 hover:text-ink"
-            title="Volver al sidebar"
+            onClick={() => dispatch({ type: "setConfig", config: { shortBreakMin: state.shortBreakMin + 5 } })}
+            disabled={state.running || !!state.pendingChoice}
+            className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
+            title="Aumentar descanso corto +5min"
           >
-            <svg className="h-3 w-3" viewBox="0 0 10 10" fill="none" aria-hidden>
-              <path d="M1.5 1.5l7 7M8.5 1.5l-7 7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
             </svg>
+            <span>{state.shortBreakMin} min</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "setConfig", config: { longBreakMin: state.longBreakMin + 5 } })}
+            disabled={state.running || !!state.pendingChoice}
+            className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
+            title="Aumentar descanso largo +5min"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
+              <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span>{state.longBreakMin} min</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "setConfig", config: { workMin: Math.max(1, state.workMin - 5) } })}
+            disabled={state.running || !!state.pendingChoice}
+            className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
+            title="Disminuir trabajo -5min"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
+              <path d="M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span>{state.workMin} min</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "setConfig", config: { shortBreakMin: Math.max(1, state.shortBreakMin - 5) } })}
+            disabled={state.running || !!state.pendingChoice}
+            className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
+            title="Disminuir descanso corto -5min"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
+              <path d="M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span>{state.shortBreakMin} min</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => dispatch({ type: "setConfig", config: { longBreakMin: Math.max(1, state.longBreakMin - 5) } })}
+            disabled={state.running || !!state.pendingChoice}
+            className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
+            title="Disminuir descanso largo -5min"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
+              <path d="M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+            </svg>
+            <span>{state.longBreakMin} min</span>
           </button>
         </div>
+      )}
+
+      <div className="mt-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => dispatch({ type: "skip" })}
+          disabled={!!state.pendingChoice}
+          className="flex-1 rounded-lg border border-line bg-surface py-2 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
+          title="Saltar fase"
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
+            <path d="M2 2l6 4-6 4zM9 2h1.5v8H9z" />
+          </svg>
+          <span className="ml-1">Saltar</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => dispatch({ type: "reset" })}
+          className="flex-1 rounded-lg border border-line bg-surface py-2 text-[11px] font-medium text-ink-muted hover:bg-surface-muted"
+          title="Reiniciar"
+        >
+          <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" aria-hidden>
+            <path d="M1.5 4.5A4.5 4.5 0 1 1 2 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            <path d="M1.5 1.5v3h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+          <span className="ml-1">Reiniciar</span>
+        </button>
       </div>
-
-      {!prefs.minimized && (
-        <div className="flex items-center gap-3 px-3 pb-3">
-          <ProgressRing pct={pct} className={cn("h-12 w-12", PHASE_COLOR[state.phase])} />
-          <div className="min-w-0 flex-1">
-            <div className="flex items-baseline justify-between gap-2">
-              <span className="text-2xl font-semibold tabular-nums text-ink">{mmss(state.remaining)}</span>
-              <span className="text-[11px] font-medium text-ink-muted">{PHASE_LABEL[state.phase]}</span>
-            </div>
-            <div className="mt-1 flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "toggle" })}
-                disabled={!!state.pendingChoice}
-                className="grid h-7 flex-none place-items-center rounded-lg bg-ink px-2.5 text-white transition-opacity hover:opacity-90 disabled:opacity-40"
-              >
-                <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-                  {state.running ? (
-                    <path d="M3.5 2v8M8.5 2v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                  ) : (
-                    <path d="M3 2l7 4-7 4z" />
-                  )}
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "skip" })}
-                className="grid h-7 w-7 place-items-center rounded-lg border border-line text-ink-muted hover:bg-surface-muted"
-                title="Saltar fase"
-              >
-                <svg className="h-3 w-3" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-                  <path d="M2 2l6 4-6 4zM9 2h1.5v8H9z" />
-                </svg>
-              </button>
-              <button
-                type="button"
-                onClick={() => dispatch({ type: "reset" })}
-                className="grid h-7 w-7 place-items-center rounded-lg border border-line text-ink-muted hover:bg-surface-muted"
-                title="Reiniciar"
-              >
-                <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none" aria-hidden>
-                  <path d="M1.5 4.5A4.5 4.5 0 1 1 2 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                  <path d="M1.5 1.5v3h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
-  );
-
-  if (!floating) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          setFloating(true);
-          persist(loadFloatPrefs());
-        }}
-        className="fixed bottom-4 right-4 z-[9000] hidden items-center gap-1.5 rounded-full border border-line bg-white py-1.5 pl-2 pr-3 text-xs font-semibold text-ink shadow-lg transition-colors hover:bg-surface-muted md:flex"
-        title="Desprender pomodoro"
-      >
-        <span className="h-2 w-2 rounded-full bg-pritio-red" />
-        Pomodoro
-      </button>
-    );
-  }
-
-  return createPortal(
-    <div
-      className="fixed z-[9000]"
-      style={{ left: prefs.x, top: prefs.y, width: prefs.minimized ? "auto" : prefs.width }}
-      onPointerDown={(e) => {
-        if ((e.target as HTMLElement).dataset.resize !== "true") return;
-      }}
-    >
-      {content}
-      {!prefs.minimized && (
-        <div
-          data-resize="true"
-          onPointerDown={beginResize}
-          onPointerMove={onResize}
-          onPointerUp={endResize}
-          onPointerCancel={endResize}
-          className="absolute -bottom-1 -right-1 h-3 w-3 cursor-nwse-resize rounded-sm border border-line bg-white shadow"
-          title="Redimensionar"
-        />
-      )}
-    </div>,
-    document.body,
   );
 }
