@@ -52,12 +52,16 @@ export function MiDiaView() {
     };
   }, [blockedEnabled, workspaceId, today]);
 
-  const { overdueTasks, todayTasks, todayMeetings } = useMemo(() => {
+  const { overdueTasks, todayTasks, todayMeetings, myDayTasks } = useMemo(() => {
     const active = tasks.filter((t) => !t.completed);
     const overdue: Task[] = [];
     const onToday: Task[] = [];
     const meetings: Task[] = [];
+    const onMyDay: Task[] = [];
     active.forEach((t) => {
+      if (t.myDayDate === today && t.kind === "task") {
+        onMyDay.push(t);
+      }
       if (t.kind === "meeting" || t.kind === "event") {
         if (
           t.dueDate === today ||
@@ -87,6 +91,7 @@ export function MiDiaView() {
       overdueTasks: overdue.sort(byTime),
       todayTasks: onToday.filter((t) => t.kind === "task").sort(byTime),
       todayMeetings: meetings.sort(byTime),
+      myDayTasks: onMyDay.sort(byTime),
     };
   }, [tasks, today]);
 
@@ -120,7 +125,7 @@ export function MiDiaView() {
   }, []);
 
   const isEmpty =
-    overdueTasks.length === 0 && todayTasks.length === 0 && todayMeetings.length === 0 && blockedToday.length === 0;
+    overdueTasks.length === 0 && todayTasks.length === 0 && todayMeetings.length === 0 && myDayTasks.length === 0 && blockedToday.length === 0;
 
   const dateLabel = new Date().toLocaleDateString("es-MX", {
     weekday: "long",
@@ -142,8 +147,8 @@ export function MiDiaView() {
         <p className="text-xs font-bold uppercase tracking-wider text-pritio-purple">Mi día</p>
         <h1 className="text-2xl font-extrabold capitalize text-ink">{dateLabel}</h1>
         <p className="text-sm text-ink-muted">
-          {todayTasks.length + todayMeetings.length > 0
-            ? `${todayTasks.length + todayMeetings.length} cosas para hoy${
+          {myDayTasks.length + todayTasks.length + todayMeetings.length > 0
+            ? `${myDayTasks.length + todayTasks.length + todayMeetings.length} cosas para hoy${
                 overdueTasks.length > 0 ? ` · ${overdueTasks.length} vencidas` : ""
               }`
             : "Tu día, sin pendientes por hoy"}
@@ -159,11 +164,29 @@ export function MiDiaView() {
           </span>
           <h2 className="text-base font-bold text-ink">Nada programado para hoy</h2>
           <p className="max-w-sm text-sm text-ink-muted">
-            Aprovecha para capturar lo que viene: usarás el espacio para decidir qué importa hoy.
+            Agrega tareas a tu día desde el botón "Mi día" dentro de cada tarea. Se limpian cada 24 h para que organices cada mañana.
           </p>
         </div>
       ) : (
         <div className="space-y-6">
+          {myDayTasks.length > 0 && (
+            <section>
+              <div className="mb-2 flex items-center gap-2">
+                <h3 className="text-sm font-bold uppercase tracking-wider text-pritio-purple">Mi día</h3>
+                <div className="h-px flex-1 bg-line" />
+                <span className="rounded-full bg-pritio-purple/10 px-2 py-0.5 text-[11px] font-bold text-pritio-purple">
+                  {myDayTasks.length}
+                </span>
+              </div>
+              <p className="mb-2 text-[11px] text-ink-muted">Se limpia a las 0:00 cada día.</p>
+              <div className="space-y-2">
+                {myDayTasks.map((t) => (
+                  <TaskCard key={t.id} task={t} onToggleComplete={handleToggleComplete} onEdit={openEdit} onDelete={setDeleteTarget} />
+                ))}
+              </div>
+            </section>
+          )}
+
           {overdueTasks.length > 0 && (
             <section>
               <div className="mb-2 flex items-center gap-2">

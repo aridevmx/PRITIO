@@ -69,7 +69,7 @@ export default defineConfig(({ mode }) => {
       },
       devOptions: {
         enabled: true,
-        type: "classic",
+        type: "module",
       },
     }),
   ],

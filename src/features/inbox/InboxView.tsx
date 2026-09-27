@@ -6,15 +6,16 @@ import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { QUADRANTS, QUADRANT_ORDER } from "@/features/tasks/quadrants";
 import { fetchSubtaskCounts } from "@/features/tasks/useTasks";
 import { updateTask as apiUpdateTask, deleteTask as apiDeleteTask } from "@/features/tasks/api";
-import { listProjectsByWorkspaces } from "@/features/projects/api";
 import { TaskCard } from "@/features/tasks/TaskCard";
 import { TaskFormDialog } from "@/features/tasks/TaskFormDialog";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { BottomQuickAdd } from "@/features/inbox/BottomQuickAdd";
 import { emitAppEvent } from "@/lib/appEvents";
 import { cn } from "@/lib/utils";
-import type { Task, Project } from "@/types";
+import { PRESET_COLORS } from "@/features/projects/presetColors";
+import type { Task, Quadrant } from "@/types";
 
-type GroupMode = "proyecto" | "cuadrante" | "lista";
+type GroupMode = "workspace" | "cuadrante" | "lista";
 
 interface TaskGroup {
   key: string;
@@ -31,13 +32,13 @@ export function InboxView() {
   const autoFocus = Boolean((location.state as { quickfocus?: boolean } | null)?.quickfocus);
 
   const [tasks, setTasks] = useState<Task[]>([]);
-  const [projects, setProjects] = useState<Project[]>([]);
+  const [quadrantFilter, setQuadrantFilter] = useState<Quadrant | null>(null);
   const [loading, setLoading] = useState(true);
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
-  const [groupMode, setGroupMode] = useState<GroupMode>("proyecto");
+  const [groupMode, setGroupMode] = useState<GroupMode>("workspace");
 
   const [profileNameMap, setProfileNameMap] = useState<Record<string, string>>({});
   const profileCacheRef = useRef<Record<string, string>>({});
@@ -114,20 +115,6 @@ export function InboxView() {
   }, [load]);
 
   useEffect(() => {
-    const wsIds = workspaces.map((w) => w.id);
-    if (wsIds.length === 0) return;
-    let cancelled = false;
-    void listProjectsByWorkspaces(wsIds)
-      .then((rows) => {
-        if (!cancelled) setProjects(rows);
-      })
-      .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [workspaces]);
-
-  useEffect(() => {
     if (autoFocus) emitAppEvent("pritio:create-task");
   }, [autoFocus]);
 
@@ -172,22 +159,15 @@ export function InboxView() {
       });
     };
     const onRefresh = () => void load();
-    const onProjectsChanged = () => {
-      const wsIds = workspaces.map((w) => w.id);
-      if (wsIds.length === 0) return;
-      void listProjectsByWorkspaces(wsIds).then(setProjects).catch(() => {});
-    };
     window.addEventListener("pritio:tasks-changed", onTasksChanged);
     window.addEventListener("pritio:app-refresh", onRefresh);
     window.addEventListener("pritio:synced", onRefresh);
-    window.addEventListener("pritio:projects-changed", onProjectsChanged);
     return () => {
       window.removeEventListener("pritio:tasks-changed", onTasksChanged);
       window.removeEventListener("pritio:app-refresh", onRefresh);
       window.removeEventListener("pritio:synced", onRefresh);
-      window.removeEventListener("pritio:projects-changed", onProjectsChanged);
     };
-  }, [load, workspaces]);
+  }, [load]);
 
   const applyUpdate = useCallback((updated: Task) => {
     setTasks((prev) =>
@@ -237,41 +217,49 @@ export function InboxView() {
 
   const visibleTasks = useMemo(() => tasks.filter((t) => !t.completed), [tasks]);
 
-  const projectMap = useMemo(() => new Map(projects.map((p) => [p.id, p])), [projects]);
-
-  const groupsByProject = useMemo<TaskGroup[]>(() => {
-    const groups = new Map<string, TaskGroup>();
-    projects.forEach((p) => {
-      groups.set(p.id, { key: p.id, label: p.name, dotColor: p.color, count: 0, tasks: [] });
+  const workspaceColorMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    workspaces.forEach((w, i) => {
+      map[w.id] = PRESET_COLORS[i % PRESET_COLORS.length];
     });
-    let sinProjecto: TaskGroup | null = null;
-    let otros: TaskGroup | null = null;
-    for (const t of visibleTasks) {
-      if (t.projectId && projectMap.has(t.projectId)) {
-        const g = groups.get(t.projectId)!;
+    if (currentWorkspace && !map[currentWorkspace.id]) {
+      map[currentWorkspace.id] = PRESET_COLORS[0];
+    }
+    return map;
+  }, [workspaces, currentWorkspace]);
+
+  const filteredVisible = useMemo(
+    () => (quadrantFilter ? visibleTasks.filter((t) => t.quadrant === quadrantFilter) : visibleTasks),
+    [visibleTasks, quadrantFilter],
+  );
+
+  const groupsByWorkspace = useMemo<TaskGroup[]>(() => {
+    const groups = new Map<string, TaskGroup>();
+    workspaces.forEach((w) => {
+      groups.set(w.id, { key: w.id, label: workspaceNameMap[w.id] ?? w.name, dotColor: workspaceColorMap[w.id], count: 0, tasks: [] });
+    });
+    let sinWorkspace: TaskGroup | null = null;
+    for (const t of filteredVisible) {
+      if (t.workspaceId && groups.has(t.workspaceId)) {
+        const g = groups.get(t.workspaceId)!;
         g.count += 1;
         g.tasks.push(t);
-      } else if (t.projectId) {
-        otros ??= { key: "otros", label: "Otros", dotClass: "bg-ink-muted", count: 0, tasks: [] };
-        otros.count += 1;
-        otros.tasks.push(t);
       } else {
-        sinProjecto ??= { key: "sin-proyecto", label: "Sin proyecto", dotClass: "bg-line-strong", count: 0, tasks: [] };
-        sinProjecto.count += 1;
-        sinProjecto.tasks.push(t);
+        sinWorkspace ??= { key: "sin-workspace", label: "General", dotClass: "bg-ink-muted", count: 0, tasks: [] };
+        sinWorkspace.count += 1;
+        sinWorkspace.tasks.push(t);
       }
     }
     const result = [...groups.values()].filter((g) => g.count > 0);
-    if (sinProjecto) result.push(sinProjecto);
-    if (otros) result.push(otros);
+    if (sinWorkspace) result.push(sinWorkspace);
     return result;
-  }, [visibleTasks, projects, projectMap]);
+  }, [filteredVisible, workspaces, workspaceNameMap, workspaceColorMap]);
 
   const groupsByQuadrant = useMemo<TaskGroup[]>(() => {
   return QUADRANT_ORDER.flatMap((key) => {
     const meta = QUADRANTS[key];
     if (!meta) return [];
-    const matched = visibleTasks.filter((t) => t.quadrant === key);
+    const matched = filteredVisible.filter((t) => t.quadrant === key);
     if (matched.length === 0) return [];
     return [
       {
@@ -283,14 +271,14 @@ export function InboxView() {
       },
     ];
   });
-}, [visibleTasks]);
+}, [filteredVisible]);
 
   const groups: TaskGroup[] =
-    groupMode === "proyecto"
-      ? groupsByProject
+    groupMode === "workspace"
+      ? groupsByWorkspace
       : groupMode === "cuadrante"
         ? groupsByQuadrant
-        : [{ key: "lista", label: "Todas", count: visibleTasks.length, tasks: visibleTasks }];
+        : [{ key: "lista", label: "Todas", count: filteredVisible.length, tasks: filteredVisible }];
 
   const renderTask = (task: Task) => (
     <div key={task.id} className={cn("transition", pendingId === task.id && "opacity-60")}>
@@ -320,23 +308,23 @@ export function InboxView() {
   );
 
   return (
-    <div className="mx-auto w-full max-w-3xl flex-1 p-4 lg:p-6">
-      <div className="mb-6">
+    <div className="mx-auto w-full max-w-3xl flex-1 px-4 pb-32 pt-4 lg:px-6 lg:pb-20">
+      <div className="mb-5">
         <p className="text-xs font-bold uppercase tracking-wider text-pritio-blue">Todas tus tareas</p>
-        <h1 className="text-2xl font-extrabold text-ink">Captura y organiza</h1>
+        <h1 className="text-2xl font-extrabold text-ink">Inbox</h1>
         <p className="text-sm text-ink-muted">
-          Cada tarea creada vive aquí. Grupo por proyecto, cuadrante o como lista; edítala para darle fecha o prioridad.
+          Vacía lo que traes en la cabeza, y luego organízalo: cuadrante, fecha o proyecto. Agrupa por workspace, cuadrante o como lista.
         </p>
       </div>
 
-      <div className="mt-6 mb-1 flex flex-wrap items-center gap-2">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <span className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
-          {visibleTasks.length} tareas pendientes
+          {filteredVisible.length} tareas pendientes
         </span>
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-line bg-surface p-0.5">
           {(
             [
-              { key: "proyecto", label: "Proyecto" },
+              { key: "workspace", label: "Workspace" },
               { key: "cuadrante", label: "Cuadrante" },
               { key: "lista", label: "Lista" },
             ] as { key: GroupMode; label: string }[]
@@ -359,23 +347,89 @@ export function InboxView() {
         </div>
       </div>
 
+      <div className="mb-4 flex flex-wrap items-center gap-1.5">
+        <button
+          type="button"
+          onClick={() => setQuadrantFilter(null)}
+          aria-pressed={quadrantFilter === null}
+          className={cn(
+            "rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
+            quadrantFilter === null
+              ? "border-ink bg-ink text-white"
+              : "border-line bg-surface text-ink-soft hover:bg-surface-muted hover:text-ink",
+          )}
+        >
+          Todos
+        </button>
+        {QUADRANT_ORDER.flatMap((key) => {
+          const meta = QUADRANTS[key];
+          if (!meta) return [];
+          const count = visibleTasks.filter((t) => t.quadrant === key).length;
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => setQuadrantFilter(quadrantFilter === key ? null : key)}
+              aria-pressed={quadrantFilter === key}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors",
+                quadrantFilter === key
+                  ? "border-ink bg-ink text-white"
+                  : "border-line bg-surface text-ink-soft hover:bg-surface-muted hover:text-ink",
+              )}
+            >
+              {meta.title}
+              {count > 0 && (
+                <span
+                  className={cn(
+                    "ml-1 hidden text-[10px] font-bold tabular-nums sm:inline",
+                    quadrantFilter === key ? "text-white/70" : "text-ink-muted",
+                  )}
+                >
+                  {count}
+                </span>
+              )}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mt-2">
         {loading ? (
           <div className="flex justify-center py-20">
             <div className="h-8 w-8 animate-spin rounded-full border-4 border-line border-t-pritio-blue" />
           </div>
-        ) : visibleTasks.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line-strong bg-surface/60 px-6 py-16 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pritio-green/10 text-pritio-green">
-              <svg className="h-6 w-6" viewBox="0 0 20 20" fill="none">
-                <path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </span>
-            <h2 className="text-base font-bold text-ink">Inbox vacío</h2>
-            <p className="max-w-sm text-sm text-ink-muted">
-              Captura algo abajo o con Cmd+K. Cada tarea vive aquí hasta que decidas su prioridad.
-            </p>
-          </div>
+        ) : filteredVisible.length === 0 ? (
+          quadrantFilter && visibleTasks.length > 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line-strong bg-surface/60 px-6 py-16 text-center">
+              <h2 className="text-base font-bold text-ink">
+                Sin tareas en {QUADRANTS[quadrantFilter]?.title ?? "este cuadrante"}
+              </h2>
+              <p className="max-w-sm text-sm text-ink-muted">
+                Tienes {visibleTasks.length} {visibleTasks.length === 1 ? "tarea" : "tareas"} pendientes en el
+                Inbox, ninguna en este cuadrante.
+              </p>
+              <button
+                type="button"
+                onClick={() => setQuadrantFilter(null)}
+                className="rounded-full border border-line bg-surface px-3 py-1 text-xs font-semibold text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink"
+              >
+                Ver todas
+              </button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-3 rounded-2xl border border-dashed border-line-strong bg-surface/60 px-6 py-16 text-center">
+              <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-pritio-green/10 text-pritio-green">
+                <svg className="h-6 w-6" viewBox="0 0 20 20" fill="none">
+                  <path d="M4 10h12M11 5l5 5-5 5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                </svg>
+              </span>
+              <h2 className="text-base font-bold text-ink">Inbox vacío</h2>
+              <p className="max-w-sm text-sm text-ink-muted">
+                Captura algo abajo o con Cmd+K. Cada tarea vive aquí hasta que decidas su prioridad.
+              </p>
+            </div>
+          )
         ) : (
           <div className="space-y-2.5">
             {groups.map((group) => (
@@ -413,6 +467,8 @@ export function InboxView() {
         confirmLabel="Eliminar"
         variant="danger"
       />
+
+      <BottomQuickAdd />
     </div>
   );
 }

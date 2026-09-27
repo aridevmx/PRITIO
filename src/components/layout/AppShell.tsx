@@ -76,6 +76,14 @@ export function AppShell() {
 
   const activeSpace = params.space ? SLUG_TO_SPACE[params.space] : undefined;
 
+  // Ruta del primer espacio del workspace actual: destino para "/" y para
+  // slugs inválidos (evita el Navigate a sí mismo, que dejaba la app en blanco).
+  const defaultSpacePath = useMemo(() => {
+    if (!currentWorkspace) return null;
+    const first = spacesForWorkspaceType(currentWorkspace.type)[0]?.key ?? "pendientes";
+    return spacePath(first);
+  }, [currentWorkspace]);
+
   const tabsForSpace = useCallback(
     (space: SpaceKey) => {
       return baseViewsFor(workspaceType, space)
@@ -149,14 +157,9 @@ export function AppShell() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleCreateTask]);
 
-  // Handle create task event from sidebar
-  useEffect(() => {
-    return onAppEvent("pritio:create-task", handleCreateTask);
-  }, [handleCreateTask]);
-
   if (!isGlobal) {
     if (!activeSpace || !validSpaces.includes(activeSpace)) {
-      return <Navigate to="/" replace />;
+      return <Navigate to={defaultSpacePath ?? "/"} replace />;
     }
   }
 
@@ -328,7 +331,7 @@ export function AppShell() {
         </main>
 
         <MobileBottomNav />
-        <GlobalFAB globalView={globalView} />
+        {globalView !== "inbox" && <GlobalFAB globalView={globalView} />}
       </div>
     </div>
   );

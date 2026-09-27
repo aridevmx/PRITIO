@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef, useMemo, lazy, Suspense, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { cn, localDateStr, isNotesEmpty, stripHtml } from "@/lib/utils";
+import { cn, localDateStr, isNotesEmpty, stripHtml, todayStr } from "@/lib/utils";
 import { Field } from "@/components/Field";
 import { SegmentedControl, type SegmentedOption } from "@/components/SegmentedControl";
 import { PropertyRow } from "@/components/PropertyRow";
@@ -19,7 +19,7 @@ import { TemplatePicker } from "@/features/docs/TemplatePicker";
 import { ProjectPicker } from "@/features/projects/ProjectPicker";
 import { AssigneePicker } from "@/features/tasks/AssigneePicker";
 import { createProject } from "@/features/projects/api";
-import { PRESET_COLORS } from "@/features/projects/ProjectsManager";
+import { PRESET_COLORS } from "@/features/projects/presetColors";
 import type { DocTemplate } from "@/features/docs/api";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
@@ -373,6 +373,7 @@ export function TaskFormDialog({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [isCompleted, setIsCompleted] = useState(false);
+  const [myDayOn, setMyDayOn] = useState(false);
   const [subtasks, setSubtasks] = useState<SubtaskDraft[]>([]);
   const [showSubtasks, setShowSubtasks] = useState(false);
   const [showNotes, setShowNotes] = useState(false);
@@ -465,6 +466,23 @@ export function TaskFormDialog({
     setKind(k);
     if (!startDate && dueDate) setStartDate(dueDate);
   };
+
+  const handleToggleMyDay = useCallback(async () => {
+    if (!task || saving) return;
+    const next = !myDayOn;
+    setMyDayOn(next);
+    try {
+      const updated = await apiUpdateTask(task.id, { myDayDate: next ? todayStr() : null });
+      window.dispatchEvent(
+        new CustomEvent("pritio:tasks-changed", {
+          detail: { task: updated, workspaceId: updated.workspaceId },
+        }),
+      );
+    } catch {
+      setMyDayOn(!next);
+      toast.error("No se pudo actualizar Mi día");
+    }
+  }, [task, myDayOn, saving, toast]);
 
   const workspaceType = currentWorkspace?.type;
   const kinds = allowedKindsFor(workspaceType, isEdit, task?.kind ?? "task");
@@ -568,6 +586,7 @@ export function TaskFormDialog({
         setLocation(task.location ?? "");
         setRequiresApproval(task.requiresApproval);
         setIsCompleted(task.completed);
+        setMyDayOn(task.myDayDate === todayStr());
         setProjectId(task.projectId ?? "");
         setSelectedAssigneeIds(task.assigneeIds);
         setRecurrenceFreq(task.recurrenceFreq ?? "");
@@ -594,6 +613,7 @@ export function TaskFormDialog({
         setMeetingLink("");
         setRequiresApproval(false);
         setIsCompleted(false);
+        setMyDayOn(false);
         setProjectId("");
         setSelectedAssigneeIds([]);
         setRecurrenceFreq("");
@@ -1172,6 +1192,7 @@ export function TaskFormDialog({
     title, description, quadrant, kind, dueDate, startDate, startTime, endDate, endTime, allDay,
     visibility, location, meetingLink, requiresApproval, projectId,
     selfAssignee, isRestrictedMember, workspaceType, allowedAssigneeIds,
+    selectedAssigneeIds, pendingDocIds,
     recurrenceFreq, recurrenceInterval, recurrenceEndDate, recurrenceEndMode, recurrenceCount,
     currentWorkspace, profile, members, isEdit, task,
     canCreate, onSaved, onClose, toast, isCompleted, reminders,
@@ -1628,6 +1649,42 @@ export function TaskFormDialog({
             <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
               Detalles
             </p>
+
+            {task && (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-2.5 py-2">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
+                    <svg className="h-4 w-4 shrink-0 text-pritio-purple" viewBox="0 0 20 20" fill="none">
+                      <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.6" />
+                      <path d="M10 6.5V10l2.5 1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                    </svg>
+                    Mi día
+                  </p>
+                  <p className="mt-0.5 text-[11px] leading-relaxed text-ink-muted">
+                    {myDayOn ? "Aparece en Mi día de hoy" : "Agrega la tarea a tu día de hoy"}
+                  </p>
+                  <p className="text-[10px] text-ink-muted/80">Se limpia sola cada 24 h.</p>
+                </div>
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={myDayOn}
+                  onClick={() => void handleToggleMyDay()}
+                  disabled={saving}
+                  className={cn(
+                    "relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50",
+                    myDayOn ? "bg-pritio-purple" : "border border-line-strong bg-surface-muted",
+                  )}
+                >
+                  <span
+                    className={cn(
+                      "absolute top-1/2 h-4 w-4 -translate-y-1/2 rounded-full bg-white shadow transition-all",
+                      myDayOn ? "left-[18px]" : "left-0.5",
+                    )}
+                  />
+                </button>
+              </div>
+            )}
 
             {/* Fechas — campos directos, sin collapsible */}
             <div className="space-y-2">

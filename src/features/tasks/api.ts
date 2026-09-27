@@ -62,6 +62,7 @@ export async function createTask(payload: CreateTaskPayload): Promise<Task> {
       quadrant: payload.quadrant,
       kind: payload.kind ?? "task",
       inboxed: payload.inboxed ?? false,
+      my_day_date: payload.myDayDate ?? null,
       start_date: payload.startDate ?? null,
       end_date: payload.endDate ?? null,
       visibility: payload.visibility ?? "all",
@@ -112,6 +113,7 @@ export async function updateTask(
   if (payload.quadrant !== undefined) updateData.quadrant = payload.quadrant;
   if (payload.kind !== undefined) updateData.kind = payload.kind;
   if (payload.inboxed !== undefined) updateData.inboxed = payload.inboxed;
+  if (payload.myDayDate !== undefined) updateData.my_day_date = payload.myDayDate;
   if (payload.startDate !== undefined) updateData.start_date = payload.startDate;
   if (payload.endDate !== undefined) updateData.end_date = payload.endDate;
   if (payload.visibility !== undefined) updateData.visibility = payload.visibility;

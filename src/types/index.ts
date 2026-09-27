@@ -233,6 +233,9 @@ export interface Task {
   kind: TaskKind;
   /** Captura rápida pendiente de triaje (Inbox). */
   inboxed: boolean;
+  /** Fecha local (YYYY-MM-DD) en que la tarea se agregó a "Mi día".
+      Se limpia sola cada 24 h: la vista solo muestra las que son de hoy. */
+  myDayDate: string | null;
   startDate: string | null;
   endDate: string | null;
   visibility: TaskVisibility;
@@ -460,6 +463,7 @@ export interface TaskRow {
   quadrant: Quadrant;
   kind: TaskKind;
   inboxed: boolean;
+  my_day_date: string | null;
   start_date: string | null;
   end_date: string | null;
   visibility: TaskVisibility;
@@ -540,6 +544,7 @@ export interface CreateTaskPayload {
   quadrant: Quadrant;
   kind?: TaskKind;
   inboxed?: boolean;
+  myDayDate?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   visibility?: TaskVisibility;
@@ -564,6 +569,7 @@ export interface UpdateTaskPayload {
   quadrant?: Quadrant;
   kind?: TaskKind;
   inboxed?: boolean;
+  myDayDate?: string | null;
   startDate?: string | null;
   endDate?: string | null;
   visibility?: TaskVisibility;
