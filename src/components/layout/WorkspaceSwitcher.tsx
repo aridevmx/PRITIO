@@ -2,6 +2,8 @@ import { useState } from "react";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { WorkspaceSettingsModal } from "@/components/layout/WorkspaceSettingsModal";
+import { AppIcon } from "@/components/AppIcon";
+import { CaretRight, Check, DotsThreeVertical, Plus } from "@phosphor-icons/react";
 import type { WorkspaceType } from "@/types";
 
 const TYPE_ORDER: WorkspaceType[] = ["personal", "family", "team"];
@@ -75,9 +77,7 @@ export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: Workspac
                     <span className="block text-xs text-ink-muted capitalize">{ws.type}</span>
                   </div>
                   {isActive && (
-                    <svg className="h-4 w-4 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
-                      <path d="M13 4L6 12L3 9" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <AppIcon glyph={Check} className="shrink-0 text-pritio-blue" />
                   )}
                   <div
                     role="button"
@@ -94,11 +94,7 @@ export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: Workspac
                     }}
                     className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-muted hover:text-ink transition-colors"
                   >
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 9a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" />
-                      <path d="M8 5a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" />
-                      <path d="M8 13a1 1 0 100-2 1 1 0 000 2z" fill="currentColor" />
-                    </svg>
+                    <AppIcon glyph={DotsThreeVertical} size="sm" />
                   </div>
                 </button>
               );
@@ -115,34 +111,26 @@ export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: Workspac
             className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-green-100 text-green-600 shrink-0">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1V15M1 8H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              <AppIcon glyph={Plus} size="sm" />
             </div>
             <div className="flex-1">
               <span className="block font-medium">Nueva familia</span>
               <span className="block text-xs text-ink-muted">Prueba Pro gratis 14 días</span>
             </div>
-            <svg className="h-4 w-4 text-ink-muted" viewBox="0 0 16 16" fill="none">
-              <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <AppIcon glyph={CaretRight} className="text-ink-muted" />
           </button>
           <button
             onClick={() => onCreateWorkspace("team", true)}
             className="flex w-full items-center gap-3 px-4 py-2.5 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
           >
             <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-red-100 text-red-600 shrink-0">
-              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                <path d="M8 1V15M1 8H15" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              <AppIcon glyph={Plus} size="sm" />
             </div>
             <div className="flex-1">
               <span className="block font-medium">Nuevo equipo</span>
               <span className="block text-xs text-ink-muted">Prueba Pro gratis 14 días</span>
             </div>
-            <svg className="h-4 w-4 text-ink-muted" viewBox="0 0 16 16" fill="none">
-              <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
+            <AppIcon glyph={CaretRight} className="text-ink-muted" />
           </button>
         </div>
       </div>

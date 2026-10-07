@@ -23,6 +23,8 @@ import { allowedKindsForWorkspace } from "@/features/tasks/kinds";
 import { IS_SELF_HOSTED, SHOW_DONATIONS } from "@/lib/constants";
 import type { SpaceKey } from "@/features/spaces/spaces";
 import type { BlockedDayStatus } from "@/types";
+import { AppIcon } from "@/components/AppIcon";
+import { X } from "@phosphor-icons/react";
 
 interface RightWidgetPanelProps {
   open: boolean;
@@ -260,9 +262,7 @@ export function RightWidgetPanel({ open, onClose, space, onNavigateToCalendar }:
             aria-label="Cerrar panel"
             className="ml-auto grid h-8 w-8 place-items-center rounded-lg text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none" aria-hidden>
-              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
 

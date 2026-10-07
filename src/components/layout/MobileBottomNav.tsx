@@ -1,6 +1,7 @@
 import { useLocation, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { GLOBAL_VIEWS, globalViewFromPath } from "@/components/layout/globalNav";
+import { AppIcon } from "@/components/AppIcon";
 
 const MOBILE_VIEWS = GLOBAL_VIEWS.filter((v) =>
   ["inbox", "mi-dia", "cuadrantes", "calendario"].includes(v.key)
@@ -35,7 +36,7 @@ export function MobileBottomNav() {
                     active ? "bg-ink text-white shadow-sm" : "text-ink-soft",
                   )}
                 >
-                  {view.icon}
+                  <AppIcon glyph={view.icon} size="lg" weight={active ? "fill" : "regular"} />
                 </span>
                 <span
                   className={cn(

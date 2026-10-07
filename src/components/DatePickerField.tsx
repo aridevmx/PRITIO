@@ -4,6 +4,8 @@ import { cn, localDateStr, todayStr } from "@/lib/utils";
 import { useTimeFormat } from "@/lib/timeFormat";
 import { usePopover } from "@/hooks/usePopover";
 import { TimePicker } from "@/components/TimePicker";
+import { AppIcon } from "@/components/AppIcon";
+import { CalendarBlank, CaretDown } from "@phosphor-icons/react";
 import { MiniCalendar } from "@/components/layout/MiniCalendar";
 
 /** Siguiente día hábil (lun-vie) estrictamente después de hoy. */
@@ -253,10 +255,7 @@ export function DatePickerField({
                 : "border-dashed border-line-strong/70 bg-surface-subtle/50 hover:border-pritio-blue/40",
         )}
       >
-        <svg className="h-4 w-4 shrink-0 text-ink-muted" viewBox="0 0 16 16" fill="none">
-          <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
+        <AppIcon glyph={CalendarBlank} className="text-ink-muted" />
         <input
           id={field}
           value={editing ? text : selected ? formatEditable(selected) : ""}
@@ -293,13 +292,11 @@ export function DatePickerField({
           aria-label="Abrir calendario"
           className="grid h-5 w-5 shrink-0 place-items-center rounded-md text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
         >
-          <svg
-            className={cn("h-3 w-3 transition-transform duration-200", open && "rotate-180")}
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <AppIcon
+            glyph={CaretDown}
+            size="xs"
+            className={cn("transition-transform duration-200", open && "rotate-180")}
+          />
         </button>
       </div>
 

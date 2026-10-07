@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { listMyPendingInvitations, acceptInvitation, rejectInvitation } from "@/features/invitations/api";
 import { useToast } from "@/components/Toast";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
@@ -13,7 +14,8 @@ export function PendingInvitationsPopover() {
   const [processing, setProcessing] = useState<string | null>(null);
   const [workspaceNames, setWorkspaceNames] = useState<Record<string, string>>({});
   const [senderNames, setSenderNames] = useState<Record<string, string>>({});
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const { toast } = useToast();
   const { refresh } = useWorkspace();
 
@@ -57,8 +59,36 @@ export function PendingInvitationsPopover() {
   }, [fetchInvitations]);
 
   useEffect(() => {
+    if (!isOpen || !btnRef.current) return;
+
+    const updatePosition = () => {
+      const rect = btnRef.current!.getBoundingClientRect();
+      const menuWidth = 320; // w-80 = 320px
+      const viewportWidth = window.innerWidth;
+      const left = Math.min(rect.right - menuWidth, viewportWidth - menuWidth - 16);
+      setMenuPosition({
+        top: rect.bottom + 8, // mt-2 = 8px
+        left: Math.max(left, 16),
+        width: menuWidth,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
-      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+      if (
+        btnRef.current &&
+        !btnRef.current.contains(e.target as Node) &&
+        (e.target as HTMLElement).closest("[data-invitations-menu]") === null
+      ) {
         setIsOpen(false);
       }
     }
@@ -97,9 +127,75 @@ export function PendingInvitationsPopover() {
 
   if (invitations.length === 0 && !isOpen) return null;
 
+  const menuContent = (
+    <div
+      data-invitations-menu
+      className="pritio-menu-enter z-[100] w-80 max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated"
+      style={{
+        position: "fixed",
+        top: menuPosition?.top ?? 0,
+        left: menuPosition?.left ?? 0,
+        width: menuPosition?.width ?? 320,
+      }}
+    >
+      <div className="border-b border-line px-4 py-3">
+        <h3 className="text-sm font-bold text-ink">Invitaciones pendientes</h3>
+      </div>
+
+      <div className="max-h-80 overflow-y-auto">
+        {loading ? (
+          <div className="py-8 text-center text-sm text-ink-muted">Cargando...</div>
+        ) : invitations.length === 0 ? (
+          <div className="py-8 text-center text-sm text-ink-muted">
+            Sin invitaciones pendientes
+          </div>
+        ) : (
+          invitations.map((inv) => (
+            <div
+              key={inv.id}
+              className="border-b border-line px-4 py-3 last:border-0"
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-ink">
+                    {workspaceNames[inv.workspaceId] ?? "Cargando..."}
+                  </p>
+                  <p className="text-xs text-ink-muted mt-0.5">
+                    {senderNames[inv.invitedBy] ?? "Alguien"} te invitó como{" "}
+                    <span className="font-medium capitalize">{inv.role}</span>
+                  </p>
+                  <p className="text-[10px] text-ink-muted mt-1">
+                    {formatRelativeTime(inv.createdAt)}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-2 flex gap-2">
+                <button
+                  onClick={() => handleAccept(inv)}
+                  disabled={processing === inv.id}
+                  className="flex-1 rounded-lg bg-pritio-blue py-1.5 text-xs font-semibold text-white hover:bg-pritio-blue/90 transition-colors disabled:opacity-50"
+                >
+                  {processing === inv.id ? "..." : "Aceptar"}
+                </button>
+                <button
+                  onClick={() => handleReject(inv.id)}
+                  disabled={processing === inv.id}
+                  className="flex-1 rounded-lg border border-line py-1.5 text-xs font-medium text-ink-muted hover:bg-surface-muted transition-colors disabled:opacity-50"
+                >
+                  Rechazar
+                </button>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="relative" ref={panelRef}>
+    <div className="relative">
       <button
+        ref={btnRef}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Invitaciones pendientes"
         aria-haspopup="dialog"
@@ -117,61 +213,7 @@ export function PendingInvitationsPopover() {
         )}
       </button>
 
-      {isOpen && (
-        <div className="pritio-menu-enter absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
-          <div className="border-b border-line px-4 py-3">
-            <h3 className="text-sm font-bold text-ink">Invitaciones pendientes</h3>
-          </div>
-
-          <div className="max-h-80 overflow-y-auto">
-            {loading ? (
-              <div className="py-8 text-center text-sm text-ink-muted">Cargando...</div>
-            ) : invitations.length === 0 ? (
-              <div className="py-8 text-center text-sm text-ink-muted">
-                Sin invitaciones pendientes
-              </div>
-            ) : (
-              invitations.map((inv) => (
-                <div
-                  key={inv.id}
-                  className="border-b border-line px-4 py-3 last:border-0"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-ink">
-                        {workspaceNames[inv.workspaceId] ?? "Cargando..."}
-                      </p>
-                      <p className="text-xs text-ink-muted mt-0.5">
-                        {senderNames[inv.invitedBy] ?? "Alguien"} te invitó como{" "}
-                        <span className="font-medium capitalize">{inv.role}</span>
-                      </p>
-                      <p className="text-[10px] text-ink-muted mt-1">
-                        {formatRelativeTime(inv.createdAt)}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() => handleAccept(inv)}
-                      disabled={processing === inv.id}
-                      className="flex-1 rounded-lg bg-pritio-blue py-1.5 text-xs font-semibold text-white hover:bg-pritio-blue/90 transition-colors disabled:opacity-50"
-                    >
-                      {processing === inv.id ? "..." : "Aceptar"}
-                    </button>
-                    <button
-                      onClick={() => handleReject(inv.id)}
-                      disabled={processing === inv.id}
-                      className="flex-1 rounded-lg border border-line py-1.5 text-xs font-medium text-ink-muted hover:bg-surface-muted transition-colors disabled:opacity-50"
-                    >
-                      Rechazar
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {isOpen && menuPosition && createPortal(menuContent, document.body)}
     </div>
   );
 }

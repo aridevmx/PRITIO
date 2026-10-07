@@ -1,5 +1,7 @@
 import { useMemo, useState } from "react";
 import { cn, localDateStr, todayStr } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import { CaretLeft, CaretRight } from "@phosphor-icons/react";
 
 const DAYS = ["L", "M", "X", "J", "V", "S", "D"];
 
@@ -81,9 +83,7 @@ export function MiniCalendar({
           onClick={() => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
           className="text-ink-muted hover:text-ink-soft transition-colors"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-          </svg>
+          <AppIcon glyph={CaretLeft} />
         </button>
 
         <span className="text-sm font-semibold text-pritio-purple capitalize">
@@ -94,9 +94,7 @@ export function MiniCalendar({
           onClick={() => setViewDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
           className="text-ink-muted hover:text-ink-soft transition-colors"
         >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-          </svg>
+          <AppIcon glyph={CaretRight} />
         </button>
       </div>
 

@@ -4,6 +4,8 @@ import { cn, addDaysStr, formatDayLabel, todayStr } from "@/lib/utils";
 import { useTimeFormat } from "@/lib/timeFormat";
 import { TimePicker } from "@/components/TimePicker";
 import { MiniCalendar } from "@/components/layout/MiniCalendar";
+import { AppIcon } from "@/components/AppIcon";
+import { ArrowLeft, ArrowRight, CalendarBlank, CaretDown, Check, Clock, X } from "@phosphor-icons/react";
 
 function dayOffsetLabel(day: string): string {
   if (!day) return "";
@@ -39,38 +41,6 @@ interface QuickDatePickerProps {
   accent?: "blue" | "purple" | "coral";
   className?: string;
 }
-
-const ClockIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="none">
-    <circle cx="8" cy="8" r="5.8" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M8 4.5V8l2.2 1.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const ArrowRightIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="none">
-    <path d="M3 8h10M9.5 4.5L13 8l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const CalendarIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="none">
-    <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-  </svg>
-);
-
-const CheckIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="none">
-    <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const BackIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="none">
-    <path d="M13 8H3M6.5 4.5L3 8l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
 
 export function QuickDatePicker({
   date,
@@ -273,24 +243,13 @@ export function QuickDatePicker({
               : "border-dashed border-line-strong/70 bg-surface-subtle/50 text-ink-muted hover:border-pritio-blue/40",
         )}
       >
-        <CalendarIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+        <AppIcon glyph={CalendarBlank} className="text-ink-muted" />
         <span className="min-w-0 flex-1 truncate">{triggerLabel}</span>
-        <svg
-          className={cn(
-            "h-3 w-3 shrink-0 text-ink-muted transition-transform duration-200",
-            open && "rotate-180",
-          )}
-          viewBox="0 0 16 16"
-          fill="none"
-        >
-          <path
-            d="M4 6l4 4 4-4"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <AppIcon
+          glyph={CaretDown}
+          size="xs"
+          className={cn("text-ink-muted transition-transform duration-200", open && "rotate-180")}
+        />
       </button>
 
       {open &&
@@ -341,9 +300,9 @@ export function QuickDatePicker({
                         )}
                       >
                         {k === "prox" ? (
-                          <ArrowRightIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+                          <AppIcon glyph={ArrowRight} className="text-ink-muted" />
                         ) : (
-                          <ClockIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+                          <AppIcon glyph={Clock} className="text-ink-muted" />
                         )}
                         <span className="min-w-0 flex-1 truncate text-sm capitalize">{k === "prox" ? "Próxima semana" : k === "hoy" ? "Hoy" : "Mañana"}</span>
                         {withTime ? (
@@ -380,7 +339,7 @@ export function QuickDatePicker({
                             {quickRightLabel(k)}
                           </span>
                         )}
-                        {selected && <CheckIcon className="h-3.5 w-3.5 shrink-0 text-pritio-blue" />}
+                        {selected && <AppIcon glyph={Check} size="sm" className="text-pritio-blue" />}
                       </div>
                     );
                   })}
@@ -403,10 +362,10 @@ export function QuickDatePicker({
                           noTime ? "border-pritio-blue bg-pritio-blue text-white" : "border-line-strong text-transparent",
                         )}
                       >
-                        <CheckIcon className="h-3 w-3" />
+                        <AppIcon glyph={Check} size="xs" />
                       </span>
                       <span className="min-w-0 flex-1 truncate text-sm">Sin hora</span>
-                      {date && !time && <CheckIcon className="h-3.5 w-3.5 shrink-0 text-pritio-blue" />}
+                      {date && !time && <AppIcon glyph={Check} size="sm" className="text-pritio-blue" />}
                     </button>
                   )}
 
@@ -423,7 +382,7 @@ export function QuickDatePicker({
                       highlight === quickKeys.indexOf("calendar") ? "bg-pritio-blue/10 text-ink" : "text-ink hover:bg-surface-muted",
                     )}
                   >
-                    <CalendarIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+                    <AppIcon glyph={CalendarBlank} className="text-ink-muted" />
                     <span className="min-w-0 flex-1 truncate text-sm">Elegir fecha…</span>
                   </button>
 
@@ -442,9 +401,7 @@ export function QuickDatePicker({
                         highlight === quickKeys.indexOf("clear") ? "bg-pritio-blue/10 text-ink" : "text-ink-soft hover:bg-surface-muted",
                       )}
                     >
-                      <svg className="h-4 w-4 shrink-0 text-ink-muted" viewBox="0 0 16 16" fill="none">
-                        <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                      </svg>
+                      <AppIcon glyph={X} className="text-ink-muted" />
                       <span className="min-w-0 flex-1 truncate text-sm">Sin fecha</span>
                     </button>
                   )}
@@ -458,7 +415,7 @@ export function QuickDatePicker({
                       className="rounded-md p-1 text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
                       aria-label="Volver a fechas rápidas"
                     >
-                      <BackIcon className="h-3.5 w-3.5" />
+                      <AppIcon glyph={ArrowLeft} size="sm" />
                     </button>
                     <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">
                       {calendarDay ? "Hora" : "Calendario"}

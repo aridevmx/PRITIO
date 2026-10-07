@@ -3,6 +3,8 @@ import { createPortal } from "react-dom";
 import { emitAppEvent } from "@/lib/appEvents";
 import type { GlobalViewKey } from "@/components/layout/globalNav";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import { FolderPlus, Note, Plus, X } from "@phosphor-icons/react";
 
 interface GlobalFABProps {
   globalView: GlobalViewKey | null;
@@ -51,13 +53,9 @@ export function GlobalFAB({ globalView }: GlobalFABProps) {
         )}
       >
         {globalView === "docs" && open ? (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
-            <path d="M6 6l12 12M6 18L18 6" />
-          </svg>
+          <AppIcon glyph={X} size="2xl" />
         ) : (
-          <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.2} strokeLinecap="round">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
+          <AppIcon glyph={Plus} size="2xl" />
         )}
       </button>
 
@@ -80,10 +78,7 @@ export function GlobalFAB({ globalView }: GlobalFABProps) {
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
             >
               <span className="grid h-7 w-7 place-items-center rounded-lg bg-pritio-purple/10 text-pritio-purple">
-                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                  <path d="M13.5 9.5c0 .8-.7 1.5-1.5 1.5H4l-2.5 2V3c0-.8.7-1.5 1.5-1.5h9c.8 0 1.5.7 1.5 1.5v6.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-                  <path d="M5 7h6M5 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={Note} />
               </span>
               Nueva nota
             </button>
@@ -96,9 +91,7 @@ export function GlobalFAB({ globalView }: GlobalFABProps) {
               className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
             >
               <span className="grid h-7 w-7 place-items-center rounded-lg bg-pritio-blue/10 text-pritio-blue">
-                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                  <path d="M2 5a1.5 1.5 0 011.5-1.5h2.6c.35 0 .68.15.91.41l.62.71c.23.26.56.41.9.41h3.47A1.5 1.5 0 0113.5 6.5v4A1.5 1.5 0 0112 12H3.5A1.5 1.5 0 012 10.5V5z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-                </svg>
+                <AppIcon glyph={FolderPlus} />
               </span>
               Nueva carpeta
             </button>

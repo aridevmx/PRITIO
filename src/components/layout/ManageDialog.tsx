@@ -10,6 +10,8 @@ import { useBilling } from "@/features/billing/BillingProvider";
 import { parsePlanLimitError } from "@/features/billing/guarded";
 import { openUpgrade } from "@/features/billing/upgrade";
 import type { Invitation } from "@/types";
+import { AppIcon } from "@/components/AppIcon";
+import { X } from "@phosphor-icons/react";
 
 type ManageTab = "members" | "projects" | "recurring";
 
@@ -186,9 +188,7 @@ function MembersPanel({
                     aria-label="Eliminar responsable"
                     className="rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500"
                   >
-                    <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                      <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                    </svg>
+                    <AppIcon glyph={X} size="sm" />
                   </button>
                 </>
               )}
@@ -373,9 +373,7 @@ function RecurringPanel({ workspaceId }: { workspaceId: string }) {
                 aria-label="Eliminar serie"
                 className="rounded-lg p-1.5 text-ink-muted transition-colors hover:bg-red-50 hover:text-red-500 disabled:opacity-50"
               >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                  <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={X} size="sm" />
               </button>
             </li>
           ))}

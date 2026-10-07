@@ -1,4 +1,6 @@
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import { MagnifyingGlass } from "@phosphor-icons/react";
 
 interface AssigneeOption {
   id: string;
@@ -45,15 +47,10 @@ export function TaskFilterBar({
   return (
     <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:overflow-x-auto">
       <div className="relative flex-1 min-w-[200px] shrink-0 lg:shrink">
-        <svg
-          className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
-          fill="none"
-          viewBox="0 0 24 24"
-          stroke="currentColor"
-          strokeWidth={2}
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-        </svg>
+        <AppIcon
+          glyph={MagnifyingGlass}
+          className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+        />
         <input
           type="text"
           value={searchQuery}

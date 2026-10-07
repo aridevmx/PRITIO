@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense } from "react";
+import { createPortal } from "react-dom";
 import { useToast } from "@/components/Toast";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { stripHtml } from "@/lib/utils";
@@ -89,11 +90,12 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
   }, [docs]);
 
   // ─── Menú "⋯" (compartir / descargar / eliminar) ─────────
-  const menuRef = useRef<HTMLDivElement | null>(null);
+const menuRef = useRef<HTMLDivElement | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
-  const [shareOpen, setShareOpen] = useState(false);
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
 
   useEffect(() => {
     if (!menuOpen && !exportOpen) return;
@@ -106,6 +108,30 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [menuOpen, exportOpen]);
+
+  useEffect(() => {
+    if (!menuOpen || !btnRef.current) return;
+
+    const updatePosition = () => {
+      const rect = btnRef.current!.getBoundingClientRect();
+      const menuWidth = 224; // w-56 = 224px
+      const viewportWidth = window.innerWidth;
+      const left = Math.min(rect.right - menuWidth, viewportWidth - menuWidth - 16);
+      setMenuPosition({
+        top: rect.bottom + 6, // mt-1.5 = 6px
+        left: Math.max(left, 16),
+        width: menuWidth,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [menuOpen]);
 
   // ─── Etiquetas (#) ────────────────────────────────────────
   const [tagsByWs, setTagsByWs] = useState<Record<string, DocTag[]>>({});
@@ -447,14 +473,10 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
     <div className="flex flex-1 flex-col overflow-hidden p-4 lg:p-8">
       <div className="mb-4 flex items-center gap-3">
         <div className="relative min-w-0 max-w-xs flex-1">
-          <svg
-            className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
-            viewBox="0 0 16 16"
-            fill="none"
-          >
-            <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-            <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
+          <AppIcon
+            glyph={MagnifyingGlass}
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+          />
           <input
             type="text"
             value={search}
@@ -469,14 +491,7 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
           disabled={isLoading}
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-2 text-sm font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-subtle disabled:opacity-50"
         >
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-            <path
-              d="M2 5a1.5 1.5 0 011.5-1.5h2.6c.35 0 .68.15.91.41l.62.71c.23.26.56.41.9.41h3.47A1.5 1.5 0 0113.5 6.5v4A1.5 1.5 0 0112 12H3.5A1.5 1.5 0 012 10.5V5z"
-              fill="currentColor"
-              opacity="0.55"
-            />
-            <path d="M8 6v4M6 8h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-          </svg>
+          <AppIcon glyph={FolderPlus} />
           Carpeta
         </button>
         <button
@@ -485,9 +500,7 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
           disabled={isLoading}
           className="flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:opacity-50"
         >
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-            <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
+          <AppIcon glyph={Plus} />
           Nueva nota
         </button>
       </div>
@@ -549,9 +562,7 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
                     aria-label="Volver al árbol"
                     className="-ml-1 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-muted hover:bg-surface-muted md:hidden"
                   >
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <path d="M10 4L6 8l4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <AppIcon glyph={CaretLeft} />
                   </button>
                   {folderPath(folders, selectedDoc?.parentFolderId ?? null).map((f, i) => (
                     <span key={f.id} className="flex min-w-0 items-center gap-1.5">
@@ -563,8 +574,9 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
                     <span className="pr-1 text-[11px] font-medium text-ink-muted">
                       {saveState === "saving" ? "Guardando…" : saveState === "saved" ? "Guardado" : selectedDoc ? formatUpdated(selectedDoc.updatedAt) : ""}
                     </span>
-                    <div className="relative shrink-0" ref={menuRef}>
+                    <div className="relative shrink-0">
                       <button
+                        ref={btnRef}
                         type="button"
                         onClick={() => {
                           setMenuOpen((o) => !o);
@@ -575,20 +587,20 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
                         className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
                       >
                         {exporting ? (
-                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.6" opacity=".25" />
-                            <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                          </svg>
+                          <Spinner size="md" />
                         ) : (
-                          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                            <circle cx="8" cy="3.5" r="1.4" fill="currentColor" />
-                            <circle cx="8" cy="8" r="1.4" fill="currentColor" />
-                            <circle cx="8" cy="12.5" r="1.4" fill="currentColor" />
-                          </svg>
+                          <AppIcon glyph={DotsThreeVertical} weight="fill" />
                         )}
                       </button>
-                      {menuOpen && (
-                        <div className="pritio-menu-enter absolute right-0 top-full z-30 mt-1.5 w-56 overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-elevated">
+                      {menuOpen && menuPosition && createPortal(
+                        <div className="pritio-menu-enter z-[100] w-56 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-elevated"
+                          style={{
+                            position: "fixed",
+                            top: menuPosition.top,
+                            left: menuPosition.left,
+                            width: menuPosition.width,
+                          }}
+                        >
                           <button
                             type="button"
                             onClick={() => {
@@ -597,12 +609,7 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
                             }}
                             className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
                           >
-                            <svg className="h-4 w-4 text-ink-soft" viewBox="0 0 16 16" fill="none">
-                              <circle cx="11.5" cy="3.5" r="1.75" stroke="currentColor" strokeWidth="1.4" />
-                              <circle cx="4" cy="8" r="1.75" stroke="currentColor" strokeWidth="1.4" />
-                              <circle cx="11.5" cy="12.5" r="1.75" stroke="currentColor" strokeWidth="1.4" />
-                              <path d="M5.6 7.2l4.3-2.5M5.6 8.8l4.3 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                            </svg>
+                            <AppIcon glyph={ShareNetwork} className="text-ink-soft" />
                             Compartir
                           </button>
                           <button
@@ -611,9 +618,7 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
                             aria-expanded={exportOpen}
                             className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
                           >
-                            <svg className="h-4 w-4 text-ink-soft" viewBox="0 0 16 16" fill="none">
-                              <path d="M8 2.5v7m0 0L5.5 7M8 9.5L10.5 7M3 10.5v1.25A1.25 1.25 0 004.25 13h7.5a1.25 1.25 0 001.25-1.25V10.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                            </svg>
+                            <AppIcon glyph={DownloadSimple} className="text-ink-soft" />
                             Descargar
                           </button>
                           {exportOpen && (
@@ -646,13 +651,11 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
                             }}
                             className="flex w-full items-center gap-2.5 px-3.5 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-50"
                           >
-                            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                              <path d="M2.5 4.5h11M6.5 2.5v-.75a.75.75 0 01.75-.75h1.5a.75.75 0 01.75.75v.75m3 2l-.6 8.4a1.5 1.5 0 01-1.5 1.35H5.85a1.5 1.5 0 01-1.5-1.35l-.6-8.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                            </svg>
+                            <AppIcon glyph={Trash} />
                             Eliminar
                           </button>
                         </div>
-                      )}
+                        , document.body)}
                     </div>
                   </div>
                 </div>
@@ -692,9 +695,7 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
                             aria-label={`Quitar etiqueta ${t.name}`}
                             className="opacity-70 transition-opacity hover:opacity-100"
                           >
-                            <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                              <path d="M3 3l6 6M9 3L3 9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                            </svg>
+                            <AppIcon glyph={X} size="xs" />
                           </button>
                         </span>
                       ))}

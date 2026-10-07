@@ -25,6 +25,8 @@ import { openUpgrade } from "@/features/billing/upgrade";
 import { PLAN_LABELS, PLAN_BADGE_CLASSES } from "@/features/billing/plans";
 import { MEMBER_TYPE_LABELS } from "@/lib/constants";
 import type { Invitation, MemberType, NotificationPreferences, WorkspaceRole } from "@/types";
+import { AppIcon } from "@/components/AppIcon";
+import { Heart, Link, X } from "@phosphor-icons/react";
 
 const TYPE_LABELS: Record<string, string> = {
   personal: "Personal",
@@ -288,9 +290,7 @@ function MembersManager({
             onClick={() => setInviteOpen(true)}
             className="flex w-full items-center justify-center gap-2 rounded-xl border-2 border-dashed border-line py-3 text-sm font-semibold text-ink-muted hover:border-pritio-blue hover:text-pritio-blue transition-colors"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M12 5.5C12 7.985 10 9 8 11C6 9 4 7.985 4 5.5C4 3.5 6 2 8 4C10 2 12 3.5 12 5.5Z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-            </svg>
+            <AppIcon glyph={Heart} />
             Invitar miembros
           </button>
         ) : (
@@ -336,10 +336,7 @@ function MembersManager({
                         className="rounded-lg p-1 text-ink-muted hover:bg-pritio-blue/10 hover:text-pritio-blue transition-colors"
                         title="Copiar enlace de invitación"
                       >
-                        <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                          <path d="M6.5 9.5C7.5 10.5 8.5 10.5 9.5 9.5L12 7C13 6 13 4.5 12 3.5C11 2.5 9.5 2.5 8.5 3.5L7 5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                          <path d="M9.5 6.5C8.5 5.5 7.5 5.5 6.5 6.5L4 9C3 10 3 11.5 4 12.5C5 13.5 6.5 13.5 7.5 12.5L9 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
+                        <AppIcon glyph={Link} size="sm" />
                       </button>
                       <button
                         type="button"
@@ -347,9 +344,7 @@ function MembersManager({
                         className="rounded-lg p-1 text-ink-muted hover:bg-red-50 hover:text-red-500 transition-colors"
                         title="Cancelar invitación"
                       >
-                        <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                          <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
+                        <AppIcon glyph={X} size="sm" />
                       </button>
                     </div>
                   </>
@@ -380,9 +375,7 @@ function MembersManager({
                               className="rounded-lg p-1 text-ink-muted hover:bg-red-50 hover:text-red-500 transition-colors"
                               title="Quitar miembro"
                             >
-                              <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                                <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                              </svg>
+                              <AppIcon glyph={X} size="sm" />
                             </button>
                           )}
                         </>
@@ -397,9 +390,7 @@ function MembersManager({
                             className="rounded-lg p-1 text-ink-muted hover:bg-red-50 hover:text-red-500 transition-colors"
                             title="Eliminar responsable"
                           >
-                            <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                            </svg>
+                            <AppIcon glyph={X} size="sm" />
                           </button>
                         </>
                       )}
@@ -696,9 +687,7 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
                   aria-label="Cerrar configuración"
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-muted hover:text-ink transition-colors"
                 >
-                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                    <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                  </svg>
+                  <AppIcon glyph={X} />
                 </button>
               </div>
             </div>

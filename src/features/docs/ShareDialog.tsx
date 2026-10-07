@@ -9,6 +9,8 @@ import {
 import { useToast } from "@/components/Toast";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
+import { AppIcon } from "@/components/AppIcon";
+import { X } from "@phosphor-icons/react";
 
 interface ShareDialogProps {
   open: boolean;
@@ -136,9 +138,7 @@ export function ShareDialog({
             aria-label="Cerrar"
             className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted hover:bg-surface-muted"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
 
@@ -225,9 +225,7 @@ export function ShareDialog({
                       aria-label={`Eliminar a ${c.email}`}
                       className="grid h-7 w-7 shrink-0 place-items-center rounded-md text-ink-muted transition-colors hover:bg-pritio-coral/10 hover:text-pritio-coral"
                     >
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                        <path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                      </svg>
+                      <AppIcon glyph={X} size="sm" />
                     </button>
                   </li>
                 ))}

@@ -1,6 +1,8 @@
 import { createPortal } from "react-dom";
 import { DONATION_LINKS, IS_SELF_HOSTED, SHOW_DONATIONS } from "@/lib/constants";
 import { APP_NAME } from "@/lib/branding";
+import { AppIcon } from "@/components/AppIcon";
+import { X } from "@phosphor-icons/react";
 
 interface DonationModalProps {
   open: boolean;
@@ -65,9 +67,7 @@ export function DonationModal({ open, onClose }: DonationModalProps) {
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-muted hover:text-ink transition-colors"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
         <p className="mb-5 text-sm text-ink-muted">

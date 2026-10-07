@@ -7,7 +7,27 @@ import { PropertyRow } from "@/components/PropertyRow";
 import { QuickDatePicker } from "@/components/QuickDatePicker";
 import { DatePickerField } from "@/components/DatePickerField";
 import { usePopover } from "@/hooks/usePopover";
-import { QUADRANTS, QUADRANT_ORDER, type QuadrantIconKey } from "@/features/tasks/quadrants";
+import { QUADRANTS, QUADRANT_ORDER } from "@/features/tasks/quadrants";
+import { QUADRANT_ICONS } from "@/features/tasks/quadrantIcons";
+import { AppIcon } from "@/components/AppIcon";
+import {
+  ArrowsClockwise,
+  Bell,
+  CalendarBlank,
+  CalendarPlus,
+  CaretDown,
+  CaretRight,
+  ChatCircle,
+  Check,
+  Clock,
+  File,
+  FolderSimple,
+  ListChecks,
+  Lock,
+  Plus,
+  Users,
+  X,
+} from "@phosphor-icons/react";
 import { SubtaskContextMenu } from "@/features/tasks/SubtaskContextMenu";
 import { allowedKindsForWorkspace } from "@/features/tasks/kinds";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
@@ -64,9 +84,7 @@ function AddRowButton({ label, onClick }: { label: string; onClick: () => void }
       onClick={onClick}
       className="flex items-center gap-1.5 text-sm font-medium text-ink-soft transition-colors hover:text-ink"
     >
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-        <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-      </svg>
+      <AppIcon glyph={Plus} />
       {label}
     </button>
   );
@@ -161,63 +179,16 @@ const KIND_LABELS: Record<TaskKind, string> = {
 const KIND_ACCENT: Record<TaskKind, { activeClassName: string; icon: ReactNode }> = {
   task: {
     activeClassName: "text-pritio-blue",
-    icon: (
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-        <path d="M2.5 4.5l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        <path d="M2.5 9l1.5 1.5 3-3" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-        <rect x="10" y="4.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-        <rect x="10" y="9.5" width="3.5" height="3.5" rx="1" stroke="currentColor" strokeWidth="1.4" />
-      </svg>
-    ),
+    icon: <AppIcon glyph={ListChecks} />,
   },
   meeting: {
     activeClassName: "text-pritio-purple",
-    icon: (
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-        <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      </svg>
-    ),
+    icon: <AppIcon glyph={CalendarBlank} />,
   },
   event: {
     activeClassName: "text-pritio-coral",
-    icon: (
-      <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-        <rect x="2.5" y="2" width="11" height="11.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-        <path d="M2.5 5.5h11M5.5 0.5V3.5M10.5 0.5V3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        <path d="M5.5 8.5h5M8 6.5v5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-      </svg>
-    ),
+    icon: <AppIcon glyph={CalendarPlus} />,
   },
-};
-
-const QUADRANT_ICONS: Record<QuadrantIconKey, ReactNode> = {
-  zap: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path d="M9 1.5L3.5 9H8L7 14.5L12.5 7H8L9 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  ),
-  calendar: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  users: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M2.5 13c.5-2.2 2-3.2 3.5-3.2s3 1 3.5 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="11.2" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M9.5 13c.4-1.7 1.4-2.5 2.5-2.5 1 0 1.8.6 2.2 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  archive: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path d="M2.5 8h3L7 10h2l1.5-2h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="2.5" y="3" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M4 4.5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
 };
 
 function allowedKindsFor(type: string | undefined, isEdit: boolean, currentKind: TaskKind): TaskKind[] {
@@ -285,48 +256,13 @@ const RECURRENCE_LABELS: Record<string, string> = {
 };
 
 const ROW_ICONS = {
-  fechas: (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  repetir: (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-      <path d="M13 6.3A5.5 5.5 0 003.4 4.6L2.7 5.4M3 9.7a5.5 5.5 0 009.6 1.7l.7-.8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <path d="M2.5 2.5v3h3M13.5 13.5v-3h-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
-  recordatorios: (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-      <path d="M8 2a4 4 0 014 4c0 2.6.7 3.7 1.3 4.3H2.7C3.3 9.7 4 8.6 4 6a4 4 0 014-4z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-      <path d="M6.5 12.5a1.5 1.5 0 003 0" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  proyecto: (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-      <path d="M2 4.5A1.5 1.5 0 013.5 3H6l1.5 1.5h5A1.5 1.5 0 0114 6v5.5a1.5 1.5 0 01-1.5 1.5h-9A1.5 1.5 0 012 11.5v-7z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  ),
-  asignados: (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-      <circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M2.5 13c.5-2.2 2-3.2 3.5-3.2s3 1 3.5 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="11.2" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M9.5 13c.4-1.7 1.4-2.5 2.5-2.5 1 0 1.8.6 2.2 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  visibilidad: (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-      <rect x="3" y="7" width="10" height="6.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5.5 7V5a2.5 2.5 0 015 0v2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  comentarios: (
-    <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-      <path d="M13.5 9.5c0 .8-.7 1.5-1.5 1.5H4l-2.5 2V3c0-.8.7-1.5 1.5-1.5h9c.8 0 1.5.7 1.5 1.5v6.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  ),
+  fechas: <AppIcon glyph={CalendarBlank} size="sm" />,
+  repetir: <AppIcon glyph={ArrowsClockwise} size="sm" />,
+  recordatorios: <AppIcon glyph={Bell} size="sm" />,
+  proyecto: <AppIcon glyph={FolderSimple} size="sm" />,
+  asignados: <AppIcon glyph={Users} size="sm" />,
+  visibilidad: <AppIcon glyph={Lock} size="sm" />,
+  comentarios: <AppIcon glyph={ChatCircle} size="sm" />,
 } as const;
 
 export function TaskFormDialog({
@@ -1230,15 +1166,7 @@ export function TaskFormDialog({
               )}
             >
               {isCompleted && (
-                <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                  <path
-                    d="M2.5 6L5 8.5L9.5 3.5"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
+                <AppIcon glyph={Check} size="xs" />
               )}
             </button>
           )}
@@ -1256,9 +1184,7 @@ export function TaskFormDialog({
             aria-label="Cerrar"
             className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
 
@@ -1456,16 +1382,14 @@ export function TaskFormDialog({
                 aria-expanded={subtasksExpanded}
                 className="-mx-1 flex w-[calc(100%+0.5rem)] items-center gap-1 rounded-lg px-1 py-1 text-left transition-colors hover:bg-surface-muted"
               >
-                <svg
+                <AppIcon
+                  glyph={CaretRight}
+                  size="xs"
                   className={cn(
-                    "h-3 w-3 shrink-0 text-ink-muted transition-transform duration-200",
+                    "shrink-0 text-ink-muted transition-transform duration-200",
                     subtasksExpanded && "rotate-90",
                   )}
-                  viewBox="0 0 16 16"
-                  fill="none"
-                >
-                  <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                />
                 <span className="text-sm font-medium text-ink">Subtareas</span>
                 {subtasks.length > 0 && (
                   <span
@@ -1494,10 +1418,8 @@ export function TaskFormDialog({
                         )}
                       >
                         {st.completed && (
-                          <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none">
-                            <path d="M2.5 6L5 8.5L9.5 3.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
+                            <AppIcon glyph={Check} size="xs" />
+                          )}
                       </button>
                       <input
                         type="text"
@@ -1540,9 +1462,7 @@ export function TaskFormDialog({
                         aria-hidden="true"
                         className="grid h-[18px] w-[18px] flex-shrink-0 place-items-center rounded-full border-2 border-dashed border-line-strong text-ink-muted"
                       >
-                        <svg className="h-2.5 w-2.5" viewBox="0 0 12 12" fill="none">
-                          <path d="M6 2.5V9.5M2.5 6H9.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                        </svg>
+                        <AppIcon glyph={Plus} size="xs" />
                       </span>
                       <input
                         type="text"
@@ -1579,13 +1499,11 @@ export function TaskFormDialog({
                 <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ink-soft">
                   {comments.length}
                 </span>
-                <svg
-                  className={cn("h-3.5 w-3.5 transition-transform", commentsExpanded && "rotate-180")}
-                  viewBox="0 0 16 16"
-                  fill="none"
-                >
-                  <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
+                <AppIcon
+                  glyph={CaretDown}
+                  size="sm"
+                  className={cn("transition-transform", commentsExpanded && "rotate-180")}
+                />
               </button>
 
               {/* Input directo, siempre visible */}
@@ -1628,9 +1546,7 @@ export function TaskFormDialog({
                           aria-label="Eliminar comentario"
                           className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-muted opacity-0 transition-all hover:bg-pritio-coral/10 hover:text-pritio-coral focus-visible:opacity-100 group-hover/c:opacity-100"
                         >
-                          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                            <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                          </svg>
+                          <AppIcon glyph={X} size="sm" />
                         </button>
                       )}
                     </div>
@@ -1654,10 +1570,7 @@ export function TaskFormDialog({
               <div className="flex items-center justify-between gap-3 rounded-lg border border-line bg-surface px-2.5 py-2">
                 <div className="min-w-0">
                   <p className="flex items-center gap-1.5 text-sm font-medium text-ink">
-                    <svg className="h-4 w-4 shrink-0 text-pritio-purple" viewBox="0 0 20 20" fill="none">
-                      <circle cx="10" cy="10" r="7.5" stroke="currentColor" strokeWidth="1.6" />
-                      <path d="M10 6.5V10l2.5 1.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                    </svg>
+                    <AppIcon glyph={Clock} className="shrink-0 text-pritio-purple" />
                     Mi día
                   </p>
                   <p className="mt-0.5 text-[11px] leading-relaxed text-ink-muted">
@@ -1906,9 +1819,7 @@ export function TaskFormDialog({
                         className="text-pritio-purple/60 hover:text-pritio-purple"
                         aria-label="Quitar recordatorio"
                       >
-                        <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                          <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
+                        <AppIcon glyph={X} size="xs" />
                       </button>
                     </span>
                   ))}
@@ -2081,10 +1992,7 @@ export function TaskFormDialog({
                       key={d.id}
                       className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-line bg-surface-subtle py-1 pl-2 pr-1.5 text-xs font-medium text-ink"
                     >
-                      <svg className="h-3 w-3 shrink-0 text-ink-muted" viewBox="0 0 16 16" fill="none">
-                        <path d="M4.5 2h4.75L12.5 5.25V13a1 1 0 01-1 1h-7a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                        <path d="M9 2v3.5h3.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
-                      </svg>
+                      <AppIcon glyph={File} size="xs" className="shrink-0 text-ink-muted" />
                       <span className="max-w-[7rem] truncate">{d.title || "Sin título"}</span>
                       <button
                         type="button"
@@ -2092,9 +2000,7 @@ export function TaskFormDialog({
                         aria-label={`Desvincular documento: ${d.title || "Sin título"}`}
                         className="text-ink-muted transition-colors hover:text-pritio-coral"
                       >
-                        <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                          <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
+                        <AppIcon glyph={X} size="xs" />
                       </button>
                     </span>
                   ))}
@@ -2149,10 +2055,8 @@ export function TaskFormDialog({
                           {d.title || "Sin título"}
                         </span>
                         {linked && (
-                          <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
-                            <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
-                        )}
+                        <AppIcon glyph={Check} size="xs" className="shrink-0 text-pritio-blue" />
+                      )}
                       </button>
                     );
                   })}
@@ -2163,9 +2067,7 @@ export function TaskFormDialog({
                 onClick={() => setTemplatePickerOpen(true)}
                 className="mt-1 flex w-full items-center gap-2 rounded-lg border-t border-line px-2 pt-2 pb-1 text-left text-sm font-medium text-pritio-blue transition-colors hover:bg-pritio-blue/5"
               >
-                <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                  <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={Plus} />
                 Crear nota y vincular
               </button>
             </div>,

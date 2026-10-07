@@ -2,6 +2,8 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn, addDaysStr, formatDayLabel } from "@/lib/utils";
 import { MiniCalendar } from "@/components/layout/MiniCalendar";
+import { AppIcon } from "@/components/AppIcon";
+import { CalendarBlank } from "@phosphor-icons/react";
 
 const PRESETS = [
   { label: "Hoy", days: 0 },
@@ -106,15 +108,7 @@ export function DatePickerPopover({
           open && "border-pritio-blue ring-2 ring-pritio-blue/20",
         )}
       >
-        <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none">
-          <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-          <path
-            d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11"
-            stroke="currentColor"
-            strokeWidth="1.5"
-            strokeLinecap="round"
-          />
-        </svg>
+        <AppIcon glyph={CalendarBlank} size="sm" />
         <span className="min-w-0 flex-1 truncate">{value ? formatDayLabel(value) : placeholder}</span>
       </button>
 

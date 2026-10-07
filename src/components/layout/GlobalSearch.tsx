@@ -14,6 +14,8 @@ import {
   type GlobalSearchResults,
 } from "@/features/search/api";
 import { emitAppEvent } from "@/lib/appEvents";
+import { AppIcon } from "@/components/AppIcon";
+import { CalendarBlank, CheckSquare, MagnifyingGlass, Note, Users, X } from "@phosphor-icons/react";
 import type { Task } from "@/types";
 
 type Hit = {
@@ -36,39 +38,17 @@ const EMPTY: GlobalSearchResults = {
 };
 
 function ResultIcon({ kind, color, initial }: { kind: Hit["kind"]; color?: string; initial: string }) {
-  const cls = "h-4 w-4 shrink-0";
+  const cls = "shrink-0";
 
   switch (kind) {
     case "task":
-      return (
-        <svg className={cn(cls, "text-pritio-blue")} viewBox="0 0 16 16" fill="none">
-          <rect x="2" y="2" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M5 8l2 2 4-4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
+      return <AppIcon glyph={CheckSquare} className={cn(cls, "text-pritio-blue")} />;
     case "meeting":
-      return (
-        <svg className={cn(cls, "text-pritio-purple")} viewBox="0 0 16 16" fill="none">
-          <circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M2.5 13c.5-2.2 2-3.2 3.5-3.2s3 1 3.5 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          <circle cx="11.2" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M9.5 13c.4-1.7 1.4-2.5 2.5-2.5 1 0 1.8.6 2.2 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      );
+      return <AppIcon glyph={Users} className={cn(cls, "text-pritio-purple")} />;
     case "event":
-      return (
-        <svg className={cn(cls, "text-pritio-coral")} viewBox="0 0 16 16" fill="none">
-          <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
-      );
+      return <AppIcon glyph={CalendarBlank} className={cn(cls, "text-pritio-coral")} />;
     case "doc":
-      return (
-        <svg className={cn(cls, "text-pritio-green")} viewBox="0 0 16 16" fill="none">
-          <path d="M13.5 9.5c0 .8-.7 1.5-1.5 1.5H4l-2.5 2V3c0-.8.7-1.5 1.5-1.5h9c.8 0 1.5.7 1.5 1.5v6.5z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M5 7h6M5 9h4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
-        </svg>
-      );
+      return <AppIcon glyph={Note} className={cn(cls, "text-pritio-green")} />;
     case "member":
       return (
         <span
@@ -213,14 +193,10 @@ export function GlobalSearch() {
   return (
     <>
       <div ref={anchorRef} className="relative">
-        <svg
-          className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
-          viewBox="0 0 16 16"
-          fill="none"
-        >
-          <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-          <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
+          <AppIcon
+            glyph={MagnifyingGlass}
+            className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted"
+          />
         <input
           value={query}
           onChange={(e) => setQuery(e.target.value)}
@@ -258,9 +234,7 @@ export function GlobalSearch() {
             aria-label="Limpiar búsqueda"
             className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-0.5 text-ink-muted hover:bg-surface-muted hover:text-ink"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-              <path d="M3 3L9 9M9 3L3 9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} size="sm" />
           </button>
         )}
       </div>

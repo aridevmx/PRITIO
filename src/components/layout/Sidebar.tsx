@@ -6,6 +6,8 @@ import { spacesForWorkspaceType } from "@/features/spaces/spaces";
 import { APP_NAME } from "@/lib/branding";
 import type { SpaceKey } from "@/features/spaces/spaces";
 import { GLOBAL_VIEWS, type GlobalViewKey } from "@/components/layout/globalNav";
+import { AppIcon } from "@/components/AppIcon";
+import { Plus } from "@phosphor-icons/react";
 import { emitAppEvent } from "@/lib/appEvents";
 
 interface SidebarProps {
@@ -74,9 +76,7 @@ export function Sidebar({
             data-tour="crear-tarea"
           >
             <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white/20">
-              <svg className="h-5 w-5" viewBox="0 0 16 16" fill="none" aria-hidden>
-                <path d="M8 3.5V12.5M3.5 8H12.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              <AppIcon glyph={Plus} size="lg" />
             </span>
             <div className="flex flex-col">
               <span className="text-sm leading-tight">Crear tarea</span>
@@ -110,7 +110,7 @@ export function Sidebar({
                       active ? view.accent.text : "text-ink-muted",
                     )}
                   >
-                    {view.icon}
+                    <AppIcon glyph={view.icon} weight={active ? "fill" : "regular"} />
                   </span>
                   <span className="truncate">{view.label}</span>
                 </button>

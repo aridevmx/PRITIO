@@ -24,6 +24,8 @@ import { InboxView } from "@/features/inbox/InboxView";
 import { MiDiaView } from "@/features/home/MiDiaView";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { RightWidgetPanel } from "@/components/layout/RightWidgetPanel";
+import { AppIcon } from "@/components/AppIcon";
+import { ArrowClockwise, CalendarBlank, List } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { onAppEvent, emitAppEvent } from "@/lib/appEvents";
 import { QuadrantsView } from "@/features/tasks/QuadrantsView";
@@ -233,15 +235,13 @@ export function AppShell() {
       <AddTaskDialog />
       <TourOverlay open={tourOpen} onClose={() => setTourOpen(false)} />
       <div className="flex flex-1 flex-col overflow-hidden">
-        <header className="sticky top-0 z-30 flex h-14 items-center gap-3 border-b border-line/70 bg-surface/75 px-4 backdrop-blur-xl lg:px-6">
+        <header className="sticky top-0 z-60 flex h-14 items-center gap-3 border-b border-line/70 bg-surface/75 px-4 backdrop-blur-xl lg:px-6">
           <button
             onClick={() => setSidebarOpen(true)}
             aria-label="Abrir menú"
             className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40 lg:hidden"
           >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
+            <AppIcon glyph={List} size="xl" />
           </button>
 
           <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -270,13 +270,7 @@ export function AppShell() {
               title="Refrescar datos"
               className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40"
             >
-              <svg className="h-[18px] w-[18px]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  d="M20 11a8.1 8.1 0 0 0-15.5-2m-.5-4v4h4m0 6a8.1 8.1 0 0 0 15.5-2m.5 4v-4h-4"
-                />
-              </svg>
+              <AppIcon glyph={ArrowClockwise} size="lg" />
             </button>
             <button
               onClick={() => setRightPanelOpen(true)}
@@ -285,11 +279,7 @@ export function AppShell() {
               className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40"
             >
               <span className="relative grid h-6 w-6 place-items-center">
-                <svg className="h-6 w-6" viewBox="0 0 20 20" fill="none" aria-hidden>
-                  <rect x="2.5" y="3" width="15" height="14.5" rx="2" stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M2.5 7.5H17.5" stroke="currentColor" strokeWidth="1.3" />
-                  <path d="M6 1.5V4.5M14 1.5V4.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={CalendarBlank} size="xl" />
                 <span className="absolute right-0 top-0.5 grid h-4 min-w-4 place-items-center rounded-full bg-pritio-purple px-1 text-[9px] font-bold text-white">
                   {new Date().getDate()}
                 </span>

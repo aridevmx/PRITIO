@@ -10,6 +10,15 @@ import {
   useExpandedWidget,
 } from "@/lib/widgetPrefs";
 import { playSound } from "@/lib/sounds";
+import { AppIcon } from "@/components/AppIcon";
+import {
+  ArrowClockwise,
+  ArrowsInSimple,
+  ArrowsOutSimple,
+  Clock,
+  Pause,
+  Play,
+} from "@phosphor-icons/react";
 
 function formatTimeWithSeconds(date: Date, hour12: boolean): string {
   return date.toLocaleTimeString(hour12 ? "en-US" : "es-MX", {
@@ -99,10 +108,7 @@ export function SidebarClock() {
             aria-pressed={alwaysShowSeconds}
             className="grid h-7 w-7 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-purple/40"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden>
-              <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M8 5v3l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={Clock} size="sm" />
           </button>
           <button
             type="button"
@@ -110,13 +116,7 @@ export function SidebarClock() {
             title={isExpanded ? "Reducir" : "Agrandar"}
             className="grid h-7 w-7 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-purple/40"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden>
-              {isExpanded ? (
-                <path d="M9 4H12V7M7 12H4V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              ) : (
-                <path d="M4 7H7V4M12 9H9V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              )}
-            </svg>
+            <AppIcon glyph={isExpanded ? ArrowsInSimple : ArrowsOutSimple} size="sm" />
           </button>
         </div>
       </div>
@@ -152,23 +152,18 @@ export function SidebarClock() {
                       className="grid h-8 w-8 place-items-center rounded-lg bg-pritio-blue text-white transition-opacity hover:opacity-90"
                       disabled={timer.done}
                     >
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-                        {timer.running ? (
-                          <path d="M3.5 2v8M8.5 2v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-                        ) : (
-                          <path d="M3 2l7 4-7 4z" />
-                        )}
-                      </svg>
+                      <AppIcon
+                        glyph={timer.running ? Pause : Play}
+                        size="sm"
+                        weight="fill"
+                      />
                     </button>
                     <button
                       type="button"
                       onClick={resetTimer}
                       className="grid h-8 w-8 place-items-center rounded-lg border border-line text-ink-muted hover:bg-surface-muted"
                     >
-                      <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" aria-hidden>
-                        <path d="M1.5 4.5A4.5 4.5 0 1 1 2 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                        <path d="M1.5 1.5v3h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      <AppIcon glyph={ArrowClockwise} size="sm" />
                     </button>
                   </div>
                   <div className="col-span-6 h-1.5 overflow-hidden rounded-full bg-surface-muted">

@@ -9,6 +9,8 @@ import {
   useWidgetPrefs,
 } from "@/lib/widgetPrefs";
 import { PomodoroFinishOverlay } from "./PomodoroFinishOverlay";
+import { AppIcon } from "@/components/AppIcon";
+import { ArrowClockwise, ArrowsInSimple, ArrowsOutSimple, Minus, Pause, Play, Plus, SkipForward } from "@phosphor-icons/react";
 
 const ALLOWED_WORKSPACE_TYPES = new Set(["personal", "team"]);
 
@@ -108,13 +110,7 @@ function SidebarPomodoro({
             title={isExpanded ? "Reducir" : "Agrandar"}
             className="grid h-7 w-7 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none" aria-hidden>
-              {isExpanded ? (
-                <path d="M9 4H12V7M7 12H4V9" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              ) : (
-                <path d="M4 7H7V4M12 9H9V12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-              )}
-            </svg>
+            <AppIcon glyph={isExpanded ? ArrowsInSimple : ArrowsOutSimple} size="sm" />
           </button>
           <button
             type="button"
@@ -123,13 +119,7 @@ function SidebarPomodoro({
             title={state.running ? "Pausar" : "Iniciar"}
             className="grid h-7 w-7 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink disabled:opacity-40"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-              {state.running ? (
-                <path d="M3.5 2v8M8.5 2v8" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-              ) : (
-                <path d="M3 2l7 4-7 4z" />
-              )}
-            </svg>
+            <AppIcon glyph={state.running ? Pause : Play} size="sm" weight="fill" />
           </button>
         </div>
       </div>
@@ -164,9 +154,7 @@ function SidebarPomodoro({
             className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
             title="Aumentar trabajo +5min"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-              <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={Plus} size="sm" />
             <span>{state.workMin} min</span>
           </button>
           <button
@@ -176,9 +164,7 @@ function SidebarPomodoro({
             className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
             title="Aumentar descanso corto +5min"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-              <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={Plus} size="sm" />
             <span>{state.shortBreakMin} min</span>
           </button>
           <button
@@ -188,9 +174,7 @@ function SidebarPomodoro({
             className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
             title="Aumentar descanso largo +5min"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-              <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={Plus} size="sm" />
             <span>{state.longBreakMin} min</span>
           </button>
           <button
@@ -200,9 +184,7 @@ function SidebarPomodoro({
             className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
             title="Disminuir trabajo -5min"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-              <path d="M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={Minus} size="sm" />
             <span>{state.workMin} min</span>
           </button>
           <button
@@ -212,9 +194,7 @@ function SidebarPomodoro({
             className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
             title="Disminuir descanso corto -5min"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-              <path d="M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={Minus} size="sm" />
             <span>{state.shortBreakMin} min</span>
           </button>
           <button
@@ -224,9 +204,7 @@ function SidebarPomodoro({
             className="flex items-center justify-center rounded-lg border border-line bg-surface px-2 py-1.5 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
             title="Disminuir descanso largo -5min"
           >
-            <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-              <path d="M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={Minus} size="sm" />
             <span>{state.longBreakMin} min</span>
           </button>
         </div>
@@ -240,9 +218,7 @@ function SidebarPomodoro({
           className="flex-1 rounded-lg border border-line bg-surface py-2 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
           title="Saltar fase"
         >
-          <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="currentColor" aria-hidden>
-            <path d="M2 2l6 4-6 4zM9 2h1.5v8H9z" />
-          </svg>
+          <AppIcon glyph={SkipForward} size="sm" weight="fill" />
           <span className="ml-1">Saltar</span>
         </button>
         <button
@@ -251,10 +227,7 @@ function SidebarPomodoro({
           className="flex-1 rounded-lg border border-line bg-surface py-2 text-[11px] font-medium text-ink-muted hover:bg-surface-muted"
           title="Reiniciar"
         >
-          <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none" aria-hidden>
-            <path d="M1.5 4.5A4.5 4.5 0 1 1 2 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            <path d="M1.5 1.5v3h3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <AppIcon glyph={ArrowClockwise} size="sm" />
           <span className="ml-1">Reiniciar</span>
         </button>
       </div>

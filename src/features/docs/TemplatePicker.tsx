@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import { X } from "@phosphor-icons/react";
 import {
   listTemplates,
   type DocTemplate,
@@ -84,9 +86,7 @@ export function TemplatePicker({
             onClick={onClose}
             className="grid h-8 w-8 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4l8 8M12 4L4 12" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
 

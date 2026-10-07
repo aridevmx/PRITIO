@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   DndContext,
   PointerSensor,
@@ -9,6 +10,8 @@ import {
   type DragEndEvent,
 } from "@dnd-kit/core";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import { CaretRight, DotsThree, File, FolderSimple, Plus } from "@phosphor-icons/react";
 import type { TreeNode } from "@/features/docs/api";
 
 interface DocsTreeProps {
@@ -30,49 +33,20 @@ const FOLDER_DROP_PREFIX = "docs-folder:";
 const DOC_PREFIX = "docs-doc:";
 const FOLDER_PREFIX = "docs-folder-item:";
 
-/** Props de acción compartidas por todas las filas del árbol. */
 type TreeCallbacks = Omit<DocsTreeProps, "nodes">;
 
 function ChevronIcon({ open }: { open: boolean }) {
   return (
-    <svg
-      className={cn("h-3 w-3 shrink-0 text-ink-muted transition-transform duration-150", open && "rotate-90")}
-      viewBox="0 0 16 16"
-      fill="none"
-    >
-      <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
+    <AppIcon
+      glyph={CaretRight}
+      size="xs"
+      className={cn("shrink-0 text-ink-muted transition-transform duration-150", open && "rotate-90")}
+    />
   );
 }
 
-const FolderGlyph = (
-  <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none">
-    <path
-      d="M2 5a1.5 1.5 0 011.5-1.5h2.6c.35 0 .68.15.91.41l.62.71c.23.26.56.41.9.41h3.47A1.5 1.5 0 0113.5 6.5v4A1.5 1.5 0 0112 12H3.5A1.5 1.5 0 012 10.5V5z"
-      fill="currentColor"
-      opacity="0.55"
-    />
-    <path
-      d="M2 7h11.5"
-      stroke="currentColor"
-      strokeWidth="0.8"
-      strokeLinecap="round"
-      opacity="0.4"
-    />
-  </svg>
-);
-
-const DocGlyph = (
-  <svg className="h-3.5 w-3.5 shrink-0" viewBox="0 0 16 16" fill="none">
-    <path
-      d="M4 2.5h5L12 5.5V13a.5.5 0 01-.5.5h-7A.5.5 0 014 13V2.5z"
-      stroke="currentColor"
-      strokeWidth="1.2"
-      strokeLinejoin="round"
-    />
-    <path d="M9 2.5V5.5H12" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round" />
-  </svg>
-);
+const FolderGlyph = <AppIcon glyph={FolderSimple} size="sm" className="shrink-0" />;
+const DocGlyph = <AppIcon glyph={File} size="sm" className="shrink-0" />;
 
 function useOutsideClose(open: boolean, onClose: () => void) {
   const ref = useRef<HTMLDivElement>(null);
@@ -99,11 +73,96 @@ function FolderMenu({
   onDelete: () => void;
 }) {
   const [open, setOpen] = useState(false);
-  const ref = useOutsideClose(open, () => setOpen(false));
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open || !btnRef.current) return;
+
+    const updatePosition = () => {
+      const rect = btnRef.current!.getBoundingClientRect();
+      const menuWidth = 160; // min-w-[10rem] = 160px
+      const viewportWidth = window.innerWidth;
+      const left = Math.min(rect.right - menuWidth, viewportWidth - menuWidth - 16);
+      setMenuPosition({
+        top: rect.bottom + 4, // mt-1 = 4px
+        left: Math.max(left, 16),
+        width: menuWidth,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [open]);
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (
+        btnRef.current &&
+        !btnRef.current.contains(e.target as Node) &&
+        (e.target as HTMLElement).closest("[data-folder-menu]") === null
+      ) {
+        setOpen(false);
+      }
+    }
+    if (open) {
+      document.addEventListener("mousedown", handleClickOutside);
+      return () => document.removeEventListener("mousedown", handleClickOutside);
+    }
+  }, [open]);
+
+  const menuContent = (
+    <div
+      data-folder-menu
+      className="pritio-menu-enter z-[100] min-w-[10rem] max-w-[calc(100vw-1rem)] overflow-hidden rounded-lg border border-line bg-white py-1 shadow-elevated"
+      style={{
+        position: "fixed",
+        top: menuPosition?.top ?? 0,
+        left: menuPosition?.left ?? 0,
+        width: menuPosition?.width ?? 160,
+      }}
+    >
+      {[
+        { label: "Nueva nota aquí", action: onCreateNote },
+        { label: "Nueva subcarpeta", action: onCreateSubfolder },
+        { label: "Renombrar", action: onRename },
+      ].map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            setOpen(false);
+            item.action();
+          }}
+          className="block w-full px-3 py-1.5 text-left text-xs font-medium text-ink transition-colors hover:bg-surface-muted"
+        >
+          {item.label}
+        </button>
+      ))}
+      <button
+        type="button"
+        onClick={(e) => {
+          e.stopPropagation();
+          setOpen(false);
+          onDelete();
+        }}
+        className="block w-full px-3 py-1.5 text-left text-xs font-medium text-pritio-coral transition-colors hover:bg-pritio-coral/10"
+      >
+        Eliminar carpeta
+      </button>
+    </div>
+  );
 
   return (
-    <div className="relative" ref={ref}>
+    <div className="relative">
       <button
+        ref={btnRef}
         type="button"
         aria-label="Opciones de carpeta"
         onClick={(e) => {
@@ -112,45 +171,9 @@ function FolderMenu({
         }}
         className="grid h-5 w-5 place-items-center rounded text-ink-muted opacity-0 transition-opacity hover:bg-surface-muted group-hover/folder:opacity-100"
       >
-        <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-          <circle cx="3.5" cy="8" r="1.2" />
-          <circle cx="8" cy="8" r="1.2" />
-          <circle cx="12.5" cy="8" r="1.2" />
-        </svg>
+        <AppIcon glyph={DotsThree} weight="fill" />
       </button>
-      {open && (
-        <div className="pritio-menu-enter absolute right-0 top-full z-40 mt-1 min-w-[10rem] overflow-hidden rounded-lg border border-line bg-white py-1 shadow-elevated">
-          {[
-            { label: "Nueva nota aquí", action: onCreateNote },
-            { label: "Nueva subcarpeta", action: onCreateSubfolder },
-            { label: "Renombrar", action: onRename },
-          ].map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setOpen(false);
-                item.action();
-              }}
-              className="block w-full px-3 py-1.5 text-left text-xs font-medium text-ink transition-colors hover:bg-surface-muted"
-            >
-              {item.label}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              setOpen(false);
-              onDelete();
-            }}
-            className="block w-full px-3 py-1.5 text-left text-xs font-medium text-pritio-coral transition-colors hover:bg-pritio-coral/10"
-          >
-            Eliminar carpeta
-          </button>
-        </div>
-      )}
+      {open && menuPosition && createPortal(menuContent, document.body)}
     </div>
   );
 }
@@ -274,9 +297,7 @@ function FolderNameOrInput(props: Omit<RowProps, "depth">) {
           }}
           className="grid h-5 w-5 place-items-center rounded text-ink-muted opacity-0 transition-opacity hover:bg-surface-muted hover:text-pritio-blue group-hover/folder:opacity-100"
         >
-          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-            <path d="M8 3.5v9M3.5 8h9" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
-          </svg>
+          <AppIcon glyph={Plus} size="sm" />
         </button>
       </>
     );
@@ -347,7 +368,6 @@ export function DocsTree(props: DocsTreeProps) {
     else if (overId.startsWith(FOLDER_DROP_PREFIX)) targetFolderId = overId.slice(FOLDER_DROP_PREFIX.length);
     else return;
 
-    // No soltar una carpeta sobre sí misma.
     if (activeId.startsWith(FOLDER_PREFIX) && targetFolderId === activeId.slice(FOLDER_PREFIX.length)) {
       return;
     }

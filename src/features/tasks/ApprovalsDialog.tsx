@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
+import { AppIcon } from "@/components/AppIcon";
+import { Lock, Warning, X } from "@phosphor-icons/react";
 import { approveTask, listPendingApprovals, rejectTask } from "@/features/tasks/api";
 import { notifyTaskChange } from "@/features/tasks/notifications";
 import {
@@ -181,11 +183,7 @@ export function ApprovalsDialog({ open, workspaceId, onClose }: ApprovalsDialogP
       <div className="relative flex max-h-[80vh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
         <div className="flex items-center gap-3 border-b border-line px-5 py-4">
           <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-100 text-amber-700">
-            <svg className="h-5 w-5" viewBox="0 0 16 16" fill="none">
-              <path d="M8 1.5L14 13.5H2L8 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-              <path d="M8 6v3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-              <circle cx="8" cy="11.5" r="0.9" fill="currentColor" />
-            </svg>
+            <AppIcon glyph={Warning} size="lg" />
           </span>
           <div className="min-w-0 flex-1">
             <h2 className="text-lg font-extrabold text-ink">Aprobaciones</h2>
@@ -196,9 +194,7 @@ export function ApprovalsDialog({ open, workspaceId, onClose }: ApprovalsDialogP
             aria-label="Cerrar"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-muted hover:text-ink"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
 
@@ -239,9 +235,7 @@ export function ApprovalsDialog({ open, workspaceId, onClose }: ApprovalsDialogP
             tasks.length === 0 ? (
               <div className="flex flex-col items-center gap-2 py-10 text-center">
                 <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-muted text-ink-muted">
-                  <svg className="h-6 w-6" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 1.5L14 13.5H2L8 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-                  </svg>
+                  <AppIcon glyph={Warning} size="2xl" weight="duotone" />
                 </span>
                 <p className="text-sm font-semibold text-ink">Sin tareas pendientes</p>
                 <p className="text-xs text-ink-muted">No hay tareas esperando tu aprobación.</p>
@@ -333,10 +327,7 @@ export function ApprovalsDialog({ open, workspaceId, onClose }: ApprovalsDialogP
           ) : days.length === 0 ? (
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <span className="grid h-12 w-12 place-items-center rounded-full bg-surface-muted text-ink-muted">
-                <svg className="h-6 w-6" viewBox="0 0 16 16" fill="none">
-                  <path d="M3.5 5H12.5V13.5H3.5V5Z" stroke="currentColor" strokeWidth="1.4" />
-                  <path d="M5.5 5V3.5C5.5 2.4 6.4 1.5 7.5 1.5H8.5C9.6 1.5 10.5 2.4 10.5 3.5V5" stroke="currentColor" strokeWidth="1.4" />
-                </svg>
+                <AppIcon glyph={Lock} size="2xl" weight="duotone" />
               </span>
               <p className="text-sm font-semibold text-ink">Sin días pendientes</p>
               <p className="text-xs text-ink-muted">No hay solicitudes de días bloqueados.</p>

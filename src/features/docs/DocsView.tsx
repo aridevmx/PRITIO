@@ -1,4 +1,5 @@
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { cn, stripHtml } from "@/lib/utils";
 import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
@@ -116,7 +117,8 @@ export function DocsView({ workspaceId }: DocsViewProps) {
     { id: string; title: string; quadrant: string; completed: boolean }[]
   >([]);
   const [pickerOpen, setPickerOpen] = useState(false);
-  const pickerRef = useRef<HTMLDivElement>(null);
+  const [pickerPosition, setPickerPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const pickerBtnRef = useRef<HTMLButtonElement>(null);
 
   const [saveState, setSaveState] = useState<"idle" | "saving" | "saved">("idle");
   const [confirmDeleteDoc, setConfirmDeleteDoc] = useState(false);
@@ -136,11 +138,16 @@ export function DocsView({ workspaceId }: DocsViewProps) {
   const [projects, setProjects] = useState<Project[]>([]);
   const [docProjectIds, setDocProjectIds] = useState<string[]>([]);
   const [tagPickerOpen, setTagPickerOpen] = useState(false);
+  const [tagPickerPosition, setTagPickerPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [projectPickerOpen, setProjectPickerOpen] = useState(false);
+  const [projectPickerPosition, setProjectPickerPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [newTagName, setNewTagName] = useState("");
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
-  const tagPickerRef = useRef<HTMLDivElement>(null);
-  const projectPickerRef = useRef<HTMLDivElement>(null);
+  const tagPickerBtnRef = useRef<HTMLButtonElement>(null);
+  const projectPickerBtnRef = useRef<HTMLButtonElement>(null);
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
+  const [exportPosition, setExportPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const [exporting, setExporting] = useState<ExportFormat | null>(null);
 
   // Índice de títulos (outline) y contenedor con scroll del área de escritura.
   const [outline, setOutline] = useState<DocOutlineItem[]>([]);
@@ -330,33 +337,119 @@ export function DocsView({ workspaceId }: DocsViewProps) {
   // ─── Popover de vínculos con tareas ───────────────────────
 
   useEffect(() => {
-    if (!pickerOpen) return;
+    if (!pickerOpen || !pickerBtnRef.current) return;
+
+    const updatePosition = () => {
+      const rect = pickerBtnRef.current!.getBoundingClientRect();
+      const menuWidth = 304; // w-[19rem] = 304px
+      const viewportWidth = window.innerWidth;
+      const left = Math.min(rect.left, viewportWidth - menuWidth - 16);
+      setPickerPosition({
+        top: rect.bottom + 8, // mt-2 = 8px
+        left: Math.max(left, 16),
+        width: menuWidth,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [pickerOpen]);
+
+  useEffect(() => {
     function handlePointerDown(e: MouseEvent) {
-      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) setPickerOpen(false);
+      if (
+        pickerBtnRef.current &&
+        !pickerBtnRef.current.contains(e.target as Node) &&
+        (e.target as HTMLElement).closest("[data-task-picker]") === null
+      ) setPickerOpen(false);
     }
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
+    if (pickerOpen) {
+      document.addEventListener("mousedown", handlePointerDown);
+      return () => document.removeEventListener("mousedown", handlePointerDown);
+    }
   }, [pickerOpen]);
 
   // ─── Popovers de etiquetas y proyectos ────────────────────
 
   useEffect(() => {
-    if (!tagPickerOpen) return;
-    function handlePointerDown(e: MouseEvent) {
-      if (tagPickerRef.current && !tagPickerRef.current.contains(e.target as Node)) setTagPickerOpen(false);
-    }
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
+    if (!tagPickerOpen || !tagPickerBtnRef.current) return;
+
+    const updatePosition = () => {
+      const rect = tagPickerBtnRef.current!.getBoundingClientRect();
+      const menuWidth = 240; // w-[15rem] = 240px
+      const viewportWidth = window.innerWidth;
+      const left = Math.min(rect.left, viewportWidth - menuWidth - 16);
+      setTagPickerPosition({
+        top: rect.bottom + 6, // mt-1.5 = 6px
+        left: Math.max(left, 16),
+        width: menuWidth,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
   }, [tagPickerOpen]);
 
   useEffect(() => {
-    if (!projectPickerOpen) return;
     function handlePointerDown(e: MouseEvent) {
-      if (projectPickerRef.current && !projectPickerRef.current.contains(e.target as Node))
-        setProjectPickerOpen(false);
+      if (
+        tagPickerBtnRef.current &&
+        !tagPickerBtnRef.current.contains(e.target as Node) &&
+        (e.target as HTMLElement).closest("[data-tag-picker]") === null
+      ) setTagPickerOpen(false);
     }
-    document.addEventListener("mousedown", handlePointerDown);
-    return () => document.removeEventListener("mousedown", handlePointerDown);
+    if (tagPickerOpen) {
+      document.addEventListener("mousedown", handlePointerDown);
+      return () => document.removeEventListener("mousedown", handlePointerDown);
+    }
+  }, [tagPickerOpen]);
+
+  useEffect(() => {
+    if (!projectPickerOpen || !projectPickerBtnRef.current) return;
+
+    const updatePosition = () => {
+      const rect = projectPickerBtnRef.current!.getBoundingClientRect();
+      const menuWidth = 240; // w-[15rem] = 240px
+      const viewportWidth = window.innerWidth;
+      const left = Math.min(rect.left, viewportWidth - menuWidth - 16);
+      setProjectPickerPosition({
+        top: rect.bottom + 6, // mt-1.5 = 6px
+        left: Math.max(left, 16),
+        width: menuWidth,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [projectPickerOpen]);
+
+  useEffect(() => {
+    function handlePointerDown(e: MouseEvent) {
+      if (
+        projectPickerBtnRef.current &&
+        !projectPickerBtnRef.current.contains(e.target as Node) &&
+        (e.target as HTMLElement).closest("[data-project-picker]") === null
+      ) setProjectPickerOpen(false);
+    }
+    if (projectPickerOpen) {
+      document.addEventListener("mousedown", handlePointerDown);
+      return () => document.removeEventListener("mousedown", handlePointerDown);
+    }
   }, [projectPickerOpen]);
 
   // ─── Acciones de documentos ───────────────────────────────
@@ -662,17 +755,47 @@ export function DocsView({ workspaceId }: DocsViewProps) {
 
   const [shareOpen, setShareOpen] = useState(false);
   const [exportOpen, setExportOpen] = useState(false);
+  const [exportPosition, setExportPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const [exporting, setExporting] = useState<ExportFormat | null>(null);
-  const exportRef = useRef<HTMLDivElement | null>(null);
+  const exportBtnRef = useRef<HTMLButtonElement>(null);
   const presencePeers = useDocPresence(selectedDoc?.id ?? null);
 
   useEffect(() => {
-    if (!exportOpen) return;
-    const onDown = (e: MouseEvent) => {
-      if (exportRef.current && !exportRef.current.contains(e.target as Node)) setExportOpen(false);
+    if (!exportOpen || !exportBtnRef.current) return;
+
+    const updatePosition = () => {
+      const rect = exportBtnRef.current!.getBoundingClientRect();
+      const menuWidth = 208; // w-52 = 208px
+      const viewportWidth = window.innerWidth;
+      const left = Math.min(rect.right - menuWidth, viewportWidth - menuWidth - 16);
+      setExportPosition({
+        top: rect.bottom + 6, // mt-1.5 = 6px
+        left: Math.max(left, 16),
+        width: menuWidth,
+      });
     };
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [exportOpen]);
+
+  useEffect(() => {
+    function handlePointerDown(e: MouseEvent) {
+      if (
+        exportBtnRef.current &&
+        !exportBtnRef.current.contains(e.target as Node) &&
+        (e.target as HTMLElement).closest("[data-export-menu]") === null
+      ) setExportOpen(false);
+    }
+    if (exportOpen) {
+      document.addEventListener("mousedown", handlePointerDown);
+      return () => document.removeEventListener("mousedown", handlePointerDown);
+    }
   }, [exportOpen]);
 
   const canManageDoc =
@@ -968,6 +1091,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                     </button>
                     <div className="relative shrink-0" ref={exportRef}>
                       <button
+                        ref={exportBtnRef}
                         type="button"
                         onClick={() => setExportOpen((o) => !o)}
                         aria-label="Exportar documento"
@@ -987,8 +1111,15 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                           </svg>
                         )}
                       </button>
-                      {exportOpen && (
-                        <div className="pritio-menu-enter absolute right-0 top-full z-30 mt-1.5 w-52 overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-elevated">
+                      {exportOpen && exportPosition && createPortal(
+                        <div className="pritio-menu-enter z-[100] w-52 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-elevated"
+                          style={{
+                            position: "fixed",
+                            top: exportPosition.top,
+                            left: exportPosition.left,
+                            width: exportPosition.width,
+                          }}
+                        >
                           {(
                             [
                               { fmt: "md" as const, label: "Markdown (.md)" },
@@ -1007,7 +1138,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                             </button>
                           ))}
                         </div>
-                      )}
+                        , document.body)}
                     </div>
                     <button
                       type="button"
@@ -1060,8 +1191,9 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                       </button>
                     </span>
                   ))}
-                  <div className="relative" ref={tagPickerRef}>
+                  <div className="relative">
                     <button
+                      ref={tagPickerBtnRef}
                       type="button"
                       onClick={() => setTagPickerOpen((v) => !v)}
                       aria-expanded={tagPickerOpen}
@@ -1069,8 +1201,15 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                     >
                       + Etiqueta
                     </button>
-                    {tagPickerOpen && (
-                      <div className="pritio-menu-enter absolute left-0 top-full z-30 mt-1.5 w-[15rem] rounded-xl border border-line bg-surface p-2 shadow-elevated">
+                    {tagPickerOpen && tagPickerPosition && createPortal(
+                      <div className="pritio-menu-enter z-[100] w-[15rem] rounded-xl border border-line bg-surface p-2 shadow-elevated"
+                        style={{
+                          position: "fixed",
+                          top: tagPickerPosition.top,
+                          left: tagPickerPosition.left,
+                          width: tagPickerPosition.width,
+                        }}
+                      >
                         <input
                           type="text"
                           value={newTagName}
@@ -1116,7 +1255,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                           </div>
                         )}
                       </div>
-                    )}
+                      , document.body)}
                   </div>
 
                   {selectedDocProjects.map((p) => (
@@ -1138,8 +1277,9 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                       </button>
                     </span>
                   ))}
-                  <div className="relative" ref={projectPickerRef}>
+                  <div className="relative">
                     <button
+                      ref={projectPickerBtnRef}
                       type="button"
                       onClick={() => setProjectPickerOpen((v) => !v)}
                       aria-expanded={projectPickerOpen}
@@ -1147,8 +1287,15 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                     >
                       + Proyecto
                     </button>
-                    {projectPickerOpen && (
-                      <div className="pritio-menu-enter absolute left-0 top-full z-30 mt-1.5 max-h-[14rem] w-[15rem] overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-elevated">
+                    {projectPickerOpen && projectPickerPosition && createPortal(
+                      <div className="pritio-menu-enter z-[100] max-h-[14rem] w-[15rem] overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-elevated"
+                        style={{
+                          position: "fixed",
+                          top: projectPickerPosition.top,
+                          left: projectPickerPosition.left,
+                          width: projectPickerPosition.width,
+                        }}
+                      >
                         {projects.length === 0 ? (
                           <p className="px-2 py-2 text-center text-xs text-ink-muted">
                             No hay proyectos en este workspace.
@@ -1178,7 +1325,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                           })
                         )}
                       </div>
-                    )}
+                      , document.body)}
                   </div>
                 </div>
 
@@ -1211,6 +1358,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                       </span>
                     ))}
                     <button
+                      ref={pickerBtnRef}
                       type="button"
                       onClick={() => setPickerOpen((v) => !v)}
                       aria-expanded={pickerOpen}
@@ -1220,8 +1368,15 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                     </button>
                   </div>
 
-                  {pickerOpen && (
-                    <div className="pritio-menu-enter absolute left-0 top-full z-30 mt-2 max-h-[16rem] w-[19rem] overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-elevated">
+                  {pickerOpen && pickerPosition && createPortal(
+                    <div className="pritio-menu-enter z-[100] max-h-[16rem] w-[19rem] overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-elevated"
+                      style={{
+                        position: "fixed",
+                        top: pickerPosition.top,
+                        left: pickerPosition.left,
+                        width: pickerPosition.width,
+                      }}
+                    >
                       {pickerTasks.length === 0 ? (
                         <p className="px-2 py-3 text-center text-xs text-ink-muted">
                           No hay tareas activas para vincular.
@@ -1254,7 +1409,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                         })
                       )}
                     </div>
-                  )}
+                    , document.body)}
                 </div>
 
                 {/* Contenido: solo el área de escritura tiene scroll */}

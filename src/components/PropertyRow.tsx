@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import { CaretDown } from "@phosphor-icons/react";
 
 const POPOVER_WIDTH = 288;
 
@@ -118,22 +120,11 @@ export function PropertyRow({
         >
           {hasValue ? value : emptyText}
         </span>
-        <svg
-          className={cn(
-            "h-3 w-3 shrink-0 text-ink-muted transition-transform duration-200",
-            expanded && "-rotate-90",
-          )}
-          viewBox="0 0 16 16"
-          fill="none"
-        >
-          <path
-            d="M4 6l4 4 4-4"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        <AppIcon
+          glyph={CaretDown}
+          size="xs"
+          className={cn("text-ink-muted transition-transform duration-200", expanded && "-rotate-90")}
+        />
       </button>
       {expanded &&
         createPortal(

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { createRoot } from "react-dom/client";
 import { EditorContent, useEditor, useEditorState } from "@tiptap/react";
 import { BubbleMenu } from "@tiptap/react/menus";
 import type { Editor, Range } from "@tiptap/core";
@@ -18,6 +19,27 @@ import { Image } from "@tiptap/extension-image";
 import { NodeRange } from "@tiptap/extension-node-range";
 import DragHandle from "@tiptap/extension-drag-handle";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
+import {
+  Code,
+  Eraser,
+  Highlighter,
+  Link,
+  ListBullets,
+  ListChecks,
+  ListNumbers,
+  Plus,
+  DotsSixVertical,
+  Quotes,
+  TextB,
+  TextHOne,
+  TextHThree,
+  TextHTwo,
+  TextItalic,
+  TextStrikethrough,
+  TextUnderline,
+} from "@phosphor-icons/react";
 import {
   filterSlashItems,
   SLASH_ITEMS,
@@ -72,108 +94,26 @@ function ToolButton({
   );
 }
 
-const BoldIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 4h7a3.5 3.5 0 0 1 0 7H6zM6 11h8a3.75 3.75 0 0 1 0 7.5H6z" />
-  </svg>
+const toolbarIcon = (glyph: PhosphorIcon) => (
+  <AppIcon glyph={glyph} size="sm" weight="bold" />
 );
 
-const ItalicIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M19 4h-9M14 20H5M15 4L9 20" />
-  </svg>
-);
-
-const UnderlineIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 4v6a6 6 0 0 0 12 0V4M4.5 20h15" />
-  </svg>
-);
-
-const StrikeIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M5 12h14M16 7c-.7-1.7-2.2-2.5-4.3-2.5C9 4.5 7.2 5.6 7.2 7.7c0 1.3.6 2.2 1.8 2.9M8 17c.8 1.7 2.4 2.6 4.6 2.6 2.9 0 4.6-1.3 4.6-3.4 0-.9-.3-1.6-.8-2.2" />
-  </svg>
-);
-
-const InlineCodeIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M9 6L3 12l6 6M15 6l6 6-6 6" />
-  </svg>
-);
-
-const HighlightIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 20h16M9.5 15.5L18.6 6.4a2.1 2.1 0 0 0-3-3L6.5 12.5l-1 4z" />
-  </svg>
-);
-
-const H1Icon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 5v14M11 5v14M4 12h7M17.5 9.5l2.5-1.5V19" />
-  </svg>
-);
-
-const H2Icon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 5v14M10 5v14M4 12h6M15 10l3-1v10M14 15.5h4" />
-  </svg>
-);
-
-const H3Icon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 5v14M9.5 5v14M4 12h5.5M15 9.5l2.8-.9V19M14 13.8h3.8M14 17h3.8" />
-  </svg>
-);
-
-const BulletListIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 6h13M8 12h13M8 18h13" />
-    <circle cx="3.5" cy="6" r="1" fill="currentColor" stroke="none" />
-    <circle cx="3.5" cy="12" r="1" fill="currentColor" stroke="none" />
-    <circle cx="3.5" cy="18" r="1" fill="currentColor" stroke="none" />
-  </svg>
-);
-
-const OrderedListIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10 6h11M10 12h11M10 18h11M4 5.5L5.5 4.5V9M4 14h2.5c.6 0 1 .4 1 .9 0 .5-.4 1-1 1H5.4c-.8 0-1.4.6-1.4 1.3 0 .5.4.8 1 .8h1.8" />
-  </svg>
-);
-
-const TaskListIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <rect x="3.5" y="4.5" width="7" height="7" rx="1.5" />
-    <path d="M5.2 8l1.6 1.6L9.8 6.6" />
-    <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
-    <path d="M14 8h7M14 17h7" />
-  </svg>
-);
-
-const QuoteIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M4 6v12M8 6h13M8 12h13M8 18h8" />
-  </svg>
-);
-
-const CodeIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 6L3 12l5 6M16 6l5 6-5 6" />
-  </svg>
-);
-
-const LinkIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-    <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-  </svg>
-);
-
-const ClearFormatIcon = (
-  <svg className="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M6 4h12M12 4l-4 13M8 21h8M9.5 17H14" />
-  </svg>
-);
+const BoldIcon = toolbarIcon(TextB);
+const ItalicIcon = toolbarIcon(TextItalic);
+const UnderlineIcon = toolbarIcon(TextUnderline);
+const StrikeIcon = toolbarIcon(TextStrikethrough);
+const InlineCodeIcon = toolbarIcon(Code);
+const HighlightIcon = toolbarIcon(Highlighter);
+const H1Icon = toolbarIcon(TextHOne);
+const H2Icon = toolbarIcon(TextHTwo);
+const H3Icon = toolbarIcon(TextHThree);
+const BulletListIcon = toolbarIcon(ListBullets);
+const OrderedListIcon = toolbarIcon(ListNumbers);
+const TaskListIcon = toolbarIcon(ListChecks);
+const QuoteIcon = toolbarIcon(Quotes);
+const CodeIcon = toolbarIcon(Code);
+const LinkIcon = toolbarIcon(Link);
+const ClearFormatIcon = toolbarIcon(Eraser);
 
 export function RichTextEditor({
   content,
@@ -210,7 +150,7 @@ export function RichTextEditor({
       "grid h-6 w-6 place-items-center rounded-md border border-line bg-surface text-ink-muted shadow-soft cursor-grab hover:text-ink hover:border-line-strong active:cursor-grabbing";
     drag.title = "Arrastrar bloque";
     drag.setAttribute("aria-hidden", "true");
-    drag.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="9" cy="12" r="1"/><circle cx="9" cy="5" r="1"/><circle cx="9" cy="19" r="1"/><circle cx="15" cy="12" r="1"/><circle cx="15" cy="5" r="1"/><circle cx="15" cy="19" r="1"/></svg>`;
+    createRoot(drag).render(<AppIcon glyph={DotsSixVertical} size="sm" weight="bold" />);
 
     const plus = document.createElement("button");
     plus.type = "button";
@@ -218,7 +158,7 @@ export function RichTextEditor({
     plus.title = "Insertar bloque";
     plus.className =
       "grid h-6 w-6 place-items-center rounded-md border border-line bg-surface text-ink-muted shadow-soft transition-colors hover:text-ink hover:border-pritio-blue/50";
-    plus.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>`;
+    createRoot(plus).render(<AppIcon glyph={Plus} size="sm" weight="bold" />);
 
     // Evitar que el botón "+" inicie un arrastre de bloque.
     wrap.addEventListener("dragstart", (e) => {

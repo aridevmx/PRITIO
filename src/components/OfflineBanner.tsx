@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { AppIcon } from "@/components/AppIcon";
+import { WifiSlash } from "@phosphor-icons/react";
 import {
   getOutbox,
   startAutoSync,
@@ -60,10 +62,7 @@ export function OfflineBanner() {
     >
       {!online ? (
         <>
-          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-            <path d="M2 6a9 9 0 0112 0M4.5 8.5a5.5 5.5 0 017 0M7 11a2 2 0 012 0M8 13.5h.01" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            <path d="M2.5 2l11 11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-          </svg>
+          <AppIcon glyph={WifiSlash} size="sm" />
           Sin conexión
           {pendingCount > 0 && ` · ${pendingCount} cambio(s) en espera`}
         </>

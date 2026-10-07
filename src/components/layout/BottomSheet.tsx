@@ -1,6 +1,8 @@
 import { createPortal } from "react-dom";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import { X } from "@phosphor-icons/react";
 
 interface BottomSheetProps {
   open: boolean;
@@ -33,9 +35,7 @@ export function BottomSheet({ open, onClose, title, children }: BottomSheetProps
             aria-label="Cerrar"
             className="flex h-8 w-8 items-center justify-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
         <div className={cn("flex-1 overflow-y-auto p-4")}>{children}</div>

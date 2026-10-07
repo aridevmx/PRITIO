@@ -2,6 +2,8 @@ import { useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { formatTime, useTimeFormat } from "@/lib/timeFormat";
+import { AppIcon } from "@/components/AppIcon";
+import { CalendarBlank, Clock, Prohibit, Record, X } from "@phosphor-icons/react";
 import type { BlockedDayStatus, Workspace } from "@/types";
 
 type PopoverFilter = "all" | "task" | "event" | "meeting" | "blocked";
@@ -104,9 +106,7 @@ export function SidebarDayPopover({
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-muted hover:text-ink transition-colors"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M12 4L4 12M4 4L12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
 
@@ -160,38 +160,13 @@ export function SidebarDayPopover({
                   >
                     <div className="flex items-start gap-2">
                       {item.kind === "meeting" && (
-                        <svg
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pritio-purple"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          aria-hidden
-                        >
-                          <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.5" />
-                          <path d="M8 4.5V8L10.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
+                        <AppIcon glyph={Clock} size="sm" className="mt-0.5 text-pritio-purple" />
                       )}
                       {item.kind === "event" && (
-                        <svg
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pritio-coral"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          aria-hidden
-                        >
-                          <rect x="2.5" y="3" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-                          <path d="M2.5 6.5H13.5" stroke="currentColor" strokeWidth="1.3" />
-                          <path d="M5.5 1.5V4M10.5 1.5V4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                        </svg>
+                        <AppIcon glyph={CalendarBlank} size="sm" className="mt-0.5 text-pritio-coral" />
                       )}
                       {item.kind === "task" && (
-                        <svg
-                          className="mt-0.5 h-3.5 w-3.5 shrink-0 text-pritio-blue"
-                          viewBox="0 0 16 16"
-                          fill="none"
-                          aria-hidden
-                        >
-                          <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.5" />
-                          <circle cx="8" cy="8" r="2" fill="currentColor" />
-                        </svg>
+                        <AppIcon glyph={Record} size="sm" className="mt-0.5 text-pritio-blue" />
                       )}
                       <div className="min-w-0 flex-1">
                         <p
@@ -263,10 +238,7 @@ export function SidebarDayPopover({
                 onClick={() => onToggleBlocked()}
                 className="flex w-full items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-medium text-rose-700 hover:bg-rose-100 transition-colors"
               >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                  <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M3.5 3.5L8.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={Prohibit} size="sm" />
                 Quitar bloqueo
               </button>
             ) : blockedBy.some((b) => b.userId === myUserId && b.status === "pending") ? (
@@ -275,9 +247,7 @@ export function SidebarDayPopover({
                 onClick={() => onToggleBlocked()}
                 className="flex w-full items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors"
               >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                  <path d="M4 12L12 4M4 4L12 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={X} size="sm" />
                 Cancelar solicitud
               </button>
             ) : blockedBy.some((b) => b.userId === myUserId && b.status === "rejected") ? (
@@ -286,9 +256,7 @@ export function SidebarDayPopover({
                 onClick={() => setShowReason(true)}
                 className="flex w-full items-center gap-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs font-medium text-red-700 hover:bg-red-100 transition-colors"
               >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                  <path d="M3.5 4L8.5 8M8.5 4L3.5 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={X} size="sm" />
                 Reintentar solicitud
               </button>
             ) : showReason ? (
@@ -329,10 +297,7 @@ export function SidebarDayPopover({
                 onClick={() => setShowReason(true)}
                 className="flex w-full items-center gap-2 rounded-lg border border-line px-3 py-2 text-xs font-medium text-ink-muted hover:bg-surface-muted transition-colors"
               >
-                <svg className="h-3.5 w-3.5" viewBox="0 0 12 12" fill="none">
-                  <circle cx="6" cy="6" r="5" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M3.5 3.5L8.5 8.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={Prohibit} size="sm" />
                 {needsApproval ? "Solicitar día" : "Bloquear día"}
               </button>
             ))}

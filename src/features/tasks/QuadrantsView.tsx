@@ -1,8 +1,11 @@
-import { useState, useCallback, useEffect, useRef, useMemo, type ReactNode } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useDroppable } from "@dnd-kit/core";
 import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
-import { QUADRANTS, QUADRANT_ORDER, type QuadrantIconKey } from "@/features/tasks/quadrants";
+import { QUADRANTS, QUADRANT_ORDER } from "@/features/tasks/quadrants";
+import { QUADRANT_ICONS } from "@/features/tasks/quadrantIcons";
+import { AppIcon } from "@/components/AppIcon";
+import { CaretRight, MagnifyingGlass, Plus, SlidersHorizontal, Sun } from "@phosphor-icons/react";
 import { TASK_COLUMNS, mapTask } from "@/lib/mappers";
 import type { SubtaskCounts } from "@/lib/mappers";
 import { cn, todayStr, localDateStr } from "@/lib/utils";
@@ -27,35 +30,6 @@ interface QuadrantsViewProps {
   refreshKey?: number;
   variant?: "grid" | "kanban";
 }
-
-const QUADRANT_ICONS: Record<QuadrantIconKey, ReactNode> = {
-  zap: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path d="M9 1.5L3.5 9H8L7 14.5L12.5 7H8L9 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  ),
-  calendar: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  users: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M2.5 13c.5-2.2 2-3.2 3.5-3.2s3 1 3.5 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="11.2" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M9.5 13c.4-1.7 1.4-2.5 2.5-2.5 1 0 1.8.6 2.2 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  archive: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path d="M2.5 8h3L7 10h2l1.5-2h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="2.5" y="3" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M4 4.5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-};
 
 function addDaysStr(n: number): string {
   const d = new Date();
@@ -143,9 +117,7 @@ function QuadrantColumn({
                 meta.classes.accentText,
               )}
             >
-              <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-              </svg>
+              <AppIcon glyph={Plus} />
             </div>
             <span className={cn("text-sm font-semibold", meta.classes.accentText)}>
               Agregar primera tarea
@@ -181,9 +153,7 @@ function QuadrantColumn({
             "hover:bg-surface-muted",
           )}
         >
-          <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-            <path d="M8 3V13M3 8H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-          </svg>
+          <AppIcon glyph={Plus} />
           Agregar tarea
         </button>
       )}
@@ -221,13 +191,11 @@ function CompletedSection({
         className="group mb-3 flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left transition-colors hover:bg-surface-muted/60"
       >
         <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-pritio-green/10 text-pritio-green">
-          <svg
-            className={cn("h-3 w-3 transition-transform duration-200", open && "rotate-90")}
-            viewBox="0 0 12 12"
-            fill="none"
-          >
-            <path d="M4.5 2L9 6L4.5 10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <AppIcon
+            glyph={CaretRight}
+            size="xs"
+            className={cn("transition-transform duration-200", open && "rotate-90")}
+          />
         </span>
         <h2 className="text-sm font-bold text-ink-muted group-hover:text-ink">Completadas</h2>
         <span className="ml-0.5 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-surface-muted px-1.5 text-[10px] font-bold tabular-nums text-ink-muted">
@@ -706,14 +674,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
           {/* Filters (desktop inline for grid, always for kanban) — una sola línea */}
           <div className={cn("flex items-center gap-2 overflow-x-auto pb-0.5", variant === "grid" && "hidden lg:flex")}>
             <div className="relative min-w-[180px] flex-1 shrink-0">
-            <svg
-              className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
-              viewBox="0 0 16 16"
-              fill="none"
-            >
-              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={MagnifyingGlass} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}
@@ -772,14 +733,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
         {variant === "grid" && (
           <div className="flex flex-col gap-3 lg:hidden">
             <div className="relative">
-              <svg
-                className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-muted"
-                viewBox="0 0 16 16"
-                fill="none"
-              >
-                <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-                <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-              </svg>
+              <AppIcon glyph={MagnifyingGlass} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
               <input
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
@@ -794,9 +748,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
                 onClick={() => setFilterSheetOpen(true)}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-muted"
               >
-                <svg className="h-4 w-4 text-ink-muted" viewBox="0 0 16 16" fill="none">
-                  <path d="M2 4.5h12M4 8h8M6.5 11.5h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={SlidersHorizontal} className="text-ink-muted" />
                 Filtros
                 {activeFilterCount > 0 && (
                   <span className="flex h-4 min-w-4 items-center justify-center rounded-full bg-pritio-blue px-1 text-[10px] font-bold text-white">
@@ -809,15 +761,7 @@ export function QuadrantsView({ workspaceIds, refreshKey, variant = "grid" }: Qu
                 onClick={() => setManageSheetOpen(true)}
                 className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-line bg-surface px-3 py-2.5 text-sm font-semibold text-ink transition-colors hover:bg-surface-muted"
               >
-                <svg className="h-4 w-4 text-ink-muted" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="3.5" stroke="currentColor" strokeWidth="1.5" />
-                  <path
-                    d="M8 1.5V3M8 13v1.5M1.5 8H3M13 8h1.5M3.4 3.4L4.5 4.5M11.5 11.5l1.1 1.1M12.6 3.4l-1.1 1.1M4.5 11.5l-1.1 1.1"
-                    stroke="currentColor"
-                    strokeWidth="1.5"
-                    strokeLinecap="round"
-                  />
-                </svg>
+                <AppIcon glyph={Sun} className="text-ink-muted" />
                 Gestionar
               </button>
             </div>

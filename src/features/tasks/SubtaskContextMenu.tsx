@@ -3,6 +3,19 @@ import { createPortal } from "react-dom";
 import { cn, localDateStr, todayStr, formatDayLabel } from "@/lib/utils";
 import { usePopover } from "@/hooks/usePopover";
 import { MiniCalendar } from "@/components/layout/MiniCalendar";
+import { AppIcon } from "@/components/AppIcon";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarBlank,
+  CaretRight,
+  Check,
+  Clock,
+  Copy,
+  DotsThreeVertical,
+  PencilSimple,
+  Trash,
+} from "@phosphor-icons/react";
 import { QUADRANTS, QUADRANT_ORDER, type QuadrantMeta } from "@/features/tasks/quadrants";
 import type { Quadrant } from "@/types";
 
@@ -54,12 +67,6 @@ interface MenuApi {
   value: string | null;
   onPick: (date: string | null) => void;
 }
-
-const CustomRowIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="none">
-    <path d="M3 8h10M9.5 4.5L13 8l-3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
 
 export function SubtaskContextMenu({
   subtask,
@@ -128,7 +135,7 @@ export function SubtaskContextMenu({
         onClick={() => setMode("custom")}
         className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm font-medium text-pritio-blue transition-colors hover:bg-pritio-blue/5"
       >
-        <CustomRowIcon className="h-3.5 w-3.5" />
+        <AppIcon glyph={ArrowRight} size="sm" />
         <span>Elegir fecha…</span>
       </button>
       <button
@@ -208,11 +215,7 @@ export function SubtaskContextMenu({
         aria-expanded={open}
         className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-ink-muted opacity-0 transition-all hover:bg-surface-muted hover:text-ink focus-visible:opacity-100 group-hover/sub:opacity-100"
       >
-        <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="currentColor">
-          <circle cx="8" cy="3.25" r="1.25" />
-          <circle cx="8" cy="8" r="1.25" />
-          <circle cx="8" cy="12.75" r="1.25" />
-        </svg>
+        <AppIcon glyph={DotsThreeVertical} size="sm" weight="fill" />
       </button>
 
       {open &&
@@ -238,9 +241,7 @@ export function SubtaskContextMenu({
               {mode === "menu" && (
                 <>
                   {labeledRow(
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <path d="M10.5 2.5l3 3-6.5 6.5H4v-3z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-                    </svg>,
+                    <AppIcon glyph={PencilSimple} />,
                     "Editar",
                     <span className="shrink-0 text-[10px] font-medium uppercase tracking-wide text-ink-muted">Ctrl E</span>,
                     () => {
@@ -251,24 +252,17 @@ export function SubtaskContextMenu({
                   )}
 
                   {labeledRow(
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-                      <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-                    </svg>,
+                    <AppIcon glyph={CalendarBlank} />,
                     "Fecha",
                     <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-ink-soft">
                       {pickDates.value ? formatDayLabel(pickDates.value) : ""}
-                      <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none">
-                        <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      <AppIcon glyph={CaretRight} size="xs" />
                     </span>,
                     () => setMode("date"),
                   )}
 
                   {labeledRow(
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <path d="M3 8l2.5 2.5L13 4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>,
+                    <AppIcon glyph={Check} />,
                     "Cuadrante",
                     <span className="flex shrink-0 items-center gap-1">
                       {QUADRANT_ORDER.map((q) => {
@@ -285,24 +279,17 @@ export function SubtaskContextMenu({
                           />
                         );
                       })}
-                      <svg className="ml-0.5 h-3 w-3 text-ink-muted" viewBox="0 0 16 16" fill="none">
-                        <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      <AppIcon glyph={CaretRight} size="xs" className="ml-0.5 text-ink-muted" />
                     </span>,
                     () => setMode("priority"),
                   )}
 
                   {labeledRow(
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <path d="M8 13.5A5.5 5.5 0 118 2.5a5.5 5.5 0 010 11z" stroke="currentColor" strokeWidth="1.4" />
-                      <path d="M8 5.5V8l2 1.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>,
+                    <AppIcon glyph={Clock} />,
                     "Fecha límite",
                     <span className="flex shrink-0 items-center gap-1 text-[11px] font-medium text-ink-soft">
                       {pickDeadline.value ? formatDayLabel(pickDeadline.value) : ""}
-                      <svg className="h-3 w-3" viewBox="0 0 16 16" fill="none">
-                        <path d="M6 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                      </svg>
+                      <AppIcon glyph={CaretRight} size="xs" />
                     </span>,
                     () => setMode("deadline"),
                   )}
@@ -310,10 +297,7 @@ export function SubtaskContextMenu({
                   <div className="mx-2 my-1 h-px bg-line" />
 
                   {labeledRow(
-                    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                      <rect x="5" y="5" width="8.5" height="8.5" rx="1.5" stroke="currentColor" strokeWidth="1.4" />
-                      <path d="M11 3.5V2.5A1.5 1.5 0 009.5 1H4A1.5 1.5 0 002.5 2.5V10A1.5 1.5 0 004 11.5h.5" stroke="currentColor" strokeWidth="1.4" />
-                    </svg>,
+                    <AppIcon glyph={Copy} />,
                     "Duplicar",
                     undefined,
                     () => {
@@ -332,9 +316,7 @@ export function SubtaskContextMenu({
                         : "text-pritio-coral hover:bg-pritio-coral/10",
                     )}
                   >
-                    <svg className="h-4 w-4 shrink-0" viewBox="0 0 16 16" fill="none">
-                      <path d="M3 4h10M6.5 4V2.5h3V4M4.5 4l.75 9h5.5l.75-9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
+                    <AppIcon glyph={Trash} />
                     <span className="min-w-0 flex-1 truncate">
                       {confirmingDelete ? "¿Eliminar definitivamente?" : "Eliminar"}
                     </span>
@@ -374,9 +356,7 @@ export function SubtaskContextMenu({
                         <span className={cn("h-3 w-3 shrink-0 rounded-full", meta.classes.accentBg)} />
                         <span className="min-w-0 flex-1 truncate">{meta.title}</span>
                         {active && (
-                          <svg className="h-3.5 w-3.5 shrink-0 text-pritio-blue" viewBox="0 0 16 16" fill="none">
-                            <path d="M3.5 8.5l3 3 6-6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                          <AppIcon glyph={Check} size="sm" className="text-pritio-blue" />
                         )}
                       </button>
                     );
@@ -437,9 +417,7 @@ function SubmenuHeader({
           className="rounded-md p-1 text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
           aria-label="Volver al menú"
         >
-          <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-            <path d="M13 8H3M6.5 4.5L3 8l3.5 3.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <AppIcon glyph={ArrowLeft} size="sm" />
         </button>
         <p className="text-[11px] font-bold uppercase tracking-wider text-ink-muted">{label}</p>
       </div>

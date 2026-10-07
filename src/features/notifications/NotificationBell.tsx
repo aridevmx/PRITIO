@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { supabase } from "@/lib/supabase";
 import { mapNotification } from "@/lib/mappers";
 import { formatRelativeTime } from "@/features/tasks/dates";
@@ -17,7 +18,8 @@ export function NotificationBell() {
   const [isOpen, setIsOpen] = useState(false);
   const [pendingApprovals, setPendingApprovals] = useState(0);
   const [approvalsOpen, setApprovalsOpen] = useState(false);
-  const panelRef = useRef<HTMLDivElement>(null);
+  const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
+  const btnRef = useRef<HTMLButtonElement>(null);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -121,10 +123,35 @@ export function NotificationBell() {
   }, []);
 
   useEffect(() => {
+    if (!isOpen || !btnRef.current) return;
+
+    const updatePosition = () => {
+      const rect = btnRef.current!.getBoundingClientRect();
+      const menuWidth = 320; // w-80 = 320px
+      const viewportWidth = window.innerWidth;
+      const left = Math.min(rect.right - menuWidth, viewportWidth - menuWidth - 16);
+      setMenuPosition({
+        top: rect.bottom + 8, // mt-2 = 8px
+        left: Math.max(left, 16),
+        width: menuWidth,
+      });
+    };
+
+    updatePosition();
+    window.addEventListener("resize", updatePosition);
+    window.addEventListener("scroll", updatePosition, true);
+    return () => {
+      window.removeEventListener("resize", updatePosition);
+      window.removeEventListener("scroll", updatePosition, true);
+    };
+  }, [isOpen]);
+
+  useEffect(() => {
     function handleClickOutside(e: MouseEvent) {
       if (
-        panelRef.current &&
-        !panelRef.current.contains(e.target as Node)
+        btnRef.current &&
+        !btnRef.current.contains(e.target as Node) &&
+        (e.target as HTMLElement).closest("[data-notification-menu]") === null
       ) {
         setIsOpen(false);
       }
@@ -150,9 +177,85 @@ export function NotificationBell() {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
   };
 
+  const menuContent = (
+    <div
+      data-notification-menu
+      className="pritio-menu-enter z-[100] w-80 max-w-[calc(100vw-1rem)] overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated"
+      style={{
+        position: "fixed",
+        top: menuPosition?.top ?? 0,
+        left: menuPosition?.left ?? 0,
+        width: menuPosition?.width ?? 320,
+      }}
+    >
+      <div className="flex items-center justify-between border-b border-line px-4 py-3">
+        <h3 className="text-sm font-bold text-ink">Notificaciones</h3>
+        {unreadCount > 0 && (
+          <button
+            onClick={markAllRead}
+            className="text-xs font-medium text-pritio-blue hover:underline"
+          >
+            Marcar todo como leído
+          </button>
+        )}
+      </div>
+
+      <div className="max-h-80 overflow-y-auto">
+        {pendingApprovals > 0 && (
+          <button
+            onClick={() => {
+              setApprovalsOpen(true);
+              setIsOpen(false);
+            }}
+            className="flex w-full items-center gap-2.5 border-b border-line bg-amber-50/60 px-4 py-3 text-left transition-colors hover:bg-amber-50"
+          >
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700">
+              <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
+                <path d="M8 1.5L14 13.5H2L8 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
+              </svg>
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-semibold text-amber-900">
+                {pendingApprovals === 1
+                  ? "1 pendiente por revisar"
+                  : `${pendingApprovals} pendientes por revisar`}
+              </span>
+              <span className="block text-xs text-amber-800/80">Aprobar tareas y días bloqueados</span>
+            </span>
+            <svg className="h-4 w-4 shrink-0 text-amber-700/60" viewBox="0 0 16 16" fill="none">
+              <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+          </button>
+        )}
+        {notifications.length === 0 ? (
+          <div className="py-8 text-center text-sm text-ink-muted">
+            Estás al día
+          </div>
+        ) : (
+          notifications.map((n) => (
+            <div
+              key={n.id}
+              className={cn(
+                "border-b border-line px-4 py-3 last:border-0",
+                !n.read && "bg-pritio-blue/5",
+              )}
+            >
+              <p className="text-sm font-semibold text-ink">{n.title}</p>
+              <p className="mt-0.5 text-xs text-ink-soft">{n.body}</p>
+              <p className="mt-1 text-[10px] text-ink-muted">
+                {formatRelativeTime(n.createdAt)}
+              </p>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+
   return (
-    <div className="relative" ref={panelRef} data-tour="notificaciones">
+    <div className="relative" data-tour="notificaciones">
       <button
+        ref={btnRef}
         onClick={() => setIsOpen(!isOpen)}
         aria-label="Notificaciones"
         aria-haspopup="dialog"
@@ -169,71 +272,7 @@ export function NotificationBell() {
         )}
       </button>
 
-      {isOpen && (
-        <div className="pritio-menu-enter absolute right-0 top-full z-50 mt-2 w-80 overflow-hidden rounded-2xl border border-line bg-surface shadow-elevated">
-          <div className="flex items-center justify-between border-b border-line px-4 py-3">
-            <h3 className="text-sm font-bold text-ink">Notificaciones</h3>
-            {unreadCount > 0 && (
-              <button
-                onClick={markAllRead}
-                className="text-xs font-medium text-pritio-blue hover:underline"
-              >
-                Marcar todo como leído
-              </button>
-            )}
-          </div>
-
-          <div className="max-h-80 overflow-y-auto">
-            {pendingApprovals > 0 && (
-              <button
-                onClick={() => {
-                  setApprovalsOpen(true);
-                  setIsOpen(false);
-                }}
-                className="flex w-full items-center gap-2.5 border-b border-line bg-amber-50/60 px-4 py-3 text-left transition-colors hover:bg-amber-50"
-              >
-                <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-amber-100 text-amber-700">
-                  <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-                    <path d="M8 1.5L14 13.5H2L8 1.5Z" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
-                  </svg>
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-semibold text-amber-900">
-                    {pendingApprovals === 1
-                      ? "1 pendiente por revisar"
-                      : `${pendingApprovals} pendientes por revisar`}
-                  </span>
-                  <span className="block text-xs text-amber-800/80">Aprobar tareas y días bloqueados</span>
-                </span>
-                <svg className="h-4 w-4 shrink-0 text-amber-700/60" viewBox="0 0 16 16" fill="none">
-                  <path d="M6 4L10 8L6 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                </svg>
-              </button>
-            )}
-            {notifications.length === 0 ? (
-              <div className="py-8 text-center text-sm text-ink-muted">
-                Estás al día
-              </div>
-            ) : (
-              notifications.map((n) => (
-                <div
-                  key={n.id}
-                  className={cn(
-                    "border-b border-line px-4 py-3 last:border-0",
-                    !n.read && "bg-pritio-blue/5",
-                  )}
-                >
-                  <p className="text-sm font-semibold text-ink">{n.title}</p>
-                  <p className="mt-0.5 text-xs text-ink-soft">{n.body}</p>
-                  <p className="mt-1 text-[10px] text-ink-muted">
-                    {formatRelativeTime(n.createdAt)}
-                  </p>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {isOpen && menuPosition && createPortal(menuContent, document.body)}
 
       <ApprovalsDialog
         open={approvalsOpen}

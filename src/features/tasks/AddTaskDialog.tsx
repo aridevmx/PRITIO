@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent, type ReactNode } from "react";
+import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { createPortal } from "react-dom";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { useToast } from "@/components/Toast";
@@ -6,7 +6,10 @@ import { parsePlanLimitError } from "@/features/billing/guarded";
 import { openUpgrade } from "@/features/billing/upgrade";
 import { createTask } from "@/features/tasks/api";
 import { allowedKindsForWorkspace } from "@/features/tasks/kinds";
-import { QUADRANTS, QUADRANT_ORDER, type QuadrantIconKey } from "@/features/tasks/quadrants";
+import { QUADRANTS, QUADRANT_ORDER } from "@/features/tasks/quadrants";
+import { QUADRANT_ICONS } from "@/features/tasks/quadrantIcons";
+import { AppIcon } from "@/components/AppIcon";
+import { Check, ChatCircleDots, ChatCircle, CircleNotch, X } from "@phosphor-icons/react";
 import { SegmentedControl, type SegmentedOption } from "@/components/SegmentedControl";
 import { DatePickerField } from "@/components/DatePickerField";
 import { usePopover } from "@/hooks/usePopover";
@@ -25,35 +28,6 @@ const KIND_OPTIONS: Record<TaskKind, { label: string; accent: string }> = {
   task: { label: "Tarea", accent: "text-pritio-blue" },
   meeting: { label: "Junta", accent: "text-pritio-purple" },
   event: { label: "Evento", accent: "text-pritio-coral" },
-};
-
-const QUADRANT_ICONS: Record<QuadrantIconKey, ReactNode> = {
-  zap: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path d="M9 1.5L3.5 9H8L7 14.5L12.5 7H8L9 1.5z" stroke="currentColor" strokeWidth="1.5" strokeLinejoin="round" />
-    </svg>
-  ),
-  calendar: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M5.5 1.5V4.5M10.5 1.5V4.5M2.5 6.5h11" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  users: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M2.5 13c.5-2.2 2-3.2 3.5-3.2s3 1 3.5 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-      <circle cx="11.2" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M9.5 13c.4-1.7 1.4-2.5 2.5-2.5 1 0 1.8.6 2.2 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
-  archive: (
-    <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-      <path d="M2.5 8h3L7 10h2l1.5-2h3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-      <rect x="2.5" y="3" width="11" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.5" />
-      <path d="M4 4.5h8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  ),
 };
 
 export function AddTaskDialog() {
@@ -200,9 +174,7 @@ export function AddTaskDialog() {
             aria-label="Cerrar"
             className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
           >
-            <svg className="h-4 w-4" viewBox="0 0 16 16" fill="none">
-              <path d="M4 4L12 12M12 4L4 12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
+            <AppIcon glyph={X} />
           </button>
         </div>
 
@@ -287,10 +259,7 @@ export function AddTaskDialog() {
                   : "border-line text-ink-soft hover:border-pritio-purple/50 hover:bg-surface-muted hover:text-ink",
               )}
             >
-              <svg className="h-3.5 w-3.5" viewBox="0 0 16 16" fill="none">
-                <path d="M13.5 9.5c0 .8-.7 1.5-1.5 1.5H4l-2.5 2V3c0-.8.7-1.5 1.5-1.5h9c.8 0 1.5.7 1.5 1.5v6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                <path d="M5.5 7h5M5.5 9h3.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
-              </svg>
+              <AppIcon glyph={ChatCircleDots} size="sm" />
               <span className="min-w-0">
                 {linkedDocIds.length > 0
                   ? `${linkedDocIds.length} ${linkedDocIds.length === 1 ? "nota vinculada" : "notas vinculadas"}`
@@ -339,9 +308,7 @@ export function AddTaskDialog() {
                           }}
                           className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm text-ink transition-colors hover:bg-surface-muted"
                         >
-                          <svg className="h-4 w-4 shrink-0 text-pritio-purple/70" viewBox="0 0 16 16" fill="none">
-                            <path d="M13.5 9.5c0 .8-.7 1.5-1.5 1.5H4l-2.5 2V3c0-.8.7-1.5 1.5-1.5h9c.8 0 1.5.7 1.5 1.5v6.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                          </svg>
+                          <AppIcon glyph={ChatCircle} className="text-pritio-purple/70" />
                           <span className="min-w-0 flex-1 truncate">{d.title || "Sin título"}</span>
                           <span
                             className={cn(
@@ -350,9 +317,7 @@ export function AddTaskDialog() {
                             )}
                           >
                             {linked && (
-                              <svg className="h-3 w-3" viewBox="0 0 12 12" fill="none">
-                                <path d="M2.5 6.5l2.5 2.5 4.5-4.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-                              </svg>
+                              <AppIcon glyph={Check} size="xs" />
                             )}
                           </span>
                         </button>
@@ -381,10 +346,7 @@ export function AddTaskDialog() {
               className="flex items-center gap-1.5 rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-ink/90 disabled:cursor-not-allowed disabled:opacity-40"
             >
               {saving && (
-                <svg className="h-3.5 w-3.5 animate-spin" viewBox="0 0 16 16" fill="none">
-                  <circle cx="8" cy="8" r="6.5" stroke="currentColor" strokeWidth="2" opacity="0.4" />
-                  <path d="M14.5 8A6.5 6.5 0 018 1.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
-                </svg>
+                <AppIcon glyph={CircleNotch} size="sm" className="animate-spin" />
               )}
               Crear
             </button>

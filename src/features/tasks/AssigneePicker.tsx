@@ -1,6 +1,8 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
+import { AppIcon } from "@/components/AppIcon";
+import { CaretDown, Check, MagnifyingGlass, Users } from "@phosphor-icons/react";
 
 type AssigneeOption = { id: string; name: string };
 
@@ -21,27 +23,6 @@ interface AssigneePickerProps {
   emptyLabel?: string;
   className?: string;
 }
-
-const UsersIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="none">
-    <circle cx="6" cy="5" r="2.2" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M2.5 13c.5-2.2 2-3.2 3.5-3.2s3 1 3.5 3.2" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-    <circle cx="11.2" cy="6" r="1.8" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M9.5 13c.4-1.7 1.4-2.5 2.5-2.5 1 0 1.8.6 2.2 1.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-  </svg>
-);
-
-const CheckIcon = ({ className }: { className?: string }) => (
-  <svg className={className} viewBox="0 0 16 16" fill="none">
-    <path
-      d="M3.5 8.5l3 3 6-6"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    />
-  </svg>
-);
 
 export function AssigneePicker({
   value,
@@ -250,28 +231,20 @@ export function AssigneePicker({
             ))}
           </span>
         ) : (
-          <UsersIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+          <AppIcon glyph={Users} className="text-ink-muted" />
         )}
         <span className="min-w-0 flex-1 truncate">
           {triggerSummary}
           {triggerCount > 0 && <span className="text-ink-muted"> +{triggerCount}</span>}
         </span>
-        <svg
+        <AppIcon
+          glyph={CaretDown}
+          size="xs"
           className={cn(
-            "h-3 w-3 shrink-0 text-ink-muted transition-transform duration-200",
+            "shrink-0 text-ink-muted transition-transform duration-200",
             open && "rotate-180",
           )}
-          viewBox="0 0 16 16"
-          fill="none"
-        >
-          <path
-            d="M4 6l4 4 4-4"
-            stroke="currentColor"
-            strokeWidth="1.6"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-        </svg>
+        />
       </button>
 
       {open &&
@@ -296,14 +269,11 @@ export function AssigneePicker({
               <div className={cn(mode === "sheet" && "mx-auto mb-2 h-1 w-10 rounded-full bg-line-strong")} />
 
               <div className="relative">
-                <svg
-                  className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-ink-muted"
-                  viewBox="0 0 16 16"
-                  fill="none"
-                >
-                  <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-                  <path d="M10.5 10.5L14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-                </svg>
+                <AppIcon
+                  glyph={MagnifyingGlass}
+                  size="sm"
+                  className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-ink-muted"
+                />
                 <input
                   ref={searchRef}
                   type="search"
@@ -334,11 +304,11 @@ export function AssigneePicker({
                   onClick={() => selectOption(flatOptions[0])}
                   className={optionClass(highlight === 0, value.length === 0, false)}
                 >
-                  <UsersIcon className="h-4 w-4 shrink-0 text-ink-muted" />
+                  <AppIcon glyph={Users} className="text-ink-muted" />
                   <span className={cn("min-w-0 flex-1 truncate text-sm", value.length === 0 ? "font-medium text-ink" : "text-ink-soft")}>
                     {emptyLabel}
                   </span>
-                  {value.length === 0 && <CheckIcon className="h-3.5 w-3.5 shrink-0 text-pritio-blue" />}
+                  {value.length === 0 && <AppIcon glyph={Check} size="sm" className="text-pritio-blue" />}
                 </button>
 
                 {filtered.length > 0 && (
@@ -379,7 +349,7 @@ export function AssigneePicker({
                             {initialsOf(a.name)}
                           </span>
                           <span className="min-w-0 flex-1 truncate text-sm">{a.name}</span>
-                          {checked && <CheckIcon className="h-3.5 w-3.5 shrink-0 text-pritio-blue" />}
+                          {checked && <AppIcon glyph={Check} size="sm" className="text-pritio-blue" />}
                         </button>
                       );
                     })}
