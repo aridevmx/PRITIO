@@ -59,7 +59,6 @@ import type {
 const MEETING_FALLBACK_MINUTES = 30 as const;
 const MAX_TASK_TITLE_LENGTH = 120;
 const MAX_NOTES_VISIBLE_CHARS = 4000;
-const MAX_SUBTASKS_PER_TASK = 20;
 
 /* El editor rico (Tiptap) pesa ~120KB gz; se carga solo cuando el
    diálogo lo necesita, para no penalizar el bundle inicial. */
@@ -277,6 +276,7 @@ export function TaskFormDialog({
 }: TaskFormDialogProps) {
   const { currentWorkspace, currentMember, profile, members } = useWorkspace();
   const { canCreate, hasFeature, usage, currentLimits } = useBilling();
+  const maxSubtasks = currentLimits.subtaskLimit;
   const { toast } = useToast();
 
   const [title, setTitle] = useState("");
@@ -716,8 +716,8 @@ export function TaskFormDialog({
   const addSubtask = () => {
     const t = newSubtaskTitle.trim();
     if (!t) return;
-    if (subtasks.length >= MAX_SUBTASKS_PER_TASK) {
-      toast.error(`Una tarea puede tener máximo ${MAX_SUBTASKS_PER_TASK} subtareas`);
+    if (subtasks.length >= maxSubtasks) {
+      toast.error(`Una tarea puede tener máximo ${maxSubtasks} subtareas`);
       return;
     }
     subtaskKeyCounter.current += 1;
@@ -757,8 +757,8 @@ export function TaskFormDialog({
     setSubtasks((prev) => prev.map((s) => (s.key === key ? { ...s, quadrant: q } : s)));
 
   const duplicateSubtask = (key: string) => {
-    if (subtasks.length >= MAX_SUBTASKS_PER_TASK) {
-      toast.error(`Una tarea puede tener máximo ${MAX_SUBTASKS_PER_TASK} subtareas`);
+    if (subtasks.length >= maxSubtasks) {
+      toast.error(`Una tarea puede tener máximo ${maxSubtasks} subtareas`);
       return;
     }
     const index = subtasks.findIndex((s) => s.key === key);
@@ -1055,7 +1055,7 @@ export function TaskFormDialog({
             originalSubtasksRef.current,
           );
         } catch {
-          // Las subtareas no deben bloquear el guardado de la tarea
+          toast.error("No se pudieron guardar las subtareas");
         }
       }
 
@@ -1395,7 +1395,7 @@ export function TaskFormDialog({
                   <span
                     className={cn(
                       "ml-auto pr-1 text-xs font-semibold tabular-nums text-ink-muted",
-                      subtasks.length >= MAX_SUBTASKS_PER_TASK && "text-pritio-coral",
+                      subtasks.length >= maxSubtasks && "text-pritio-coral",
                     )}
                   >
                     {subtasks.filter((s) => s.completed).length}/{subtasks.length}
@@ -1452,9 +1452,9 @@ export function TaskFormDialog({
                       />
                     </div>
                   ))}
-                  {subtasks.length >= MAX_SUBTASKS_PER_TASK ? (
+                  {subtasks.length >= maxSubtasks ? (
                     <p className="px-1 py-0.5 text-[11px] font-medium text-pritio-coral">
-                      Límite de {MAX_SUBTASKS_PER_TASK} subtareas alcanzado.
+                      Límite de {maxSubtasks} subtareas alcanzado.
                     </p>
                   ) : (
                     <div className="flex items-center gap-2 px-1 py-0.5">
@@ -1474,7 +1474,7 @@ export function TaskFormDialog({
                             addSubtask();
                           }
                         }}
-                        placeholder={`Añadir subtarea… (${subtasks.length}/${MAX_SUBTASKS_PER_TASK})`}
+                        placeholder={`Añadir subtarea… (${subtasks.length}/${maxSubtasks})`}
                         aria-label="Nueva subtarea"
                         className="min-w-0 flex-1 bg-transparent text-sm text-ink outline-none placeholder:text-ink-muted"
                       />

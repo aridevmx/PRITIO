@@ -48,19 +48,6 @@ function ChevronIcon({ open }: { open: boolean }) {
 const FolderGlyph = <AppIcon glyph={FolderSimple} size="sm" className="shrink-0" />;
 const DocGlyph = <AppIcon glyph={File} size="sm" className="shrink-0" />;
 
-function useOutsideClose(open: boolean, onClose: () => void) {
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    function onDown(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    document.addEventListener("mousedown", onDown);
-    return () => document.removeEventListener("mousedown", onDown);
-  }, [open, onClose]);
-  return ref;
-}
-
 function FolderMenu({
   onCreateNote,
   onCreateSubfolder,

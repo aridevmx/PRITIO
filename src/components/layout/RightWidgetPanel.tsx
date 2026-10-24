@@ -25,6 +25,7 @@ import type { SpaceKey } from "@/features/spaces/spaces";
 import type { BlockedDayStatus } from "@/types";
 import { AppIcon } from "@/components/AppIcon";
 import { X } from "@phosphor-icons/react";
+import { useIsDesktop } from "@/lib/useMediaQuery";
 
 interface RightWidgetPanelProps {
   open: boolean;
@@ -38,6 +39,7 @@ export function RightWidgetPanel({ open, onClose, space, onNavigateToCalendar }:
   const { canCreate } = useBilling();
   const { toast } = useToast();
   const { clockVisible } = useWidgetPrefs();
+  const isDesktop = useIsDesktop();
 
   const [calendarScope, setCalendarScope] = useState<"workspace" | "all">("workspace");
   const [dayPopover, setDayPopover] = useState<string | null>(null);
@@ -241,17 +243,18 @@ export function RightWidgetPanel({ open, onClose, space, onNavigateToCalendar }:
     <>
       {open && (
         <div
-          className="fixed inset-0 z-40 bg-ink/30 backdrop-blur-sm"
+          className="fixed inset-0 z-40 bg-ink/20 lg:hidden"
           onClick={onClose}
           aria-hidden
         />
       )}
 
       <aside
-        aria-hidden={!open}
+        aria-hidden={!open && !isDesktop}
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-[85vw] max-w-80 flex-col bg-surface border-l border-line shadow-elevated transition-transform duration-200 ease-out",
-          open ? "translate-x-0" : "translate-x-full",
+          "fixed inset-y-0 right-0 z-50 flex w-[85vw] max-w-80 flex-col overflow-hidden border-l border-line bg-surface transition-transform duration-200 ease-out",
+          "lg:static lg:transition-[width]",
+          open ? "translate-x-0 lg:w-80" : "translate-x-full border-l-transparent lg:w-0",
         )}
       >
         <div className="flex items-center gap-2.5 border-b border-line px-4 py-3">

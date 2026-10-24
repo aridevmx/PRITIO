@@ -18,6 +18,18 @@ import { isOnline, loadSnapshot, saveSnapshot } from "@/lib/offline";
 import { onAppEvent } from "@/lib/appEvents";
 import { takeSearchPendingTarget, OPEN_DOC_EVENT } from "@/features/search/api";
 import type { Doc, DocFolder } from "@/features/docs/api";
+import { AppIcon } from "@/components/AppIcon";
+import {
+  CaretLeft,
+  DotsThreeVertical,
+  DownloadSimple,
+  FolderPlus,
+  MagnifyingGlass,
+  Plus,
+  ShareNetwork,
+  Trash,
+  X,
+} from "@phosphor-icons/react";
 
 /* El editor rico (Tiptap) se carga solo al abrir la sección de notas. */
 const RichTextEditor = lazy(() =>
@@ -83,6 +95,7 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
   const pendingRef = useRef<{ title?: string; content?: string | null }>({});
   const docsRef = useRef<Doc[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const selectedDoc = useMemo(() => docs.find((d) => d.id === selectedId) ?? null, [docs, selectedId]);
 
   useEffect(() => {
@@ -587,13 +600,16 @@ const menuRef = useRef<HTMLDivElement | null>(null);
                         className="grid h-8 w-8 shrink-0 place-items-center rounded-lg text-ink-muted transition-colors hover:bg-surface-muted hover:text-ink"
                       >
                         {exporting ? (
-                          <Spinner size="md" />
+                          <svg className="h-4 w-4 animate-spin" viewBox="0 0 16 16" fill="none">
+                            <circle cx="8" cy="8" r="6" stroke="currentColor" strokeWidth="1.6" opacity=".25" />
+                            <path d="M14 8a6 6 0 00-6-6" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                          </svg>
                         ) : (
                           <AppIcon glyph={DotsThreeVertical} weight="fill" />
                         )}
                       </button>
                       {menuOpen && menuPosition && createPortal(
-                        <div className="pritio-menu-enter z-[100] w-56 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-elevated"
+                        <div ref={menuRef} className="pritio-menu-enter z-[100] w-56 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-elevated"
                           style={{
                             position: "fixed",
                             top: menuPosition.top,

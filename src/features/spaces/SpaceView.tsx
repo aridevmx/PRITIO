@@ -52,21 +52,17 @@ export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceView
   const [editingTask, setEditingTask] = useState<Task | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
-  const isPendientes = space === "pendientes";
   const activeCount = tasks.filter((t) => !t.completed).length;
 
   const showGuide =
     !!currentWorkspace &&
     view === "cuadrantes" &&
-    !isPendientes &&
     !isLoading &&
     tasks.length === 0 &&
     !isWorkspaceGuideDismissed(currentWorkspace.id);
 
-  const isPersonal = currentWorkspace?.type === "personal" || space === "personal" || space === "pendientes";
-  const baseTabs: ViewKey[] = isPersonal
-    ? ["cuadrantes", "plan", "kanban", "calendario", "docs", "indicadores"]
-    : ["cuadrantes", "plan", "kanban", "calendario", "docs", "indicadores"];
+  const isPersonal = currentWorkspace?.type === "personal" || space === "personal";
+  const baseTabs: ViewKey[] = ["cuadrantes", "plan", "kanban", "calendario", "docs", "indicadores"];
   const availableTabs = baseTabs
     .filter((v) => !hiddenViews.includes(v))
     .filter((v) => v !== "plan" || hasFeature("plan_view"))
@@ -171,14 +167,12 @@ export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceView
       {view === "cuadrantes" && !showGuide && (
         <QuadrantsView
           key={currentWorkspace?.id ?? "none"}
-          workspaceIds={isPendientes ? workspaces.map((w) => w.id) : undefined}
           refreshKey={refreshKey}
         />
       )}
       {view === "kanban" && (
         <QuadrantsView
           key={`kanban-${currentWorkspace?.id ?? "none"}`}
-          workspaceIds={isPendientes ? workspaces.map((w) => w.id) : undefined}
           refreshKey={refreshKey}
           variant="kanban"
         />

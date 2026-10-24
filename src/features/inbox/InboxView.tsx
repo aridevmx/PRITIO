@@ -13,9 +13,12 @@ import { BottomQuickAdd } from "@/features/inbox/BottomQuickAdd";
 import { emitAppEvent } from "@/lib/appEvents";
 import { cn } from "@/lib/utils";
 import { PRESET_COLORS } from "@/features/projects/presetColors";
-import type { Task, Quadrant } from "@/types";
+import { listProjectsByWorkspaces } from "@/features/projects/api";
+import { AppIcon } from "@/components/AppIcon";
+import { CaretRight } from "@phosphor-icons/react";
+import type { Task, Quadrant, Project } from "@/types";
 
-type GroupMode = "workspace" | "cuadrante" | "lista";
+type GroupMode = "workspace" | "cuadrante" | "proyecto" | "lista";
 
 interface TaskGroup {
   key: string;
@@ -39,6 +42,8 @@ export function InboxView() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Task | null>(null);
   const [groupMode, setGroupMode] = useState<GroupMode>("workspace");
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(new Set());
+  const [projects, setProjects] = useState<Project[]>([]);
 
   const [profileNameMap, setProfileNameMap] = useState<Record<string, string>>({});
   const profileCacheRef = useRef<Record<string, string>>({});
@@ -95,11 +100,17 @@ export function InboxView() {
         assigneeMap.set(row.task_id as string, entries);
       });
 
-      let subtaskCounts: Map<string, SubtaskCounts> | undefined;
+let subtaskCounts: Map<string, SubtaskCounts> | undefined;
       try {
         subtaskCounts = await fetchSubtaskCounts(wsIds);
       } catch {
         // Los conteos son cosméticos; no deben romper Inbox.
+      }
+
+      try {
+        setProjects(await listProjectsByWorkspaces(wsIds));
+      } catch {
+        // El agrupado por proyecto es opcional; no debe romper Inbox.
       }
 
       setTasks(rows.map((row) => mapTask(row as never, assigneeMap.get(row.id as string) ?? [], subtaskCounts?.get(row.id as string))));
@@ -255,7 +266,7 @@ export function InboxView() {
     return result;
   }, [filteredVisible, workspaces, workspaceNameMap, workspaceColorMap]);
 
-  const groupsByQuadrant = useMemo<TaskGroup[]>(() => {
+const groupsByQuadrant = useMemo<TaskGroup[]>(() => {
   return QUADRANT_ORDER.flatMap((key) => {
     const meta = QUADRANTS[key];
     if (!meta) return [];
@@ -273,12 +284,47 @@ export function InboxView() {
   });
 }, [filteredVisible]);
 
+  const groupsByProject = useMemo<TaskGroup[]>(() => {
+    const groups = new Map<string, TaskGroup>();
+    projects.forEach((p) => {
+      groups.set(p.id, { key: p.id, label: p.name, dotColor: p.color, count: 0, tasks: [] });
+    });
+    let sinProyecto: TaskGroup | null = null;
+    for (const t of filteredVisible) {
+      if (t.projectId && groups.has(t.projectId)) {
+        const g = groups.get(t.projectId)!;
+        g.count += 1;
+        g.tasks.push(t);
+      } else {
+        sinProyecto ??= { key: "sin-proyecto", label: "Sin proyecto", dotClass: "bg-ink-muted", count: 0, tasks: [] };
+        sinProyecto.count += 1;
+        sinProyecto.tasks.push(t);
+      }
+    }
+    const result = [...groups.values()].filter((g) => g.count > 0);
+    if (sinProyecto) result.push(sinProyecto);
+    return result;
+  }, [filteredVisible, projects]);
+
   const groups: TaskGroup[] =
     groupMode === "workspace"
       ? groupsByWorkspace
       : groupMode === "cuadrante"
         ? groupsByQuadrant
-        : [{ key: "lista", label: "Todas", count: filteredVisible.length, tasks: filteredVisible }];
+        : groupMode === "proyecto"
+          ? groupsByProject
+          : [{ key: "lista", label: "Todas", count: filteredVisible.length, tasks: filteredVisible }];
+
+  const toggleGroup = (key: string) =>
+    setCollapsedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) {
+        next.delete(key);
+      } else {
+        next.add(key);
+      }
+      return next;
+    });
 
   const renderTask = (task: Task) => (
     <div key={task.id} className={cn("transition", pendingId === task.id && "opacity-60")}>
@@ -294,18 +340,34 @@ export function InboxView() {
     </div>
   );
 
-  const renderGroupHeading = (group: TaskGroup) => (
-    <div className="flex items-center gap-2 px-1 pt-5 pb-1.5 first:pt-2">
-      <span
-        className={cn("h-2.5 w-2.5 shrink-0 rounded-full", group.dotClass)}
-        style={group.dotColor ? { backgroundColor: group.dotColor } : undefined}
-      />
-      <h3 className="min-w-0 truncate text-sm font-bold text-ink">{group.label}</h3>
-      <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ink-muted">
-        {group.count}
-      </span>
-    </div>
-  );
+const renderGroupHeading = (group: TaskGroup) => {
+    const collapsed = collapsedGroups.has(group.key);
+    return (
+      <button
+        type="button"
+        onClick={() => toggleGroup(group.key)}
+        aria-expanded={!collapsed}
+        className="flex w-full items-center gap-2 rounded-lg px-1 pt-5 pb-1.5 text-left first:pt-2"
+      >
+        <AppIcon
+          glyph={CaretRight}
+          size="xs"
+          className={cn(
+            "shrink-0 text-ink-muted transition-transform duration-200",
+            collapsed && "-rotate-90",
+          )}
+        />
+        <span
+          className={cn("h-2.5 w-2.5 shrink-0 rounded-full", group.dotClass)}
+          style={group.dotColor ? { backgroundColor: group.dotColor } : undefined}
+        />
+        <h3 className="min-w-0 truncate text-sm font-bold text-ink">{group.label}</h3>
+        <span className="rounded-full bg-surface-muted px-1.5 py-0.5 text-[10px] font-semibold tabular-nums text-ink-muted">
+          {group.count}
+        </span>
+      </button>
+    );
+  };
 
   return (
     <div className="mx-auto w-full max-w-3xl flex-1 px-4 pb-32 pt-4 lg:px-6 lg:pb-20">
@@ -313,7 +375,7 @@ export function InboxView() {
         <p className="text-xs font-bold uppercase tracking-wider text-pritio-blue">Todas tus tareas</p>
         <h1 className="text-2xl font-extrabold text-ink">Inbox</h1>
         <p className="text-sm text-ink-muted">
-          Vacía lo que traes en la cabeza, y luego organízalo: cuadrante, fecha o proyecto. Agrupa por workspace, cuadrante o como lista.
+          Vacía lo que traes en la cabeza, y luego organízalo: cuadrante, fecha o proyecto. Agrupa por workspace, cuadrante, proyecto o como lista.
         </p>
       </div>
 
@@ -323,9 +385,10 @@ export function InboxView() {
         </span>
         <div className="ml-auto flex items-center gap-1 rounded-lg border border-line bg-surface p-0.5">
           {(
-            [
+[
               { key: "workspace", label: "Workspace" },
               { key: "cuadrante", label: "Cuadrante" },
+              { key: "proyecto", label: "Proyecto" },
               { key: "lista", label: "Lista" },
             ] as { key: GroupMode; label: string }[]
           ).map((opt) => (
@@ -431,13 +494,15 @@ export function InboxView() {
             </div>
           )
         ) : (
-          <div className="space-y-2.5">
+<div className="space-y-2.5">
             {groups.map((group) => (
               <section key={group.key}>
                 {renderGroupHeading(group)}
-                <div className="space-y-2.5">
-                  {group.tasks.map(renderTask)}
-                </div>
+                {!collapsedGroups.has(group.key) && (
+                  <div className="space-y-2.5">
+                    {group.tasks.map(renderTask)}
+                  </div>
+                )}
               </section>
             ))}
           </div>

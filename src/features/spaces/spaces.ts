@@ -1,6 +1,6 @@
 import type { WorkspaceType } from "@/types";
 
-export type SpaceKey = "pendientes" | "personal" | "casa" | "trabajo";
+export type SpaceKey = "personal" | "casa" | "trabajo";
 
 export interface SpaceMeta {
   key: SpaceKey;
@@ -18,21 +18,6 @@ export interface SpaceMeta {
 }
 
 export const SPACES: Record<SpaceKey, SpaceMeta> = {
-  pendientes: {
-    key: "pendientes",
-    dbValue: null,
-    label: "Pendientes",
-    subtitle: "Tu foco personal",
-    description:
-      "Tus prioridades reales, lo programado para esta semana y las decisiones pendientes.",
-    accent: {
-      text: "text-space-pendientes-primary",
-      bg: "bg-space-pendientes-primary",
-      softBg: "bg-space-pendientes-soft",
-      border: "border-space-pendientes-border",
-      shellBg: "bg-shell-pendientes",
-    },
-  },
   personal: {
     key: "personal",
     dbValue: "Personal",
@@ -83,7 +68,7 @@ export const SPACES: Record<SpaceKey, SpaceMeta> = {
 export function spacesForWorkspaceType(type: WorkspaceType): SpaceMeta[] {
   switch (type) {
     case "personal":
-      return [SPACES.pendientes, SPACES.personal];
+      return [SPACES.personal];
     case "family":
       return [SPACES.casa];
     case "team":
@@ -94,7 +79,6 @@ export function spacesForWorkspaceType(type: WorkspaceType): SpaceMeta[] {
 // ─── URL routing ──────────────────────────────────────
 
 export const SPACE_SLUGS: Record<SpaceKey, string> = {
-  pendientes: "pendiente",
   personal: "personal",
   casa: "familia",
   trabajo: "trabajo",

@@ -121,7 +121,8 @@ export type PlanResource =
   | "blocked_days"
   | "workspaces"
   | "meetings"
-  | "events";
+  | "events"
+  | "premium_themes";
 
 /** Feature flags driven by plan_limits (no numeric quota). */
 export type PlanFeature =
@@ -141,6 +142,7 @@ export interface PlanLimits {
   assigneeLimit: number;
   blockedDayLimit: number;
   workspaceLimit: number;
+  subtaskLimit: number;
   meetingsPerMonth: number | null;
   eventsPerMonth: number | null;
   allowPlanView: boolean;
@@ -413,6 +415,7 @@ export interface PlanLimitsRow {
   assignee_limit: number;
   blocked_day_limit: number;
   workspace_limit: number;
+  subtask_limit: number;
   meetings_per_month: number | null;
   events_per_month: number | null;
   allow_plan_view: boolean;

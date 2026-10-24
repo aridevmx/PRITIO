@@ -17,6 +17,7 @@ interface UpgradePromptProps {
 export function UpgradePrompt({ resource, onClose, onViewPlans }: UpgradePromptProps) {
   const { effectivePlan, currentLimits, usage } = useBilling();
 
+  const isPremiumThemes = resource === "premium_themes";
   const resourceLabel = PLAN_RESOURCE_LABELS[resource];
   const current = usageFor(usage, resource);
   const limit = limitFor(currentLimits, resource);
@@ -43,40 +44,62 @@ export function UpgradePrompt({ resource, onClose, onViewPlans }: UpgradePromptP
               </svg>
             </div>
             <h3 className="mt-3 text-base font-bold text-ink">
-              Llegaste al límite de {resourceLabel.toLowerCase()}
+              {isPremiumThemes
+                ? "Tema premium"
+                : `Llegaste al límite de ${resourceLabel.toLowerCase()}`}
             </h3>
             <p className="mt-1 text-sm leading-relaxed text-ink-muted">
-              Tu plan{" "}
-              <span
-                className={cn(
-                  "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
-                  PLAN_BADGE_CLASSES[effectivePlan],
-                )}
-              >
-                {PLAN_LABELS[effectivePlan]}
-              </span>{" "}
-              permite {formatLimit(limit)} {resourceLabel.toLowerCase()}.{" "}
-              {effectivePlan === "free"
-                ? "Activa Pro para aumentar los límites de este workspace."
-                : "Tu plan Pro ya alcanza este límite para el tipo de workspace actual."}
+              {isPremiumThemes ? (
+                <>
+                  Los temas de color premium ({resourceLabel.toLowerCase()}) están disponibles
+                  con el plan{" "}
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                      PLAN_BADGE_CLASSES.pro,
+                    )}
+                  >
+                    Pro
+                  </span>
+                  . Activa Pro para personalizar el aspecto de toda la app.
+                </>
+              ) : (
+                <>
+                  Tu plan{" "}
+                  <span
+                    className={cn(
+                      "inline-flex rounded-full px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider",
+                      PLAN_BADGE_CLASSES[effectivePlan],
+                    )}
+                  >
+                    {PLAN_LABELS[effectivePlan]}
+                  </span>{" "}
+                  permite {formatLimit(limit)} {resourceLabel.toLowerCase()}.{" "}
+                  {effectivePlan === "free"
+                    ? "Activa Pro para aumentar los límites de este workspace."
+                    : "Tu plan Pro ya alcanza este límite para el tipo de workspace actual."}
+                </>
+              )}
             </p>
           </div>
         </div>
 
-        <div className="px-6 pb-5">
-          <div className="flex items-center justify-between text-xs font-medium">
-            <span className="text-ink-muted">En uso</span>
-            <span className="text-ink">
-              {formatLimit(current)} / {formatLimit(limit)}
-            </span>
+        {!isPremiumThemes && (
+          <div className="px-6 pb-5">
+            <div className="flex items-center justify-between text-xs font-medium">
+              <span className="text-ink-muted">En uso</span>
+              <span className="text-ink">
+                {formatLimit(current)} / {formatLimit(limit)}
+              </span>
+            </div>
+            <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-pritio-blue to-pritio-purple transition-all"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
           </div>
-          <div className="mt-2 h-2 overflow-hidden rounded-full bg-surface-muted">
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-pritio-blue to-pritio-purple transition-all"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
+        )}
 
         <div className="flex gap-2 border-t border-line bg-surface-muted/40 px-6 py-4">
           <button

@@ -25,7 +25,7 @@ import { MiDiaView } from "@/features/home/MiDiaView";
 import { GlobalSearch } from "@/components/layout/GlobalSearch";
 import { RightWidgetPanel } from "@/components/layout/RightWidgetPanel";
 import { AppIcon } from "@/components/AppIcon";
-import { ArrowClockwise, CalendarBlank, List } from "@phosphor-icons/react";
+import { CalendarBlank, List } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { onAppEvent, emitAppEvent } from "@/lib/appEvents";
 import { QuadrantsView } from "@/features/tasks/QuadrantsView";
@@ -35,6 +35,8 @@ import { DocsGlobalView } from "@/features/docs/DocsGlobalView";
 import { StatsGlobalView } from "@/features/stats/StatsGlobalView";
 import { CalendarGlobalView } from "@/features/calendar/CalendarGlobalView";
 import { WorkspaceSelector } from "@/components/layout/WorkspaceSelector";
+
+const LAST_ROUTE_KEY = "pritio:lastRoute";
 
 function baseViewsFor(_workspaceType: string, _space: SpaceKey): ViewKey[] {
   void _workspaceType;
@@ -56,6 +58,17 @@ export function AppShell() {
   const [tourOpen, setTourOpen] = useState(false);
   const [workspaceSelectorOpen, setWorkspaceSelectorOpen] = useState(false);
 
+  useEffect(() => {
+    try {
+      const path = location.pathname + location.search;
+      if (path && path !== "/" && path !== "/auth" && path !== "/auth/callback" && path !== "/reset-password") {
+        localStorage.setItem(LAST_ROUTE_KEY, path);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [location.pathname, location.search]);
+
   const globalView = globalViewFromPath(location.pathname);
   const isGlobal = globalView !== null;
 
@@ -64,7 +77,7 @@ export function AppShell() {
     () =>
       currentWorkspace
         ? spacesForWorkspaceType(currentWorkspace.type).map((s) => s.key)
-        : ["pendientes"],
+        : ["personal"],
     [currentWorkspace],
   );
 
@@ -82,7 +95,7 @@ export function AppShell() {
   // slugs inválidos (evita el Navigate a sí mismo, que dejaba la app en blanco).
   const defaultSpacePath = useMemo(() => {
     if (!currentWorkspace) return null;
-    const first = spacesForWorkspaceType(currentWorkspace.type)[0]?.key ?? "pendientes";
+    const first = spacesForWorkspaceType(currentWorkspace.type)[0]?.key ?? "personal";
     return spacePath(first);
   }, [currentWorkspace]);
 
@@ -161,25 +174,22 @@ export function AppShell() {
 
   if (!isGlobal) {
     if (!activeSpace || !validSpaces.includes(activeSpace)) {
-      return <Navigate to={defaultSpacePath ?? "/"} replace />;
+      if (defaultSpacePath && location.pathname !== defaultSpacePath) {
+        return <Navigate to={defaultSpacePath} replace />;
+      }
+      return null;
     }
   }
 
   const activeView: ViewKey =
     viewParam && (availableTabs as string[]).includes(viewParam) ? viewParam : "cuadrantes";
 
-  const handleSpaceChange = (key: SpaceKey) => {
-    const newTabs = tabsForSpace(key);
-    const view = (newTabs as string[]).includes(activeView) ? activeView : "cuadrantes";
-    navigate(spacePath(key, view));
-  };
-
   const handleViewChange = (key: ViewKey) => {
     if (activeSpace) navigate(spacePath(activeSpace, key));
   };
 
   const headerAccent =
-    !isGlobal && activeSpace ? SPACES[activeSpace].accent.bg : SPACES.pendientes.accent.bg;
+    !isGlobal && activeSpace ? SPACES[activeSpace].accent.bg : (SPACES.personal?.accent.bg ?? "bg-pritio-purple");
 
   const renderMain = () => {
     if (isGlobal && globalView) {
@@ -213,20 +223,11 @@ export function AppShell() {
   return (
     <div className="flex h-screen overflow-hidden bg-surface-muted">
       <Sidebar
-        activeSpace={isGlobal ? null : activeSpace!}
-        onSpaceChange={handleSpaceChange}
         globalView={isGlobal ? globalView : null}
         onGlobalViewChange={handleGlobalViewChange}
         isOpen={sidebarOpen}
         onClose={() => setSidebarOpen(false)}
         onCreateTask={handleCreateTask}
-      />
-
-      <RightWidgetPanel
-        open={rightPanelOpen}
-        onClose={() => setRightPanelOpen(false)}
-        space={activeSpace ?? null}
-        onNavigateToCalendar={handleNavigateToCalendar}
       />
 
       <PushNotificationInit />
@@ -265,17 +266,10 @@ export function AppShell() {
 
           <div className="flex shrink-0 items-center gap-1.5">
             <button
-              onClick={() => emitAppEvent("pritio:app-refresh")}
-              aria-label="Refrescar datos"
-              title="Refrescar datos"
-              className="grid h-9 w-9 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40"
-            >
-              <AppIcon glyph={ArrowClockwise} size="lg" />
-            </button>
-            <button
-              onClick={() => setRightPanelOpen(true)}
-              aria-label="Abrir calendario y utilidades"
+              onClick={() => setRightPanelOpen((v) => !v)}
+              aria-label="Alternar calendario y utilidades"
               title="Calendario y utilidades"
+              aria-pressed={rightPanelOpen}
               className="grid h-9 w-9 shrink-0 place-items-center rounded-xl text-ink-soft transition-colors hover:bg-surface-muted hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-pritio-blue/40"
             >
               <span className="relative grid h-6 w-6 place-items-center">
@@ -323,6 +317,13 @@ export function AppShell() {
         <MobileBottomNav />
         {globalView !== "inbox" && <GlobalFAB globalView={globalView} />}
       </div>
+
+      <RightWidgetPanel
+        open={rightPanelOpen}
+        onClose={() => setRightPanelOpen(false)}
+        space={activeSpace ?? null}
+        onNavigateToCalendar={handleNavigateToCalendar}
+      />
     </div>
   );
 }

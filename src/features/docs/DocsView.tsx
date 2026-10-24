@@ -145,9 +145,6 @@ export function DocsView({ workspaceId }: DocsViewProps) {
   const [activeTagFilter, setActiveTagFilter] = useState<string | null>(null);
   const tagPickerBtnRef = useRef<HTMLButtonElement>(null);
   const projectPickerBtnRef = useRef<HTMLButtonElement>(null);
-  const exportBtnRef = useRef<HTMLButtonElement>(null);
-  const [exportPosition, setExportPosition] = useState<{ top: number; left: number; width: number } | null>(null);
-  const [exporting, setExporting] = useState<ExportFormat | null>(null);
 
   // Índice de títulos (outline) y contenedor con scroll del área de escritura.
   const [outline, setOutline] = useState<DocOutlineItem[]>([]);
@@ -1089,7 +1086,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                         <path d="M5.6 7.2l4.3-2.5M5.6 8.8l4.3 2.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
                       </svg>
                     </button>
-                    <div className="relative shrink-0" ref={exportRef}>
+                    <div className="relative shrink-0">
                       <button
                         ref={exportBtnRef}
                         type="button"
@@ -1112,7 +1109,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                         )}
                       </button>
                       {exportOpen && exportPosition && createPortal(
-                        <div className="pritio-menu-enter z-[100] w-52 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-elevated"
+                        <div data-export-menu className="pritio-menu-enter z-[100] w-52 max-w-[calc(100vw-1rem)] overflow-hidden rounded-xl border border-line bg-surface py-1 shadow-elevated"
                           style={{
                             position: "fixed",
                             top: exportPosition.top,
@@ -1330,7 +1327,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                 </div>
 
                 {/* Tareas vinculadas */}
-                <div className="relative mb-3 shrink-0" ref={pickerRef}>
+                <div className="relative mb-3 shrink-0">
                   <div className="flex flex-wrap items-center gap-1.5">
                     <span className="mr-1 text-[11px] font-bold uppercase tracking-wider text-ink-muted">
                       Tareas vinculadas
@@ -1369,7 +1366,7 @@ export function DocsView({ workspaceId }: DocsViewProps) {
                   </div>
 
                   {pickerOpen && pickerPosition && createPortal(
-                    <div className="pritio-menu-enter z-[100] max-h-[16rem] w-[19rem] overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-elevated"
+                    <div data-task-picker className="pritio-menu-enter z-[100] max-h-[16rem] w-[19rem] overflow-y-auto rounded-xl border border-line bg-surface p-2 shadow-elevated"
                       style={{
                         position: "fixed",
                         top: pickerPosition.top,

@@ -30,7 +30,7 @@ export function BottomQuickAdd() {
   };
 
   return (
-    <div className="pointer-events-none fixed inset-x-0 bottom-[calc(5.25rem+env(safe-area-inset-bottom))] z-[55] px-4 lg:bottom-6 lg:px-0">
+    <div className="pointer-events-none fixed bottom-[calc(5.25rem+env(safe-area-inset-bottom))] left-0 right-0 z-[55] px-4 lg:bottom-6 lg:left-72 lg:right-0 lg:px-0">
       <form
         onSubmit={handleSubmit}
         className="pointer-events-auto mx-auto w-full max-w-3xl"

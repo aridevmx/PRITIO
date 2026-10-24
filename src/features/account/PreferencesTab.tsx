@@ -8,6 +8,10 @@ import { useWidgetPrefs } from "@/lib/widgetPrefs";
 import { ToggleRow } from "@/features/account/AccountToggle";
 import { useToast } from "@/components/Toast";
 import { exportMyData, downloadJson } from "@/features/account/exportData";
+import { useAppTheme, APP_THEMES, type AppThemeId } from "@/lib/appTheme";
+import { useBilling } from "@/features/billing/BillingProvider";
+import { openUpgrade } from "@/features/billing/upgrade";
+import { cn } from "@/lib/utils";
 
 export function PreferencesTab() {
   const { theme, setTheme } = useTheme();
@@ -15,9 +19,21 @@ export function PreferencesTab() {
   const { hiddenViews, toggleView } = useViewPrefs();
   const { clockVisible, pomodoroVisible, clockShowSeconds, toggleClockVisible, togglePomodoroVisible, setClockShowSeconds } = useWidgetPrefs();
   const { toast } = useToast();
+  const { theme: appTheme, setTheme: setAppTheme } = useAppTheme();
+  const { hasFeature } = useBilling();
 
   const [sounds, setSounds] = useState(areSoundsEnabled());
   const [exporting, setExporting] = useState(false);
+
+  const pickAppTheme = (id: AppThemeId) => {
+    const target = APP_THEMES.find((t) => t.id === id);
+    if (!target) return;
+    if (target.paid && !hasFeature("premium_themes")) {
+      openUpgrade("premium_themes");
+      return;
+    }
+    setAppTheme(id);
+  };
 
   async function handleExport() {
     setExporting(true);
@@ -35,7 +51,7 @@ export function PreferencesTab() {
   return (
     <div className="space-y-7">
       <div>
-        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Apariencia</p>
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Personalizar y temas</p>
         <div className="rounded-xl border border-line bg-surface-muted px-3.5 py-3">
           <p className="text-sm font-medium text-ink">Tema</p>
           <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">Se aplica en toda la app.</p>
@@ -49,6 +65,57 @@ export function PreferencesTab() {
             ]}
             className="mt-3"
           />
+        </div>
+
+        <div className="mt-3 rounded-xl border border-line bg-surface-muted px-3.5 py-3">
+          <p className="text-sm font-medium text-ink">Color del tema</p>
+          <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+            Personaliza los acentos de toda la app. Algunos temas requieren el plan Pro.
+          </p>
+          <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {APP_THEMES.map((t) => {
+              const active = appTheme === t.id;
+              const locked = t.paid && !hasFeature("premium_themes");
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => pickAppTheme(t.id)}
+                  aria-pressed={active}
+                  className={cn(
+                    "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
+                    active
+                      ? "border-pritio-purple/50 bg-pritio-purple/10"
+                      : "border-line hover:bg-surface-subtle",
+                  )}
+                >
+                  <span className="flex shrink-0 gap-0.5">
+                    {t.swatch.map((c) => (
+                      <span
+                        key={c}
+                        className="h-4 w-4 rounded-full ring-1 ring-black/10"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-semibold text-ink">{t.name}</span>
+                    <span className="block truncate text-[11px] text-ink-muted">{t.description}</span>
+                  </span>
+                  {locked && (
+                    <span className="shrink-0 rounded-full bg-ink/5 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+                      Pro
+                    </span>
+                  )}
+                  {active && (
+                    <span className="shrink-0 rounded-full bg-pritio-purple/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-pritio-purple">
+                      Activo
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { usePresence } from "@/features/workspaces/usePresence";
@@ -57,8 +57,6 @@ export function MemberPresenceStack({ workspaceId, profileId }: MemberPresenceSt
   const [menuPosition, setMenuPosition] = useState<{ top: number; left: number; width: number } | null>(null);
   const btnRef = useRef<HTMLButtonElement>(null);
 
-  if (members.length <= 1) return null;
-
   const visible = members.slice(0, MAX_VISIBLE);
   const extra = members.length - visible.length;
   const onlineCount = members.filter((m) => m.isOnline).length;
@@ -97,11 +95,13 @@ export function MemberPresenceStack({ workspaceId, profileId }: MemberPresenceSt
         setOpen(false);
       }
     }
-    if (isOpen) {
+    if (open) {
       document.addEventListener("mousedown", handleClickOutside);
       return () => document.removeEventListener("mousedown", handleClickOutside);
     }
-  }, [isOpen]);
+  }, [open]);
+
+  if (members.length <= 1) return null;
 
   const menuContent = (
     <div

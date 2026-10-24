@@ -15,6 +15,7 @@ import { DatePickerField } from "@/components/DatePickerField";
 import { usePopover } from "@/hooks/usePopover";
 import { onAppEvent } from "@/lib/appEvents";
 import { cn } from "@/lib/utils";
+import { todayStr } from "@/lib/utils";
 import { listDocs, linkDocToTask, type Doc } from "@/features/docs/api";
 import type { CreateTaskPayload, TaskKind, Quadrant } from "@/types";
 
@@ -22,6 +23,8 @@ export interface CreateTaskDialogOptions {
   quadrant?: Quadrant;
   kind?: TaskKind;
   title?: string;
+  /** Cuando viene de la vista "Mi día": la tarea nace ya en Mi día de hoy. */
+  myDay?: boolean;
 }
 
 const KIND_OPTIONS: Record<TaskKind, { label: string; accent: string }> = {
@@ -39,6 +42,7 @@ export function AddTaskDialog() {
   const [quadrant, setQuadrant] = useState<Quadrant>("do");
   const [date, setDate] = useState("");
   const [saving, setSaving] = useState(false);
+  const [myDay, setMyDay] = useState(false);
 
   // Notas/documentos a vincular con la tarea.
   const [docs, setDocs] = useState<Doc[]>([]);
@@ -52,6 +56,7 @@ export function AddTaskDialog() {
       setTitle(options?.title ?? "");
       setKind(options?.kind ?? "task");
       setQuadrant(options?.quadrant ?? "do");
+      setMyDay(Boolean(options?.myDay));
       setDate("");
       setLinkedDocIds([]);
       setDocSearch("");
@@ -120,6 +125,7 @@ export function AddTaskDialog() {
       kind: effectiveKind,
       inboxed: false,
       createdBy: profile.id,
+      ...(myDay ? { myDayDate: todayStr() } : {}),
       ...(date ? { startDate: date } : {}),
     };
     try {
@@ -244,6 +250,12 @@ export function AddTaskDialog() {
               className="min-w-0 flex-1"
             />
           </div>
+
+          {myDay && (
+            <p className="rounded-lg bg-pritio-purple/10 px-3 py-1.5 text-xs font-semibold text-pritio-purple">
+              Aparecerá en "Mi día" de hoy.
+            </p>
+          )}
 
           <div className="flex items-center gap-2">
             <span className="w-8 shrink-0 text-[11px] font-medium text-ink-muted">Notas</span>

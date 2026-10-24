@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { ToastProvider } from "@/components/Toast";
@@ -40,6 +40,40 @@ function AuthenticatedApp() {
   return <Outlet />;
 }
 
+const LAST_ROUTE_KEY = "pritio:lastRoute";
+
+function RootRedirect() {
+  const { user, loading: authLoading } = useAuth();
+  const { loading: wsLoading } = useWorkspace();
+  const navigate = useNavigate();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (authLoading || wsLoading || !user) return;
+    if (location.pathname !== "/") return;
+    try {
+      const last = localStorage.getItem(LAST_ROUTE_KEY);
+      if (last && last.startsWith("/") && last !== "/" && last !== "/auth" && last !== "/auth/callback") {
+        navigate(last, { replace: true });
+      } else {
+        navigate("/mi-dia", { replace: true });
+      }
+    } catch {
+      navigate("/mi-dia", { replace: true });
+    }
+  }, [authLoading, wsLoading, user, navigate, location.pathname]);
+
+  if (authLoading || wsLoading) {
+    return <LogoLoader />;
+  }
+
+  if (!user) {
+    return <AuthScreen />;
+  }
+
+  return null;
+}
+
 function Root() {
   const { user, loading: authLoading } = useAuth();
 
@@ -54,6 +88,7 @@ function Root() {
   return (
     <WorkspaceProvider>
       <BillingProvider>
+        <RootRedirect />
         <AuthenticatedApp />
         <OfflineBanner />
       </BillingProvider>
@@ -83,7 +118,7 @@ export default function App() {
                 <Route path="indicadores" element={<AppShell />} />
                 <Route path="oauth/asana/callback" element={<AsanaOAuthCallback />} />
                 <Route path=":space/:view?" element={<AppShell />} />
-                <Route path="*" element={<Navigate to="/" replace />} />
+                <Route path="*" element={<AppShell />} />
               </Route>
             </Routes>
           </AuthProvider>

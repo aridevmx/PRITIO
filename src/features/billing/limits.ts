@@ -28,6 +28,7 @@ const ROW = (
   assigneeLimit: number,
   blockedDayLimit: number,
   workspaceLimit: number,
+  subtaskLimit: number,
   meetingsPerMonth: number | null,
   eventsPerMonth: number | null,
   allowPlanView: boolean,
@@ -44,6 +45,7 @@ const ROW = (
   assigneeLimit,
   blockedDayLimit,
   workspaceLimit,
+  subtaskLimit,
   meetingsPerMonth,
   eventsPerMonth,
   allowPlanView,
@@ -54,12 +56,12 @@ const ROW = (
 });
 
 export const PLAN_LIMITS: PlanLimits[] = [
-  ROW("free", "personal", 1, 50, 3, 0, 10, 1, 5, 5, false, false, false, false, "mail"),
-  ROW("pro", "personal", 1, 300, 100, 0, 30, 1, null, null, true, true, true, true, "mail+chat"),
-  ROW("free", "family", 4, 50, 5, 5, 10, 1, 0, 5, false, false, false, false, "mail"),
-  ROW("pro", "family", 10, 300, 100, 50, 30, 1, null, null, true, true, true, true, "email+chat"),
-  ROW("free", "team", 5, 100, 5, 10, 10, 1, 5, 0, false, false, false, false, "mail"),
-  ROW("pro", "team", 50, 5000, 500, 500, 90, 1, null, null, true, true, true, true, "chat+mail+phone"),
+  ROW("free", "personal", 1, 50, 3, 0, 10, 1, 10, 5, 5, false, false, false, false, "mail"),
+  ROW("pro", "personal", 1, 300, 100, 0, 30, 1, 20, null, null, true, true, true, true, "mail+chat"),
+  ROW("free", "family", 4, 50, 5, 5, 10, 1, 10, 0, 5, false, false, false, false, "mail"),
+  ROW("pro", "family", 10, 300, 100, 50, 30, 1, 20, null, null, true, true, true, true, "email+chat"),
+  ROW("free", "team", 5, 100, 5, 10, 10, 1, 10, 5, 0, false, false, false, false, "mail"),
+  ROW("pro", "team", 50, 5000, 500, 500, 90, 1, 20, null, null, true, true, true, true, "chat+mail+phone"),
 ];
 
 export function getLimits(plan: WorkspacePlan, workspaceType: WorkspaceType): PlanLimits {
@@ -123,6 +125,7 @@ export const PLAN_RESOURCE_LABELS: Record<PlanResource, string> = {
   meetings: "Juntas",
   events: "Eventos",
   workspaces: "Workspaces",
+  premium_themes: "Temas premium",
 };
 
 /** True when the current usage already reached the plan limit (block next insert). */

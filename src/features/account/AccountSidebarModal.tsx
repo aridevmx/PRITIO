@@ -1,4 +1,4 @@
-import { useRef, useState, useEffect } from "react";
+import { useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/features/auth/AuthProvider";
@@ -12,7 +12,7 @@ import { AboutTab } from "@/features/account/AboutTab";
 import { useBilling } from "@/features/billing/BillingProvider";
 import { PLAN_LABELS, PLAN_BADGE_CLASSES } from "@/features/billing/plans";
 import { AppIcon } from "@/components/AppIcon";
-import { X, ChevronRight } from "@phosphor-icons/react";
+import { X, CaretRight } from "@phosphor-icons/react";
 
 export type TabId =
   | "identity"
@@ -159,7 +159,7 @@ export function AccountSidebarModal({ onClose, initialTab }: { onClose: () => vo
                 </svg>
               </span>
               <span className="truncate">Plan y facturación</span>
-              <AppIcon glyph={ChevronRight} className="ml-auto text-ink-muted" />
+              <AppIcon glyph={CaretRight} className="ml-auto text-ink-muted" />
             </button>
           </nav>
 

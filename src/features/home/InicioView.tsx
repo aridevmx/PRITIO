@@ -126,7 +126,7 @@ export function InicioView() {
 
   const goToSpace = useCallback(() => {
     if (!currentWorkspace) return;
-    const first = spacesForWorkspaceType(currentWorkspace.type)[0]?.key ?? "pendientes";
+    const first = spacesForWorkspaceType(currentWorkspace.type)[0]?.key ?? "personal";
     navigate(spacePath(first));
   }, [currentWorkspace, navigate]);
 

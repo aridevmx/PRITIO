@@ -8,6 +8,14 @@ import {
   getAsanaConnection,
   type ImportResult,
 } from "@/features/integrations/api";
+import {
+  getObsidianConfig,
+  saveObsidianConfig,
+  testObsidianConnection,
+  writeObsidianNote,
+  type ObsidianConfig,
+} from "@/lib/obsidianApi";
+import { cn } from "@/lib/utils";
 
 export function IntegrationsTab() {
   const { workspaces } = useWorkspace();
@@ -18,6 +26,14 @@ export function IntegrationsTab() {
   const [importing, setImporting] = useState(false);
   const [selectedWs, setSelectedWs] = useState("");
   const [result, setResult] = useState<ImportResult | null>(null);
+
+  const [obsConfig, setObsConfig] = useState<ObsidianConfig>(() => {
+    const c = getObsidianConfig();
+    return { baseUrl: c.baseUrl, apiKey: c.apiKey };
+  });
+  const [obsTesting, setObsTesting] = useState(false);
+  const [obsSending, setObsSending] = useState(false);
+  const [obsTestMsg, setObsTestMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   // Check connection on mount
   useEffect(() => {
@@ -118,6 +134,48 @@ export function IntegrationsTab() {
     }
   }
 
+  async function handleTestObsidian() {
+    setObsTesting(true);
+    setObsTestMsg(null);
+    const res = await testObsidianConnection(obsConfig);
+    setObsTesting(false);
+    setObsTestMsg(
+      res.ok
+        ? { ok: true, text: res.error ?? "Conectado — la API key es válida." }
+        : { ok: false, text: res.error ?? "No se pudo conectar con Obsidian." },
+    );
+  }
+
+  function handleSaveObsidian() {
+    saveObsidianConfig(obsConfig);
+    toast.success("Configuración de Obsidian guardada");
+  }
+
+  async function handleSendTestNote() {
+    if (!obsConfig.apiKey) {
+      toast.error("Ingresa la API key antes de enviar una nota");
+      return;
+    }
+    setObsSending(true);
+    try {
+      const today = new Date().toLocaleDateString("es-MX", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+      });
+      await writeObsidianNote(
+        obsConfig,
+        "Pritio/Hola Pritio.md",
+        `# Hola Pritio\n\nNota de prueba creada el ${today} desde la app.\n`,
+      );
+      toast.success("Nota de prueba creada en Obsidian");
+    } catch {
+      toast.error("No se pudo crear la nota en Obsidian");
+    } finally {
+      setObsSending(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-12">
@@ -211,6 +269,100 @@ export function IntegrationsTab() {
           )}
         </div>
       )}
+
+      <div>
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Obsidian (local)</p>
+        <div className="overflow-hidden rounded-xl border border-line bg-surface-muted">
+          <div className="px-3.5 py-3">
+            <div className="flex items-center gap-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-surface">
+                <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" aria-hidden>
+                  <path d="M12 3c-2.5 1-4 3-4 6v2H6a2 2 0 00-2 2v6a2 2 0 002 2h12a2 2 0 002-2v-6a2 2 0 00-2-2h-2V9c0-3-1.5-5-4-6z" fill="currentColor" className="text-pritio-purple" />
+                </svg>
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-ink">Obsidian (Local REST API)</p>
+                <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+                  Conecta tu bóveda local (solo de escritorio): escribe notas markdown y abre
+                  archivos desde Pritio. Requiere el plugin "Local REST API (with MCP)" en Obsidian.
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-3 space-y-2">
+              <label className="block">
+                <span className="text-xs font-semibold text-ink-soft">URL del servidor</span>
+                <input
+                  type="url"
+                  value={obsConfig.baseUrl}
+                  onChange={(e) => setObsConfig((prev) => ({ ...prev, baseUrl: e.target.value }))}
+                  placeholder="https://127.0.0.1:27124"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="mt-1 w-full rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none transition-colors focus:border-pritio-purple focus:ring-1 focus:ring-pritio-purple/20"
+                />
+              </label>
+              <label className="block">
+                <span className="text-xs font-semibold text-ink-soft">API key</span>
+                <input
+                  type="password"
+                  value={obsConfig.apiKey}
+                  onChange={(e) => setObsConfig((prev) => ({ ...prev, apiKey: e.target.value }))}
+                  placeholder="La muestra Obsidian en Ajustes → Local REST API"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="mt-1 w-full rounded-xl border border-line bg-surface-subtle px-3.5 py-2 text-sm text-ink outline-none transition-colors focus:border-pritio-purple focus:ring-1 focus:ring-pritio-purple/20"
+                />
+              </label>
+              <p className="text-[11px] leading-relaxed text-ink-muted">
+                Se guarda solo en este dispositivo (localStorage); nunca se sube al servidor. Si el
+                certificado autofirmado no es confiable, activa el servidor HTTP inseguro (puerto
+                27123) y úsalo como URL.
+              </p>
+            </div>
+
+            {obsTestMsg && (
+              <p
+                className={cn(
+                  "mt-3 rounded-xl px-3 py-2 text-xs font-medium",
+                  obsTestMsg.ok
+                    ? "border border-pritio-green/30 bg-pritio-green/5 text-pritio-green"
+                    : "border border-pritio-coral/30 bg-pritio-coral/5 text-pritio-coral",
+                )}
+              >
+                {obsTestMsg.text}
+              </p>
+            )}
+
+            <div className="mt-3 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleTestObsidian}
+                disabled={!obsConfig.baseUrl || obsTesting}
+                className="rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-subtle disabled:opacity-50"
+              >
+                {obsTesting ? "Probando..." : "Probar conexión"}
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveObsidian}
+                disabled={!obsConfig.baseUrl}
+                className="rounded-xl border border-line px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-surface-subtle disabled:opacity-50"
+              >
+                Guardar
+              </button>
+              <button
+                type="button"
+                onClick={handleSendTestNote}
+                disabled={obsSending || !obsConfig.apiKey}
+                className="shrink-0 rounded-xl bg-ink px-3 py-1.5 text-xs font-semibold text-white transition-opacity hover:opacity-90 disabled:opacity-40"
+              >
+                {obsSending ? "Enviando..." : "Crear nota de prueba"}
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

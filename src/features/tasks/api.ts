@@ -301,8 +301,8 @@ export async function createSubtasks(
       title: item.title,
       completed: item.completed ?? false,
       position: item.position,
-      start_date: item.startDate ?? null,
-      due_date: item.dueDate ?? null,
+      start_date: item.startDate || null,
+      due_date: item.dueDate || null,
       quadrant: item.quadrant ?? null,
     })),
   );
