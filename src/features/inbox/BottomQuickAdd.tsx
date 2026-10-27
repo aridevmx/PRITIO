@@ -2,13 +2,17 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { emitAppEvent } from "@/lib/appEvents";
 import type { CreateTaskDialogOptions } from "@/features/tasks/AddTaskDialog";
 
+interface BottomQuickAddProps {
+  onQuickAdd?: (title: string) => void;
+}
+
 /**
  * Barra de captura rápida anclada al fondo de la pantalla (solo Inbox).
  * Sin tarjeta: solo el input. Al enviar (Enter o botón) abre el modal compacto
  * (AddTaskDialog) con el título ya prellenado para terminar la tarea en un par
  * de clicks. Escribir no abre el modal: el input se queda con el foco.
  */
-export function BottomQuickAdd() {
+export function BottomQuickAdd({ onQuickAdd }: BottomQuickAddProps) {
   const [text, setText] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -26,7 +30,11 @@ export function BottomQuickAdd() {
     const title = text.trim();
     if (!title) return;
     setText("");
-    emitAppEvent<CreateTaskDialogOptions>("pritio:create-task", { title });
+    if (onQuickAdd) {
+      onQuickAdd(title);
+    } else {
+      emitAppEvent<CreateTaskDialogOptions>("pritio:create-task", { title });
+    }
   };
 
   return (

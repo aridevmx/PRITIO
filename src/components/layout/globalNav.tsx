@@ -87,6 +87,7 @@ export const GLOBAL_VIEWS: GlobalViewMeta[] = [
 export function globalViewFromPath(pathname: string): GlobalViewKey | null {
   switch (pathname) {
     case "/inbox":
+    case "/inbox/lista":
       return "inbox";
     case "/mi-dia":
       return "mi-dia";

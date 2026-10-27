@@ -3,7 +3,7 @@ import { SegmentedControl } from "@/components/SegmentedControl";
 import { useTheme, type Theme } from "@/lib/useTheme";
 import { useTimeFormat, setTimeFormat } from "@/lib/timeFormat";
 import { areSoundsEnabled, setSoundsEnabled } from "@/lib/sounds";
-import { useViewPrefs } from "@/lib/viewPrefs";
+import { useViewPrefs, useInboxViewPrefs } from "@/lib/viewPrefs";
 import { useWidgetPrefs } from "@/lib/widgetPrefs";
 import { ToggleRow } from "@/features/account/AccountToggle";
 import { useToast } from "@/components/Toast";
@@ -17,6 +17,7 @@ export function PreferencesTab() {
   const { theme, setTheme } = useTheme();
   const timeFormat = useTimeFormat();
   const { hiddenViews, toggleView } = useViewPrefs();
+  const { hiddenViews: inboxHiddenViews, toggleView: toggleInboxView } = useInboxViewPrefs();
   const { clockVisible, pomodoroVisible, clockShowSeconds, toggleClockVisible, togglePomodoroVisible, setClockShowSeconds } = useWidgetPrefs();
   const { toast } = useToast();
   const { theme: appTheme, setTheme: setAppTheme } = useAppTheme();
@@ -171,6 +172,30 @@ export function PreferencesTab() {
               Cuadrantes, Calendario e Indicadores siempre están disponibles y no se pueden ocultar.
             </p>
           </div>
+        </div>
+      </div>
+
+      <div>
+        <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Vistas en Inbox</p>
+        <div className="overflow-hidden rounded-xl border border-line divide-y divide-line bg-surface-muted">
+          <ToggleRow
+            label="Plan en Inbox"
+            description="Muestra la vista de planificación semanal dentro de Inbox."
+            checked={!inboxHiddenViews.includes("inbox-plan")}
+            onChange={() => toggleInboxView("inbox-plan")}
+          />
+          <ToggleRow
+            label="Tablero (Kanban) en Inbox"
+            description="Muestra la vista de tablero de tareas dentro de Inbox."
+            checked={!inboxHiddenViews.includes("inbox-board")}
+            onChange={() => toggleInboxView("inbox-board")}
+          />
+          <ToggleRow
+            label="Lista en Inbox"
+            description="Muestra la vista de lista con búsqueda y filtros dentro de Inbox."
+            checked={!inboxHiddenViews.includes("inbox-list")}
+            onChange={() => toggleInboxView("inbox-list")}
+          />
         </div>
       </div>
 
