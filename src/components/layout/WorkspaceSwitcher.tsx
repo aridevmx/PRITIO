@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { WorkspaceSettingsModal } from "@/components/layout/WorkspaceSettingsModal";
@@ -28,6 +29,7 @@ interface WorkspaceSwitcherProps {
 
 export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: WorkspaceSwitcherProps) {
   const { workspaces, currentWorkspace, switchWorkspace } = useWorkspace();
+  const navigate = useNavigate();
   const [settingsId, setSettingsId] = useState<string | null>(null);
 
   const grouped = TYPE_ORDER.map((type) => ({
@@ -39,6 +41,7 @@ export function WorkspaceSwitcher({ open, onClose, onCreateWorkspace }: Workspac
   const handleSelect = (id: string) => {
     switchWorkspace(id);
     onClose();
+    navigate("/inbox");
   };
 
   if (!open) return null;

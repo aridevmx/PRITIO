@@ -210,12 +210,12 @@ function SidebarPomodoro({
         </div>
       )}
 
-      <div className="mt-2 flex items-center gap-2">
+      <div className="mt-2 flex items-center gap-1">
         <button
           type="button"
           onClick={() => dispatch({ type: "skip" })}
           disabled={!!state.pendingChoice}
-          className="flex-1 rounded-lg border border-line bg-surface py-2 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
+          className="flex-1 inline-flex items-center justify-center rounded-lg border border-line bg-surface py-2 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
           title="Saltar fase"
         >
           <AppIcon glyph={SkipForward} size="sm" weight="fill" />
@@ -224,7 +224,7 @@ function SidebarPomodoro({
         <button
           type="button"
           onClick={() => dispatch({ type: "reset" })}
-          className="flex-1 rounded-lg border border-line bg-surface py-2 text-[11px] font-medium text-ink-muted hover:bg-surface-muted"
+          className="flex-1 inline-flex items-center justify-center rounded-lg border border-line bg-surface py-2 text-[11px] font-medium text-ink-muted hover:bg-surface-muted disabled:opacity-40"
           title="Reiniciar"
         >
           <AppIcon glyph={ArrowClockwise} size="sm" />

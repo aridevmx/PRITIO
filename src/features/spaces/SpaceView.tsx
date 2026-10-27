@@ -40,7 +40,7 @@ interface SpaceViewProps {
 
 export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceViewProps) {
   const meta = SPACES[space];
-  const { currentWorkspace, workspaces, members } = useWorkspace();
+  const { currentWorkspace, members } = useWorkspace();
   const { hasFeature } = useBilling();
   const { hiddenViews } = useViewPrefs();
   const { tasks, refresh, isLoading } = useTasks(
@@ -61,7 +61,6 @@ export function SpaceView({ space, view, onViewChange, calendarDate }: SpaceView
     tasks.length === 0 &&
     !isWorkspaceGuideDismissed(currentWorkspace.id);
 
-  const isPersonal = currentWorkspace?.type === "personal" || space === "personal";
   const baseTabs: ViewKey[] = ["cuadrantes", "plan", "kanban", "calendario", "docs", "indicadores"];
   const availableTabs = baseTabs
     .filter((v) => !hiddenViews.includes(v))

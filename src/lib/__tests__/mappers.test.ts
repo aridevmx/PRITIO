@@ -11,6 +11,9 @@ const row: WorkspaceRow = {
   blocked_days_require_approval: true,
   auto_promote_due_to_do: true,
   grace_until: null,
+  my_day_start_time: "06:00",
+  my_day_reset_time: "00:00",
+  my_day_timezone: "America/Mexico_City",
   created_at: "2026-01-01T00:00:00Z",
 };
 

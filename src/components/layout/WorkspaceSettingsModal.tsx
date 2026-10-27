@@ -507,6 +507,9 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
 
   const [name, setName] = useState(ws?.name ?? "");
   const [autoPromote, setAutoPromote] = useState(ws?.autoPromoteDueToDo ?? false);
+  const [myDayStartTime, setMyDayStartTime] = useState("06:00");
+  const [myDayResetTime, setMyDayResetTime] = useState("00:00");
+  const [myDayTimezone, setMyDayTimezone] = useState("America/Mexico_City");
   const [recapEnabled, setRecapEnabled] = useState(false);
   const [morningTime, setMorningTime] = useState("08:00");
   const [eveningTime, setEveningTime] = useState("18:00");
@@ -530,6 +533,9 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
     if (ws) {
       setName(ws.name);
       setAutoPromote(ws.autoPromoteDueToDo);
+      setMyDayStartTime(ws.myDayStartTime ?? "06:00");
+      setMyDayResetTime(ws.myDayResetTime ?? "00:00");
+      setMyDayTimezone(ws.myDayTimezone ?? "America/Mexico_City");
     }
   }, [ws]);
 
@@ -580,7 +586,13 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
     if (!ws) return;
     setSaving(true);
     try {
-      await apiUpdateWorkspace(ws.id, { name: name.trim() || ws.name, autoPromoteDueToDo: autoPromote });
+      await apiUpdateWorkspace(ws.id, { 
+        name: name.trim() || ws.name, 
+        autoPromoteDueToDo: autoPromote,
+        myDayStartTime,
+        myDayResetTime,
+        myDayTimezone,
+      });
       await refreshWorkspace();
       toast.success("Configuracion guardada");
     } catch {
@@ -680,9 +692,57 @@ export function WorkspaceSettingsModal({ workspaceId, onClose }: WorkspaceSettin
                       <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700">Owner</span>
                     )}
                     <span className="text-xs text-ink-muted">{memberCount} miembro{memberCount !== 1 ? "s" : ""}</span>
+</div>
                   </div>
-                </div>
-                <button
+                  
+                  <div>
+                    <p className="mb-2 text-[11px] font-bold uppercase tracking-wider text-ink-muted">Mi día</p>
+                    <div className="overflow-hidden rounded-xl border border-line divide-y divide-line bg-surface-muted">
+                      <div className="px-3.5 py-3">
+                        <p className="text-sm font-medium text-ink">Horario de inicio del día</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+                          Cuándo empieza tu día para sugerencias y planificación en Mi día.
+                        </p>
+                        <input
+                          type="time"
+                          value={myDayStartTime}
+                          onChange={(e) => setMyDayStartTime(e.target.value)}
+                          className={inputClass + " mt-3"}
+                        />
+                      </div>
+                      <div className="px-3.5 py-3">
+                        <p className="text-sm font-medium text-ink">Hora de limpieza automática</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+                          A esta hora se limpian las tareas de Mi día para empezar de nuevo.
+                        </p>
+                        <input
+                          type="time"
+                          value={myDayResetTime}
+                          onChange={(e) => setMyDayResetTime(e.target.value)}
+                          className={inputClass + " mt-3"}
+                        />
+                      </div>
+                      <div className="px-3.5 py-3">
+                        <p className="text-sm font-medium text-ink">Zona horaria</p>
+                        <p className="mt-0.5 text-xs leading-relaxed text-ink-muted">
+                          Zona horaria para calcular el inicio y fin de tu día.
+                        </p>
+                        <select
+                          value={myDayTimezone}
+                          onChange={(e) => setMyDayTimezone(e.target.value)}
+                          className={inputClass + " mt-3"}
+                        >
+                          <option value="America/Mexico_City">America/Mexico City (UTC-6)</option>
+                          <option value="America/New_York">America/New York (UTC-5)</option>
+                          <option value="America/Los_Angeles">America/Los Angeles (UTC-8)</option>
+                          <option value="America/Argentina/Buenos_Aires">America/Buenos Aires (UTC-3)</option>
+                          <option value="Europe/Madrid">Europe/Madrid (UTC+1)</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
                   onClick={onClose}
                   aria-label="Cerrar configuración"
                   className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-ink-muted hover:bg-surface-muted hover:text-ink transition-colors"

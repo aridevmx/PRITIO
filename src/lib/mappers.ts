@@ -116,6 +116,9 @@ export function mapWorkspace(row: WorkspaceRow): Workspace {
     blockedDaysRequireApproval: row.blocked_days_require_approval,
     autoPromoteDueToDo: row.auto_promote_due_to_do,
     graceUntil: row.grace_until,
+    myDayStartTime: row.my_day_start_time ?? "06:00",
+    myDayResetTime: row.my_day_reset_time ?? "00:00",
+    myDayTimezone: row.my_day_timezone ?? "America/Mexico_City",
     createdAt: row.created_at,
   };
 }

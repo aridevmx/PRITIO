@@ -80,7 +80,7 @@ export async function leaveWorkspace(id: string): Promise<void> {
 
 export async function updateWorkspace(
   id: string,
-  data: Partial<Pick<Workspace, "name" | "blockedDaysRequireApproval" | "autoPromoteDueToDo">>,
+  data: Partial<Pick<Workspace, "name" | "blockedDaysRequireApproval" | "autoPromoteDueToDo" | "myDayStartTime" | "myDayResetTime" | "myDayTimezone">>,
 ): Promise<void> {
   const payload: Record<string, unknown> = {};
   if (data.name !== undefined) payload.name = data.name;
@@ -88,6 +88,12 @@ export async function updateWorkspace(
     payload.blocked_days_require_approval = data.blockedDaysRequireApproval;
   if (data.autoPromoteDueToDo !== undefined)
     payload.auto_promote_due_to_do = data.autoPromoteDueToDo;
+  if (data.myDayStartTime !== undefined)
+    payload.my_day_start_time = data.myDayStartTime;
+  if (data.myDayResetTime !== undefined)
+    payload.my_day_reset_time = data.myDayResetTime;
+  if (data.myDayTimezone !== undefined)
+    payload.my_day_timezone = data.myDayTimezone;
 
   const { error } = await supabase
     .from("workspaces")

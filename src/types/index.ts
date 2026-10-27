@@ -96,6 +96,9 @@ export interface Workspace {
   blockedDaysRequireApproval: boolean;
   autoPromoteDueToDo: boolean;
   graceUntil: string | null;
+  myDayStartTime: string;
+  myDayResetTime: string;
+  myDayTimezone: string;
   createdAt: string;
 }
 
@@ -389,6 +392,9 @@ export interface WorkspaceRow {
   blocked_days_require_approval: boolean;
   auto_promote_due_to_do: boolean;
   grace_until: string | null;
+  my_day_start_time: string;
+  my_day_reset_time: string;
+  my_day_timezone: string;
   created_at: string;
 }
 

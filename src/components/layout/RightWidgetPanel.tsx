@@ -58,7 +58,7 @@ export function RightWidgetPanel({ open, onClose, space, onNavigateToCalendar }:
   const activeWorkspaceId = calendarScope === "all" ? null : (currentWorkspace?.id ?? null);
   const { taskDates } = useTaskDates(activeWorkspaceId, profile?.id ?? null);
 
-  const blockedEnabled = blockedDaysEnabled(space ?? "pendientes", members.length);
+  const blockedEnabled = space ? blockedDaysEnabled(space, members.length) : false;
 
   useEffect(() => {
     let cancelled = false;

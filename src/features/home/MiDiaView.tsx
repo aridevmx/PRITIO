@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from "react";
-import { cn, todayStr } from "@/lib/utils";
+import { cn } from "@/lib/utils";
 import { useTasks } from "@/features/tasks/useTasks";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { TaskCard } from "@/features/tasks/TaskCard";
@@ -16,6 +16,7 @@ import {
   type WorkspaceBlockedDay,
 } from "@/features/calendar/blockedDaysApi";
 import type { Task } from "@/types";
+import { getMiDiaToday, getMiDiaStartOfDay } from "@/features/home/miDiaSettings";
 
 export function MiDiaView() {
   const { currentWorkspace, profile, members } = useWorkspace();
@@ -33,7 +34,9 @@ export function MiDiaView() {
   const [quickAdd, setQuickAdd] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(true);
 
-  const today = todayStr();
+  const today = getMiDiaToday(currentWorkspace);
+  const startOfDay = getMiDiaStartOfDay(currentWorkspace);
+  const resetTime = currentWorkspace?.myDayResetTime ?? "00:00";
   const blockedEnabled = currentWorkspace?.type === "team" && blockedDaysEnabled("trabajo", members.length);
 
   useEffect(() => {
@@ -103,19 +106,20 @@ export function MiDiaView() {
   // fecha de hoy o que ya estaban agendadas para otro día).
   const suggestions = useMemo(() => {
     const onMyDayIds = new Set(myDayTasks.map((t) => t.id));
+    const startOfDayStr = startOfDay.toISOString().split("T")[0];
     const cands = tasks.filter(
       (t) =>
         t.kind === "task" &&
         !t.completed &&
         !onMyDayIds.has(t.id) &&
         (isOverdue(t) ||
-          t.startDate === today ||
-          t.dueDate === today ||
-          (t.startDate && t.endDate && t.startDate <= today && t.endDate >= today) ||
+          t.startDate === startOfDayStr ||
+          t.dueDate === startOfDayStr ||
+          (t.startDate && t.endDate && t.startDate <= startOfDayStr && t.endDate >= startOfDayStr) ||
           (t.myDayDate !== null && t.myDayDate !== today)),
     );
     return cands.slice(0, 8);
-  }, [tasks, myDayTasks, today]);
+  }, [tasks, myDayTasks, today, startOfDay]);
 
   const handleAddToMyDay = useCallback(
     async (task: Task) => {
@@ -169,11 +173,15 @@ export function MiDiaView() {
   const isEmpty =
     overdueTasks.length === 0 && todayTasks.length === 0 && todayMeetings.length === 0 && myDayTasks.length === 0 && blockedToday.length === 0;
 
-  const dateLabel = new Date().toLocaleDateString("es-MX", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-  });
+  const dateLabel = (() => {
+    const [y, m, d] = today.split("-").map(Number);
+    const date = new Date(y, (m ?? 1) - 1, d ?? 1);
+    return date.toLocaleDateString("es-MX", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+    });
+  })();
 
   if (isLoading) {
     return (
@@ -312,7 +320,7 @@ export function MiDiaView() {
                   {myDayTasks.length}
                 </span>
               </div>
-              <p className="mb-2 text-[11px] text-ink-muted">Se limpia a las 0:00 cada día.</p>
+              <p className="mb-2 text-[11px] text-ink-muted">Se limpia a las {resetTime} cada día.</p>
               <div className="space-y-2">
                 {myDayTasks.map((t) => (
                   <TaskCard key={t.id} task={t} onToggleComplete={handleToggleComplete} onEdit={openEdit} onDelete={setDeleteTarget} />
