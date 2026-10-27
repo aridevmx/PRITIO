@@ -10,6 +10,7 @@ import {
   ListNumbers,
   Minus,
   Quotes,
+  SquaresFour,
   Table,
   TextAlignLeft,
   TextHOne,
@@ -126,12 +127,21 @@ export const SLASH_ITEMS: SlashMenuItem[] = [
   },
   {
     id: "tabla",
-    label: "Tabla",
-    hint: "Cuadrícula 3×2",
-    keywords: ["tabla", "cuadricula", "grid", "celdas"],
+    label: "Tabla 3×3",
+    hint: "Cuadrícula con fila de cabecera",
+    keywords: ["tabla", "cuadricula", "grid", "celdas", "3x3"],
     icon: glyph(Table),
     command: ({ editor, range }) =>
-      editor.chain().focus().deleteRange(range).insertTable({ rows: 2, cols: 3, withHeaderRow: true }).run(),
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
+  },
+  {
+    id: "tabla-simple",
+    label: "Tabla simple 2×3",
+    hint: "Cuadrícula sin cabecera",
+    keywords: ["tabla", "simple", "cuadricula", "grid", "celdas", "2x3"],
+    icon: glyph(SquaresFour),
+    command: ({ editor, range }) =>
+      editor.chain().focus().deleteRange(range).insertTable({ rows: 2, cols: 3, withHeaderRow: false }).run(),
   },
   {
     id: "divisor",

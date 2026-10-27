@@ -18,20 +18,31 @@ import { Highlight } from "@tiptap/extension-highlight";
 import { Image } from "@tiptap/extension-image";
 import { NodeRange } from "@tiptap/extension-node-range";
 import DragHandle from "@tiptap/extension-drag-handle";
+import { Underline } from "@tiptap/extension-underline";
+import { Link } from "@tiptap/extension-link";
+import { HorizontalRule } from "@tiptap/extension-horizontal-rule";
 import { cn } from "@/lib/utils";
 import { AppIcon } from "@/components/AppIcon";
 import type { Icon as PhosphorIcon } from "@phosphor-icons/react";
 import {
+  ArrowsIn,
+  ArrowsOut,
+  ArrowDown,
+  ArrowLeft,
+  ArrowRight,
+  ArrowUp,
   Code,
   Eraser,
   Highlighter,
-  Link,
+  Link as LinkIconPhosphor,
   ListBullets,
   ListChecks,
   ListNumbers,
+  Minus,
   Plus,
   DotsSixVertical,
   Quotes,
+  Table as TableIcon,
   TextB,
   TextHOne,
   TextHThree,
@@ -39,6 +50,7 @@ import {
   TextItalic,
   TextStrikethrough,
   TextUnderline,
+  Trash,
 } from "@phosphor-icons/react";
 import {
   filterSlashItems,
@@ -112,8 +124,17 @@ const OrderedListIcon = toolbarIcon(ListNumbers);
 const TaskListIcon = toolbarIcon(ListChecks);
 const QuoteIcon = toolbarIcon(Quotes);
 const CodeIcon = toolbarIcon(Code);
-const LinkIcon = toolbarIcon(Link);
+const LinkIcon = toolbarIcon(LinkIconPhosphor);
 const ClearFormatIcon = toolbarIcon(Eraser);
+const RowUpIcon = toolbarIcon(ArrowUp);
+const RowDownIcon = toolbarIcon(ArrowDown);
+const ColLeftIcon = toolbarIcon(ArrowLeft);
+const ColRightIcon = toolbarIcon(ArrowRight);
+const DeleteRowColIcon = toolbarIcon(Minus);
+const HeaderRowIcon = toolbarIcon(TableIcon);
+const MergeCellsIcon = toolbarIcon(ArrowsIn);
+const SplitCellIcon = toolbarIcon(ArrowsOut);
+const DeleteTableIcon = toolbarIcon(Trash);
 
 export function RichTextEditor({
   content,
@@ -322,7 +343,21 @@ export function RichTextEditor({
     extensions: [
       StarterKit.configure({
         heading: { levels: [1, 2, 3] },
+        horizontalRule: false,
+        link: false,
+        underline: false,
       }),
+      Underline,
+      Link.configure({
+        openOnClick: false,
+        autolink: true,
+        linkOnPaste: true,
+        HTMLAttributes: {
+          rel: "noopener noreferrer",
+          target: "_blank",
+        },
+      }),
+      HorizontalRule,
       // Selección por bloques: necesaria para que el drag handle mueva bloques completos.
       NodeRange,
       Highlight.configure({ multicolor: true }),
@@ -335,7 +370,7 @@ export function RichTextEditor({
           return unstyled ? "Escribe '/' para comandos…" : placeholder;
         },
       }),
-      Table.configure({ resizable: true }),
+      Table.configure({ resizable: true, allowTableNodeSelection: true }),
       TableRow,
       TableHeader,
       TableCell,
@@ -390,6 +425,7 @@ export function RichTextEditor({
             blockquote: e.isActive("blockquote"),
             codeBlock: e.isActive("codeBlock"),
             link: e.isActive("link"),
+            isTable: e.isActive("table"),
           }
         : null,
   });
@@ -523,6 +559,67 @@ export function RichTextEditor({
           <ToolButton active={state?.orderedList} label="Lista numerada" onClick={() => editor.chain().focus().toggleOrderedList().run()}>
             {OrderedListIcon}
           </ToolButton>
+        </div>
+      )}
+
+      {/* Barra contextual de tabla — solo visible cuando el cursor está dentro */}
+      {editable && state?.isTable && (
+        <div
+          className="flex flex-wrap items-center gap-1 border-b border-line bg-pritio-blue/5 px-1.5 py-1"
+          data-table-toolbar
+        >
+          <span className="shrink-0 px-1 text-[10px] font-bold uppercase tracking-wider text-ink-muted">
+            Tabla
+          </span>
+
+          <span className="shrink-0 px-1 text-[10px] font-medium text-ink-muted">Fila</span>
+          <ToolButton label="Agregar fila arriba" onClick={() => editor.chain().focus().addRowBefore().run()}>
+            {RowUpIcon}
+          </ToolButton>
+          <ToolButton label="Agregar fila abajo" onClick={() => editor.chain().focus().addRowAfter().run()}>
+            {RowDownIcon}
+          </ToolButton>
+          <ToolButton label="Eliminar fila" onClick={() => editor.chain().focus().deleteRow().run()}>
+            {DeleteRowColIcon}
+          </ToolButton>
+
+          <span className="mx-0.5 h-5 w-px bg-line" aria-hidden="true" />
+
+          <span className="shrink-0 px-1 text-[10px] font-medium text-ink-muted">Columna</span>
+          <ToolButton label="Agregar columna a la izquierda" onClick={() => editor.chain().focus().addColumnBefore().run()}>
+            {ColLeftIcon}
+          </ToolButton>
+          <ToolButton label="Agregar columna a la derecha" onClick={() => editor.chain().focus().addColumnAfter().run()}>
+            {ColRightIcon}
+          </ToolButton>
+          <ToolButton label="Eliminar columna" onClick={() => editor.chain().focus().deleteColumn().run()}>
+            {DeleteRowColIcon}
+          </ToolButton>
+
+          <span className="mx-0.5 h-5 w-px bg-line" aria-hidden="true" />
+
+          <ToolButton label="Alternar fila de cabecera" onClick={() => editor.chain().focus().toggleHeaderRow().run()}>
+            {HeaderRowIcon}
+          </ToolButton>
+          <ToolButton label="Fusionar celdas" onClick={() => editor.chain().focus().mergeCells().run()}>
+            {MergeCellsIcon}
+          </ToolButton>
+          <ToolButton label="Dividir celda" onClick={() => editor.chain().focus().splitCell().run()}>
+            {SplitCellIcon}
+          </ToolButton>
+
+          <span className="mx-0.5 h-5 w-px bg-line" aria-hidden="true" />
+
+          <button
+            type="button"
+            title="Eliminar tabla"
+            aria-label="Eliminar tabla"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => editor.chain().focus().deleteTable().run()}
+            className="grid h-7 w-7 place-items-center rounded-md text-ink-soft transition-colors hover:bg-pritio-coral/10 hover:text-pritio-coral"
+          >
+            {DeleteTableIcon}
+          </button>
         </div>
       )}
 
