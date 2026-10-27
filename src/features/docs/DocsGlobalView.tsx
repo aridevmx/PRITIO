@@ -3,7 +3,7 @@ import { createPortal } from "react-dom";
 import { useToast } from "@/components/Toast";
 import { useWorkspace } from "@/features/workspaces/WorkspaceProvider";
 import { stripHtml } from "@/lib/utils";
-import { listDocs, createDoc, listFolders, createFolder, buildDocTree, updateDoc, deleteDoc, listTags, createTag, listTagIdsForDoc, linkDocTag, unlinkDocTag, type DocTag } from "@/features/docs/api";
+import { listDocs, createDoc, listFolders, createFolder, buildDocTree, updateDoc, deleteDoc, renameFolder, moveFolder as apiMoveFolder, deleteFolder as apiDeleteFolder, listTags, createTag, listTagIdsForDoc, linkDocTag, unlinkDocTag, type DocTag } from "@/features/docs/api";
 import { DocsTree } from "@/features/docs/DocsTree";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { ShareDialog } from "@/features/docs/ShareDialog";
@@ -95,6 +95,7 @@ export function DocsGlobalView({ workspaceIds }: DocsGlobalViewProps) {
   const pendingRef = useRef<{ title?: string; content?: string | null }>({});
   const docsRef = useRef<Doc[]>([]);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [folderToDelete, setFolderToDelete] = useState<DocFolder | null>(null);
   const [shareOpen, setShareOpen] = useState(false);
   const selectedDoc = useMemo(() => docs.find((d) => d.id === selectedId) ?? null, [docs, selectedId]);
 
@@ -458,6 +459,122 @@ const menuRef = useRef<HTMLDivElement | null>(null);
     [profile, workspaceIds],
   );
 
+  const handleRenameFolder = useCallback(
+    async (folderId: string, name: string) => {
+      const previous = folders;
+      setFolders((prev) => prev.map((f) => (f.id === folderId ? { ...f, name } : f)));
+      try {
+        await renameFolder(folderId, name);
+      } catch {
+        setFolders(previous);
+        toast.error("No se pudo renombrar la carpeta");
+      }
+    },
+    [folders, toast],
+  );
+
+  const handleMoveDoc = useCallback(
+    async (docId: string, targetFolderId: string | null) => {
+      const before = docs.find((d) => d.id === docId);
+      if (!before || before.parentFolderId === targetFolderId) return;
+      setDocs((prev) =>
+        prev.map((d) => (d.id === docId ? { ...d, parentFolderId: targetFolderId } : d)),
+      );
+      if (targetFolderId) setExpandedIds((prev) => new Set(prev).add(targetFolderId));
+      try {
+        await updateDoc(docId, { parentFolderId: targetFolderId });
+      } catch {
+        setDocs((prev) =>
+          prev.map((d) => (d.id === docId ? { ...d, parentFolderId: before.parentFolderId } : d)),
+        );
+        toast.error("No se pudo mover el documento");
+      }
+    },
+    [docs, toast],
+  );
+
+  const handleMoveFolder = useCallback(
+    async (folderId: string, targetFolderId: string | null) => {
+      if (folderId === targetFolderId) return;
+
+      // Evitar ciclos: no mover una carpeta dentro de sí misma o sus descendientes.
+      const childrenOf = new Map<string | null, DocFolder[]>();
+      for (const f of folders) {
+        const list = childrenOf.get(f.parentId) ?? [];
+        list.push(f);
+        childrenOf.set(f.parentId, list);
+      }
+      const collectDesc = (id: string, acc: Set<string>) => {
+        for (const c of childrenOf.get(id) ?? []) {
+          acc.add(c.id);
+          collectDesc(c.id, acc);
+        }
+      };
+      if (targetFolderId) {
+        const desc = new Set<string>();
+        collectDesc(folderId, desc);
+        if (desc.has(targetFolderId)) {
+          toast.error("No puedes mover una carpeta dentro de sí misma");
+          return;
+        }
+      }
+
+      const before = folders.find((f) => f.id === folderId);
+      if (!before || before.parentId === targetFolderId) return;
+      setFolders((prev) =>
+        prev.map((f) => (f.id === folderId ? { ...f, parentId: targetFolderId } : f)),
+      );
+      if (targetFolderId) setExpandedIds((prev) => new Set(prev).add(targetFolderId));
+      try {
+        await apiMoveFolder(folderId, targetFolderId);
+      } catch {
+        setFolders((prev) =>
+          prev.map((f) => (f.id === folderId ? { ...f, parentId: before.parentId } : f)),
+        );
+        toast.error("No se pudo mover la carpeta");
+      }
+    },
+    [folders, toast],
+  );
+
+  const handleDeleteFolder = useCallback(async () => {
+    if (!folderToDelete) return;
+    const doomed = folderToDelete;
+    setFolderToDelete(null);
+
+    // El borrado en la base de datos es en cascada: calculamos los descendientes
+    // para reflejarlo de inmediato en la UI.
+    const removed = new Set<string>([doomed.id]);
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const f of folders) {
+        if (f.parentId && removed.has(f.parentId) && !removed.has(f.id)) {
+          removed.add(f.id);
+          changed = true;
+        }
+      }
+    }
+
+    const previousFolders = folders;
+    const previousDocs = docs;
+    setFolders((prev) => prev.filter((f) => !removed.has(f.id)));
+    setDocs((prev) =>
+      prev.map((d) =>
+        d.parentFolderId && removed.has(d.parentFolderId) ? { ...d, parentFolderId: null } : d,
+      ),
+    );
+
+    try {
+      await apiDeleteFolder(doomed.id);
+      toast.success(`Carpeta "${doomed.name}" eliminada. Sus notas pasaron a la raíz.`);
+    } catch {
+      setFolders(previousFolders);
+      setDocs(previousDocs);
+      toast.error("No se pudo eliminar la carpeta");
+    }
+  }, [folderToDelete, folders, docs, toast]);
+
   // El "+" flotante dispara la creación de nota / carpeta desde cualquier lugar.
   useEffect(() => {
     const onCreateDoc = () => void handleCreate(null);
@@ -557,10 +674,12 @@ const menuRef = useRef<HTMLDivElement | null>(null);
                 onSelectDoc={handleSelectDoc}
                 onCreateNote={(fid) => handleCreate(fid)}
                 onCreateFolder={(pid) => handleCreateFolder(pid)}
-                onRenameFolder={() => {}}
-                onDeleteFolder={() => {}}
-                onMoveDoc={() => {}}
-                onMoveFolder={() => {}}
+                onRenameFolder={(id, name) => void handleRenameFolder(id, name)}
+                onDeleteFolder={(id) =>
+                  setFolderToDelete(folders.find((f) => f.id === id) ?? null)
+                }
+                onMoveDoc={(docId, fid) => void handleMoveDoc(docId, fid)}
+                onMoveFolder={(folderId, targetId) => void handleMoveFolder(folderId, targetId)}
               />
             )}
           </div>
@@ -779,6 +898,16 @@ const menuRef = useRef<HTMLDivElement | null>(null);
         onClose={() => setConfirmDelete(false)}
         title="Eliminar nota"
         description="¿Eliminar esta nota? Esta acción no se puede deshacer."
+        confirmLabel="Eliminar"
+        variant="danger"
+      />
+
+      <ConfirmDialog
+        open={!!folderToDelete}
+        onConfirm={() => void handleDeleteFolder()}
+        onClose={() => setFolderToDelete(null)}
+        title="Eliminar carpeta"
+        description={`¿Eliminar "${folderToDelete?.name ?? ""}"? Las notas dentro pasarán a la raíz y las subcarpetas también se eliminarán.`}
         confirmLabel="Eliminar"
         variant="danger"
       />
